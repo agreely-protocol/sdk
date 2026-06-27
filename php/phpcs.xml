@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<ruleset name="agreely-sdk">
+    <description>PSR-12 for the Agreely PHP SDK.</description>
+
+    <file>src</file>
+    <file>test</file>
+
+    <arg name="colors"/>
+    <arg value="p"/>
+
+    <rule ref="PSR12"/>
+
+    <!-- Soft line-length only; test fixtures inline JSON. No hard cap. -->
+    <rule ref="Generic.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="200"/>
+            <property name="absoluteLineLimit" value="0"/>
+        </properties>
+    </rule>
+</ruleset>
