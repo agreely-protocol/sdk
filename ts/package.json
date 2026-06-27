@@ -1,0 +1,46 @@
+{
+  "name": "@agreely/sdk",
+  "version": "0.1.0",
+  "description": "The thin, typed TypeScript/Node client for the Agreely /v1 consent API — a one-call consent gate with fail-closed-by-default outage handling.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run test/unit",
+    "test:unit": "vitest run test/unit",
+    "test:contract": "vitest run test/contract",
+    "test:all": "vitest run",
+    "test:watch": "vitest"
+  },
+  "optionalDependencies": {
+    "undici": "^6.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "eslint": "^9.17.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  }
+}
