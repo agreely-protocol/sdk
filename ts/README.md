@@ -91,10 +91,12 @@ Every failure is an `AgreelyError` subclass — a **deny is not an error**.
 ```ts
 import { AgreelyRateLimitError } from "@agreely/sdk";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 try {
   await agreely.check(id, cat, pur);
 } catch (e) {
-  if (e instanceof AgreelyRateLimitError) await sleep(e.retryAfter! * 1000);
+  if (e instanceof AgreelyRateLimitError) await sleep((e.retryAfter ?? 1) * 1000);
   else throw e;
 }
 ```
@@ -148,6 +150,28 @@ agreely.breakGlass.disengage();
 Break-glass auto-expires, requires a `reason` (engaging without one throws), and
 is independent of the config allow-list. Engage / disengage / expiry are audited
 via the `onBreakGlass` callback.
+
+Every **break-glass-authorized allow** also emits a per-decision `onBreakGlass`
+event `{ action: "authorized", customerId, category, purpose, reason, error, at }`
+— for *every* such allow, even with **no** `degradeOnOutage` config — so the
+evidence trail shows every access permitted inside a break-glass window, not just
+the engage/expire bookends.
+
+### Bounding the window
+
+Both a break-glass `ttl` and `degradeOnOutage.maxOutageWindow` are capped at
+**24h** by default. A value over the cap (e.g. `ttl: "9999h"`) throws
+`AgreelyConfigError` rather than opening an effectively-unbounded fail-open
+window. Raise (or lower) the cap per client:
+
+```ts
+new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
+```
+
+> Heads-up: a per-call `{ onOutage: "allow" }` that is **not** backed by a
+> matching `degradeOnOutage.categories` entry has no effect — the check still
+> **denies**. The SDK logs a one-time dev warning when this happens; silence it
+> with the `AGREELY_SILENCE_WARNINGS` env var.
 
 ## Notes
 
