@@ -1,0 +1,73 @@
+{
+  "description": "Shared cross-SDK golden vectors for the Agreely /v1 contract. The TS SDK (P3-M2) and the PHP SDK (P3-M4) both seed the fixture via scripts/sdk-contract-seed.php and assert these request -> expected outcomes against the LIVE API, so neither SDK drifts from the contract (openapi.yaml). Category/purpose are sent RAW; the server normalizes (the casing/whitespace variants below MUST resolve to the same record). `subject` selects the seeded customer: \"active\" -> fixture.subject, \"absent\" -> fixture.absent.",
+  "checks": [
+    {
+      "name": "active grant allows",
+      "subject": "active",
+      "category": "Email Address",
+      "purpose": "Marketing Outreach",
+      "expect": { "decision": "allow", "status": "active", "consentRefPresent": true }
+    },
+    {
+      "name": "normalization: lowercase + extra whitespace still allows",
+      "subject": "active",
+      "category": "  email   ADDRESS ",
+      "purpose": "marketing outreach",
+      "expect": { "decision": "allow", "status": "active", "consentRefPresent": true }
+    },
+    {
+      "name": "normalization: tab whitespace still allows",
+      "subject": "active",
+      "category": "Email\tAddress",
+      "purpose": "Marketing\tOutreach",
+      "expect": { "decision": "allow", "status": "active", "consentRefPresent": true }
+    },
+    {
+      "name": "no record denies with status none and no consentRef",
+      "subject": "absent",
+      "category": "Email Address",
+      "purpose": "Marketing Outreach",
+      "expect": { "decision": "deny", "status": "none", "consentRefPresent": false }
+    },
+    {
+      "name": "revoked grant denies",
+      "subject": "active",
+      "category": "Postal Address",
+      "purpose": "Shipping",
+      "expect": { "decision": "deny", "status": "revoked", "consentRefPresent": true }
+    },
+    {
+      "name": "expired grant denies",
+      "subject": "active",
+      "category": "Location Data",
+      "purpose": "Analytics",
+      "expect": { "decision": "deny", "status": "expired", "consentRefPresent": true }
+    }
+  ],
+  "errors": [
+    {
+      "name": "missing purpose is a 422 invalid_request naming the field",
+      "scope": "check",
+      "method": "POST",
+      "path": "/v1/check",
+      "body": { "customerId": "anyone", "category": "Email Address" },
+      "expect": { "status": 422, "code": "invalid_request", "field": "purpose" }
+    },
+    {
+      "name": "an issue-only key cannot check (403 forbidden)",
+      "scope": "issue",
+      "method": "POST",
+      "path": "/v1/check",
+      "body": { "customerId": "anyone", "category": "Email Address", "purpose": "Marketing Outreach" },
+      "expect": { "status": 403, "code": "forbidden" }
+    },
+    {
+      "name": "a bad bearer key is 401 unauthorized",
+      "scope": "bad",
+      "method": "POST",
+      "path": "/v1/check",
+      "body": { "customerId": "anyone", "category": "Email Address", "purpose": "Marketing Outreach" },
+      "expect": { "status": 401, "code": "unauthorized" }
+    }
+  ]
+}
