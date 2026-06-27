@@ -1,0 +1,241 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
+import {
+  Agreely,
+  AgreelyAuthError,
+  AgreelyValidationError,
+  type CheckResult,
+} from "../../src/index.js";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(here, "../../..");
+const fixturePath = resolve(here, "fixture.json");
+const goldenPath = resolve(here, "../golden/vectors.json");
+
+interface Fixture {
+  baseUrl: string;
+  keys: { check: string; issue: string; both: string; otherTenantCheck: string };
+  subject: string;
+  absent: string;
+  revocable: { category: string; purpose: string; consentRef: string };
+  issue: {
+    catalogId: string;
+    category: string;
+    purpose: string;
+    recipientEmail: string;
+    validUntil: string;
+  };
+}
+
+interface Golden {
+  checks: Array<{
+    name: string;
+    subject: "active" | "absent";
+    category: string;
+    purpose: string;
+    expect: { decision: string; status: string; consentRefPresent: boolean };
+  }>;
+  errors: Array<{
+    name: string;
+    scope: "check" | "issue" | "bad";
+    method: string;
+    path: string;
+    body: Record<string, unknown>;
+    expect: { status: number; code: string; field?: string };
+  }>;
+}
+
+const hasFixture = existsSync(fixturePath);
+const fixture: Fixture | null = hasFixture
+  ? (JSON.parse(readFileSync(fixturePath, "utf8")) as Fixture)
+  : null;
+const golden = JSON.parse(readFileSync(goldenPath, "utf8")) as Golden;
+
+const REQUEST_ID = /^0x[0-9a-f]{64}$/;
+const CONSENT_REF = /^0x[0-9a-f]+$/;
+
+/** Assert an object has exactly the contract's keys (openapi additionalProperties:false). */
+function assertExactKeys(obj: Record<string, unknown>, required: string[], optional: string[] = []) {
+  for (const key of required) expect(obj, `missing required key ${key}`).toHaveProperty(key);
+  const allowed = new Set([...required, ...optional]);
+  for (const key of Object.keys(obj)) {
+    expect(allowed.has(key), `unexpected key "${key}" (not in openapi contract)`).toBe(true);
+  }
+}
+
+// The suite is gated on a seeded fixture: `make sdk-contract` (or the seed step)
+// writes test/contract/fixture.json from the LIVE api. Without it (CI without the
+// stack), the suite skips cleanly rather than failing.
+const suite = hasFixture ? describe : describe.skip;
+
+suite("contract: @agreely/sdk vs the live /v1 API", () => {
+  let agreely: Agreely;
+
+  beforeAll(() => {
+    agreely = new Agreely({ apiKey: fixture!.keys.check, baseUrl: fixture!.baseUrl });
+  });
+
+  describe("golden vector checks (shared with the PHP SDK)", () => {
+    for (const vec of golden.checks) {
+      it(vec.name, async () => {
+        const customerId = vec.subject === "active" ? fixture!.subject : fixture!.absent;
+        const r: CheckResult = await agreely.checkDetailed(customerId, vec.category, vec.purpose);
+        // Shape vs openapi CheckDecision.
+        assertExactKeys(
+          r as unknown as Record<string, unknown>,
+          ["decision", "status", "checkedAt"],
+          ["consentRef"],
+        );
+        expect(r.decision).toBe(vec.expect.decision);
+        expect(r.status).toBe(vec.expect.status);
+        if (vec.expect.consentRefPresent) {
+          expect(r.consentRef).toMatch(CONSENT_REF);
+        } else {
+          expect(r.consentRef).toBeUndefined();
+        }
+        // The boolean gate agrees with the decision.
+        expect(await agreely.check(customerId, vec.category, vec.purpose)).toBe(
+          vec.expect.decision === "allow",
+        );
+      });
+    }
+  });
+
+  describe("golden error vectors", () => {
+    for (const vec of golden.errors) {
+      it(vec.name, async () => {
+        const token =
+          vec.scope === "bad" ? "agr_live_" + "z".repeat(43) : fixture!.keys[vec.scope];
+        const res = await fetch(fixture!.baseUrl + vec.path, {
+          method: vec.method,
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify(vec.body),
+        });
+        expect(res.status).toBe(vec.expect.status);
+        const body = (await res.json()) as { error: { code: string; message: string; field?: string } };
+        // openapi Error envelope: { error: { code, message, field? } }, no extras.
+        assertExactKeys(body as unknown as Record<string, unknown>, ["error"]);
+        assertExactKeys(body.error as unknown as Record<string, unknown>, ["code", "message"], ["field"]);
+        expect(body.error.code).toBe(vec.expect.code);
+        if (vec.expect.field) expect(body.error.field).toBe(vec.expect.field);
+      });
+    }
+  });
+
+  describe("typed errors map from the live API", () => {
+    it("an issue-only key throws AgreelyAuthError (forbidden) from check", async () => {
+      const issueClient = new Agreely({ apiKey: fixture!.keys.issue, baseUrl: fixture!.baseUrl });
+      await expect(issueClient.checkDetailed(fixture!.subject, "Email Address", "Marketing Outreach"))
+        .rejects.toMatchObject({ name: "AgreelyAuthError", code: "forbidden", status: 403 });
+    });
+
+    it("a bad key throws AgreelyAuthError (401)", async () => {
+      const bad = new Agreely({ apiKey: "agr_live_" + "z".repeat(43), baseUrl: fixture!.baseUrl });
+      await expect(bad.catalog.list()).rejects.toBeInstanceOf(AgreelyAuthError);
+    });
+
+    it("an empty purpose throws AgreelyValidationError naming the field", async () => {
+      await expect(agreely.checkDetailed(fixture!.subject, "Email Address", ""))
+        .rejects.toMatchObject({ name: "AgreelyValidationError", field: "purpose" });
+      await expect(agreely.checkDetailed(fixture!.subject, "Email Address", "")).rejects.toBeInstanceOf(
+        AgreelyValidationError,
+      );
+    });
+  });
+
+  describe("revoke-then-check: instant deny, no chain wait (§17.9)", () => {
+    it("allows, then denies on the very next call after an out-of-band revoke", async () => {
+      const { category, purpose, consentRef } = fixture!.revocable;
+      expect(await agreely.check(fixture!.subject, category, purpose)).toBe(true);
+
+      // Flip the enforcement record out-of-band (the M5 revoke path), in-container.
+      execFileSync(
+        "docker",
+        ["compose", "exec", "-T", "api", "php", "scripts/sdk-contract-seed.php", "revoke", consentRef],
+        { cwd: repoRoot, stdio: "pipe" },
+      );
+
+      const after = await agreely.checkDetailed(fixture!.subject, category, purpose);
+      expect(after.decision).toBe("deny");
+      expect(after.status).toBe("revoked");
+    });
+  });
+
+  describe("tenant isolation", () => {
+    it("another tenant's key cannot read this company's grant", async () => {
+      const other = new Agreely({ apiKey: fixture!.keys.otherTenantCheck, baseUrl: fixture!.baseUrl });
+      const r = await other.checkDetailed(fixture!.subject, "Email Address", "Marketing Outreach");
+      // A granted this (subject, labels); B did not. A leak would show allow.
+      expect(r.decision).toBe("deny");
+      expect(r.status).toBe("none");
+    });
+  });
+
+  describe("catalog discovery", () => {
+    it("lists the company's active catalog (shape vs openapi CatalogEntry)", async () => {
+      const both = new Agreely({ apiKey: fixture!.keys.both, baseUrl: fixture!.baseUrl });
+      const entries = await both.catalog.list();
+      expect(entries.length).toBeGreaterThan(0);
+      for (const e of entries) {
+        assertExactKeys(e as unknown as Record<string, unknown>, ["id", "category", "purpose", "description"]);
+      }
+      expect(entries.some((e) => e.id === fixture!.issue.catalogId)).toBe(true);
+    });
+  });
+
+  describe("issuance + idempotency replay (no double-issue)", () => {
+    it("creates a request, then replays it byte-for-byte under the same Idempotency-Key", async () => {
+      const issuer = new Agreely({ apiKey: fixture!.keys.issue, baseUrl: fixture!.baseUrl });
+      const input = {
+        customerId: fixture!.subject,
+        recipientEmail: fixture!.issue.recipientEmail,
+        items: [fixture!.issue.catalogId],
+        validUntil: fixture!.issue.validUntil,
+      };
+      const key = "sdk-contract-" + Math.random().toString(36).slice(2);
+
+      const first = await issuer.consentRequests.create(input, { idempotencyKey: key });
+      assertExactKeys(
+        first as unknown as Record<string, unknown>,
+        ["requestId", "status", "deepLink", "emailDelivered", "items"],
+      );
+      expect(first.requestId).toMatch(REQUEST_ID);
+      expect(first.status).toBe("pending");
+
+      const replay = await issuer.consentRequests.create(input, { idempotencyKey: key });
+      expect(replay.requestId).toBe(first.requestId); // same handle, nothing new issued
+
+      // get() by the PROTOCOL requestId (not a uuid).
+      const got = await issuer.consentRequests.get(first.requestId);
+      expect(got.requestId).toBe(first.requestId);
+      assertExactKeys(
+        got as unknown as Record<string, unknown>,
+        ["requestId", "status", "validUntil", "expiresAt", "createdAt", "settledAt", "items"],
+      );
+
+      // list() surfaces it; the page maps the wire `requests` field to `items`.
+      const page = await issuer.consentRequests.list({ status: "pending" });
+      expect(page).toHaveProperty("items");
+      expect(page).toHaveProperty("nextCursor");
+      expect(page.items.some((r) => r.requestId === first.requestId)).toBe(true);
+    });
+
+    it("resolves a {category,purpose} pair item server-side", async () => {
+      const issuer = new Agreely({ apiKey: fixture!.keys.issue, baseUrl: fixture!.baseUrl });
+      const created = await issuer.consentRequests.create({
+        customerId: fixture!.subject,
+        recipientEmail: fixture!.issue.recipientEmail,
+        items: [{ category: fixture!.issue.category, purpose: fixture!.issue.purpose }],
+        validUntil: fixture!.issue.validUntil,
+      });
+      expect(created.requestId).toMatch(REQUEST_ID);
+      expect(created.items[0]).toMatchObject({
+        category: fixture!.issue.category,
+        purpose: fixture!.issue.purpose,
+      });
+    });
+  });
+});
