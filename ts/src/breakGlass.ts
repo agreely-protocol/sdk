@@ -1,6 +1,10 @@
 import { AgreelyConfigError } from "./errors.js";
 import type { BreakGlassEngageInput, BreakGlassEvent } from "./types.js";
-import { localPolicyKey, parseDuration } from "./util.js";
+import {
+  DEFAULT_MAX_DEGRADE_WINDOW_MS,
+  localPolicyKey,
+  parseDurationCapped,
+} from "./util.js";
 
 interface EngagedState {
   reason: string;
@@ -17,7 +21,10 @@ interface EngagedState {
 export class BreakGlass {
   private state: EngagedState | null = null;
 
-  constructor(private readonly audit: (event: BreakGlassEvent) => void) {}
+  constructor(
+    private readonly audit: (event: BreakGlassEvent) => void,
+    private readonly maxTtlMs: number = DEFAULT_MAX_DEGRADE_WINDOW_MS,
+  ) {}
 
   /** Engage break-glass. Reason is mandatory; without it this throws. */
   engage(input: BreakGlassEngageInput): void {
@@ -25,7 +32,8 @@ export class BreakGlass {
     if (!reason) {
       throw new AgreelyConfigError("breakGlass.engage requires a non-empty reason.");
     }
-    const ttlMs = parseDuration(input.ttl);
+    // Refuse an effectively-unbounded window (e.g. "9999h"): cap the ttl.
+    const ttlMs = parseDurationCapped(input.ttl, this.maxTtlMs, "breakGlass.engage ttl");
     const expiresAt = Date.now() + ttlMs;
     this.state = {
       reason,
@@ -39,6 +47,31 @@ export class BreakGlass {
       ttl: input.ttl,
       at: new Date().toISOString(),
       expiresAt: new Date(expiresAt).toISOString(),
+    });
+  }
+
+  /**
+   * Emit a PER-DECISION audit record for a single break-glass-authorized allow.
+   * Called by the degrade policy on every break-glass allow during an outage, so
+   * the evidence trail records every access (not just engage/disengage/expire) —
+   * regardless of whether `degradeOnOutage`/`onDegrade` is configured.
+   */
+  recordAuthorized(record: {
+    customerId: string;
+    category: string;
+    purpose: string;
+    reason: string;
+    error: Error;
+    at: string;
+  }): void {
+    this.audit({
+      action: "authorized",
+      reason: record.reason,
+      customerId: record.customerId,
+      category: record.category,
+      purpose: record.purpose,
+      error: record.error,
+      at: record.at,
     });
   }
 

@@ -6,7 +6,11 @@ import type {
   DegradeMode,
   DegradeOnOutageConfig,
 } from "./types.js";
-import { localPolicyKey, parseDuration } from "./util.js";
+import {
+  DEFAULT_MAX_DEGRADE_WINDOW_MS,
+  localPolicyKey,
+  parseDurationCapped,
+} from "./util.js";
 
 export interface OutageInput {
   customerId: string;
@@ -42,10 +46,13 @@ export class DegradePolicy {
   private readonly allowList: Set<string>;
   private readonly maxOutageWindowMs: number | undefined;
   private outageStartedAt: number | null = null;
+  /** One-time guard so an ineffective-opt-in warning doesn't spam the logs. */
+  private warnedIneffectiveOptIn = false;
 
   constructor(
     config: DegradeOnOutageConfig | undefined,
     private readonly breakGlass: BreakGlass,
+    private readonly maxWindowMs: number = DEFAULT_MAX_DEGRADE_WINDOW_MS,
   ) {
     if (config) {
       if (config.mode !== "fail-open") {
@@ -58,7 +65,12 @@ export class DegradePolicy {
           "degradeOnOutage.onDegrade is mandatory when mode is \"fail-open\".",
         );
       }
-      this.maxOutageWindowMs = parseDuration(config.maxOutageWindow);
+      // Cap the window (refuse an unbounded "9999h" fail-open window).
+      this.maxOutageWindowMs = parseDurationCapped(
+        config.maxOutageWindow,
+        this.maxWindowMs,
+        "degradeOnOutage.maxOutageWindow",
+      );
       this.allowList = new Set((config.categories ?? []).map(localPolicyKey));
     } else {
       this.allowList = new Set();
@@ -83,6 +95,18 @@ export class DegradePolicy {
     // Gate 3: break-glass (independent operator override, own scope + ttl).
     const bgReason = this.breakGlass.reasonFor(input.category);
     if (bgReason !== null) {
+      // ALWAYS record a per-decision audit for a break-glass allow — even with no
+      // degradeOnOutage config there must be an evidence trail of every access
+      // allowed inside the break-glass window (compliance invariant).
+      this.breakGlass.recordAuthorized({
+        customerId: input.customerId,
+        category: input.category,
+        purpose: input.purpose,
+        reason: bgReason,
+        error: input.error,
+        at: new Date().toISOString(),
+      });
+      // Also surface through onDegrade when a config sink is present.
       this.emit(input, "break-glass", true, bgReason);
       return { allow: true, mode: "break-glass" };
     }
@@ -103,15 +127,39 @@ export class DegradePolicy {
       return { allow: true, mode: "fail-open" };
     }
 
+    // A per-call opt-in that reached here had NO effect (the category is not in
+    // the config allow-list, or no degradeOnOutage config exists). It STILL
+    // denies (safety unchanged), but the silent no-op is a footgun — warn once.
+    if (optedIn) this.warnIneffectiveOptIn(input.category);
+
     // Default: fail closed.
     return { allow: false };
   }
 
+  /**
+   * Dev-mode, fire-once warning that a per-call `onOutage:"allow"` was ignored
+   * and the check was denied. Gated to one emission per policy instance and
+   * silenceable via the `AGREELY_SILENCE_WARNINGS` env var. Never weakens safety.
+   */
+  private warnIneffectiveOptIn(category: string): void {
+    if (this.warnedIneffectiveOptIn) return;
+    const env = typeof process !== "undefined" ? process.env : undefined;
+    if (env?.AGREELY_SILENCE_WARNINGS) return;
+    this.warnedIneffectiveOptIn = true;
+    console.warn(
+      `[agreely] onOutage:"allow" had no effect for category "${category}" — the check was DENIED. ` +
+        `A per-call fail-open is effective ONLY when the category is also listed in ` +
+        `degradeOnOutage.categories (and degradeOnOutage is configured). Add the category to ` +
+        `the allow-list, or engage break-glass for an ad-hoc override. ` +
+        `(Warns once per client; set AGREELY_SILENCE_WARNINGS to silence.)`,
+    );
+  }
+
   private emit(input: OutageInput, mode: DegradeMode, breakGlass: boolean, reason?: string): void {
     if (!this.config) {
-      // A break-glass allow with no config still needs an evidence trail, but
-      // there is no onDegrade sink. Nothing to emit to; the break-glass audit
-      // (engage/disengage) already recorded the operator action.
+      // No onDegrade sink. A break-glass allow's per-decision evidence is already
+      // recorded via breakGlass.recordAuthorized (onBreakGlass), so the audit
+      // trail is complete even without a degradeOnOutage config.
       return;
     }
     const ctx: DegradeContext = {

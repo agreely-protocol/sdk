@@ -31,6 +31,39 @@ export function localPolicyKey(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+/**
+ * Default upper bound for an open degrade window — both a break-glass `ttl` and
+ * a `degradeOnOutage.maxOutageWindow`. 24h. An accountability product must not
+ * let an operator open an effectively-unbounded fail-open window ("9999h"); the
+ * cap is overridable per-client via the `maxDegradeWindow` option.
+ */
+export const DEFAULT_MAX_DEGRADE_WINDOW_MS = 24 * 3_600_000;
+
+/** Render a millisecond count back to a compact duration string for messages. */
+function formatDuration(ms: number): string {
+  if (ms % 3_600_000 === 0) return `${ms / 3_600_000}h`;
+  if (ms % 60_000 === 0) return `${ms / 60_000}m`;
+  if (ms % 1000 === 0) return `${ms / 1000}s`;
+  return `${ms}ms`;
+}
+
+/**
+ * Parse a duration AND enforce an upper bound. Throws AgreelyConfigError when the
+ * value exceeds `maxMs`. An unbounded degrade / break-glass window is itself a
+ * compliance risk, so the SDK refuses it at construction / engage time rather
+ * than mid-outage. `label` names the offending field for the message.
+ */
+export function parseDurationCapped(input: string, maxMs: number, label: string): number {
+  const ms = parseDuration(input);
+  if (ms > maxMs) {
+    throw new AgreelyConfigError(
+      `${label} "${input}" exceeds the maximum allowed window (${formatDuration(maxMs)}). ` +
+        `Lower it, or raise the cap via the client \`maxDegradeWindow\` option.`,
+    );
+  }
+  return ms;
+}
+
 /** Sleep for ms (used for jittered retry backoff). */
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

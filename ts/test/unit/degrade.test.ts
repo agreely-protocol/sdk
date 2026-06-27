@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Agreely, AgreelyConfigError, AgreelyUnavailableError } from "../../src/index.js";
-import type { DegradeContext } from "../../src/index.js";
+import type { BreakGlassEvent, DegradeContext } from "../../src/index.js";
 import { mockFetch } from "./helpers.js";
 
 const BASE = "http://api.test";
@@ -208,5 +208,121 @@ describe("break-glass (gate 3, independent operator override)", () => {
     const { agreely } = bgClient(outageScript());
     agreely.breakGlass.engage({ reason: "incident", ttl: "30m" }); // no scope = all
     expect(await agreely.check("c", "Some Sensitive Cat", "p")).toBe(true);
+  });
+});
+
+describe("break-glass per-decision audit (compliance evidence, QA #1)", () => {
+  it("a break-glass allow with NO degradeOnOutage config STILL emits a per-decision audit record", async () => {
+    const onBreakGlass = vi.fn();
+    const { fetch } = mockFetch(outageScript());
+    // No degradeOnOutage config at all — only onBreakGlass.
+    const agreely = new Agreely({ apiKey: "k", baseUrl: BASE, fetch, onBreakGlass });
+    agreely.breakGlass.engage({ reason: "incident-99", ttl: "30m", scope: ["Browsing/usage"] });
+
+    const ok = await agreely.check("cust_42", "Browsing/usage", "Analytics");
+    expect(ok).toBe(true);
+
+    // The invariant: every break-glass-authorized allow leaves an evidence trail.
+    const authorized = onBreakGlass.mock.calls
+      .map((c) => c[0] as BreakGlassEvent)
+      .find((e) => e.action === "authorized");
+    expect(authorized).toBeDefined();
+    expect(authorized).toMatchObject({
+      action: "authorized",
+      customerId: "cust_42",
+      category: "Browsing/usage",
+      purpose: "Analytics",
+      reason: "incident-99",
+    });
+    expect(authorized!.error).toBeInstanceOf(AgreelyUnavailableError);
+    expect(authorized!.at).toBeTruthy();
+  });
+
+  it("also fires onBreakGlass 'authorized' when a config IS present (alongside onDegrade)", async () => {
+    const onBreakGlass = vi.fn();
+    const onDegrade = vi.fn();
+    const { fetch } = mockFetch(outageScript());
+    const agreely = new Agreely({
+      apiKey: "k",
+      baseUrl: BASE,
+      fetch,
+      onBreakGlass,
+      degradeOnOutage: { mode: "fail-open", categories: [], maxOutageWindow: "1h", onDegrade },
+    });
+    agreely.breakGlass.engage({ reason: "incident-77", ttl: "30m" });
+    expect(await agreely.check("c", "X", "p")).toBe(true);
+
+    expect(
+      onBreakGlass.mock.calls.some((c) => (c[0] as BreakGlassEvent).action === "authorized"),
+    ).toBe(true);
+    expect(onDegrade).toHaveBeenCalledTimes(1); // onDegrade still fires too
+  });
+});
+
+describe("upper-bound cap on degrade windows (QA #2)", () => {
+  it("rejects a break-glass ttl over the 24h default cap", async () => {
+    const agreely = new Agreely({ apiKey: "k", baseUrl: BASE, fetch: mockFetch([DOWN]).fetch });
+    expect(() => agreely.breakGlass.engage({ reason: "x", ttl: "9999h" })).toThrow(
+      AgreelyConfigError,
+    );
+  });
+
+  it("rejects a degradeOnOutage.maxOutageWindow over the 24h default cap at construction", () => {
+    expect(
+      () =>
+        new Agreely({
+          apiKey: "k",
+          baseUrl: BASE,
+          fetch: mockFetch([DOWN]).fetch,
+          degradeOnOutage: {
+            mode: "fail-open",
+            categories: ["x"],
+            maxOutageWindow: "9999h",
+            onDegrade: vi.fn(),
+          },
+        }),
+    ).toThrow(AgreelyConfigError);
+  });
+
+  it("accepts a ttl up to the cap, and the cap is overridable via maxDegradeWindow", async () => {
+    // Default cap would reject "48h"; raising the cap to 72h accepts it.
+    const agreely = new Agreely({
+      apiKey: "k",
+      baseUrl: BASE,
+      fetch: mockFetch([DOWN]).fetch,
+      maxDegradeWindow: "72h",
+    });
+    expect(() => agreely.breakGlass.engage({ reason: "x", ttl: "48h" })).not.toThrow();
+    // ...but still rejects beyond the raised cap.
+    expect(() => agreely.breakGlass.engage({ reason: "x", ttl: "999h" })).toThrow(
+      AgreelyConfigError,
+    );
+  });
+});
+
+describe("ineffective onOutage:'allow' dev warning (QA #3)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("warns exactly once and STILL denies when the opt-in has no effect", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetch } = mockFetch([DOWN]); // every call is an outage
+    // No config: the per-call opt-in can never take effect.
+    const agreely = new Agreely({ apiKey: "k", baseUrl: BASE, fetch });
+
+    expect(await agreely.check("c", "Browsing/usage", "Analytics", { onOutage: "allow" })).toBe(false);
+    expect(await agreely.check("c", "Browsing/usage", "Analytics", { onOutage: "allow" })).toBe(false);
+
+    expect(warn).toHaveBeenCalledTimes(1); // fire-once, no spam
+    expect(String(warn.mock.calls[0]![0])).toContain('onOutage:"allow" had no effect');
+  });
+
+  it("is silenced by AGREELY_SILENCE_WARNINGS", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubEnv("AGREELY_SILENCE_WARNINGS", "1");
+    const { fetch } = mockFetch([DOWN]);
+    const agreely = new Agreely({ apiKey: "k", baseUrl: BASE, fetch });
+    expect(await agreely.check("c", "Browsing/usage", "Analytics", { onOutage: "allow" })).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 });

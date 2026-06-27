@@ -149,14 +149,31 @@ export interface DegradeOnOutageConfig {
   onDegrade: (ctx: DegradeContext) => void;
 }
 
-/** An auditable break-glass lifecycle event (engage / disengage). */
+/**
+ * An auditable break-glass event.
+ *
+ *   "engage" / "disengage" / "expire" — lifecycle of the operator lever.
+ *   "authorized" — a PER-DECISION record: a single break-glass-authorized allow
+ *     that happened during an outage. Emitted for EVERY such allow, regardless of
+ *     whether `degradeOnOutage` is configured, so the evidence trail can show
+ *     every access allowed inside a break-glass window (not just engage/expire).
+ *     Carries the customer/category/purpose/error of the specific decision.
+ */
 export interface BreakGlassEvent {
-  action: "engage" | "disengage" | "expire";
+  action: "engage" | "disengage" | "expire" | "authorized";
   reason?: string;
   scope?: string[];
   ttl?: string;
   at: string;
   expiresAt?: string;
+  /** Present on "authorized": the customer of the allowed decision. */
+  customerId?: string;
+  /** Present on "authorized": the (raw) category of the allowed decision. */
+  category?: string;
+  /** Present on "authorized": the (raw) purpose of the allowed decision. */
+  purpose?: string;
+  /** Present on "authorized": the underlying outage error (503 / network / timeout). */
+  error?: Error;
 }
 
 export interface BreakGlassEngageInput {
@@ -177,8 +194,14 @@ export interface AgreelyOptions {
   timeout?: number;
   /** Opt specific categories into fail-open on an outage. Off by default. */
   degradeOnOutage?: DegradeOnOutageConfig;
-  /** Audit sink for break-glass engage/disengage/expire. */
+  /** Audit sink for break-glass engage/disengage/expire AND per-decision authorized allows. */
   onBreakGlass?: (event: BreakGlassEvent) => void;
+  /**
+   * Upper bound for both a break-glass `ttl` and `degradeOnOutage.maxOutageWindow`.
+   * A value like "30m" or "24h". Exceeding it throws AgreelyConfigError (an
+   * unbounded fail-open window is a compliance risk). Defaults to "24h".
+   */
+  maxDegradeWindow?: string;
   /**
    * Inject a fetch implementation (tests / custom transport). Defaults to the
    * global fetch (Node 18+), falling back to a lazily-imported `undici`.

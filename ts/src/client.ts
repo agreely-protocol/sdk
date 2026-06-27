@@ -5,6 +5,7 @@ import { Catalog } from "./resources/catalog.js";
 import { ConsentRequests } from "./resources/consentRequests.js";
 import { Transport } from "./transport.js";
 import type { AgreelyOptions, CheckOptions, CheckResult } from "./types.js";
+import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
 
 const DEFAULT_BASE_URL = "https://api.agreely.org";
 const DEFAULT_TIMEOUT_MS = 800;
@@ -37,9 +38,16 @@ export class Agreely {
       ...(options.fetch !== undefined ? { fetch: options.fetch } : {}),
     });
 
-    this.breakGlass = new BreakGlass(options.onBreakGlass ?? (() => {}));
-    // Construction validates the degrade config (fail-open without onDegrade throws).
-    this.degrade = new DegradePolicy(options.degradeOnOutage, this.breakGlass);
+    // The shared upper bound for both break-glass ttl and maxOutageWindow.
+    const maxDegradeWindowMs =
+      options.maxDegradeWindow !== undefined
+        ? parseDuration(options.maxDegradeWindow)
+        : DEFAULT_MAX_DEGRADE_WINDOW_MS;
+
+    this.breakGlass = new BreakGlass(options.onBreakGlass ?? (() => {}), maxDegradeWindowMs);
+    // Construction validates the degrade config (fail-open without onDegrade throws,
+    // an over-cap maxOutageWindow throws).
+    this.degrade = new DegradePolicy(options.degradeOnOutage, this.breakGlass, maxDegradeWindowMs);
 
     this.consentRequests = new ConsentRequests(this.transport);
     this.catalog = new Catalog(this.transport);
