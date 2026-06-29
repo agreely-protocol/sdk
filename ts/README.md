@@ -65,6 +65,35 @@ instead of issuing twice:
 await agreely.consentRequests.create(input, { idempotencyKey: "order-4471" });
 ```
 
+### Record a manual / offline (company-attested) consent
+
+When you gathered consent out of band (a signed paper or PDF), record it under
+your company's attestation. The result carries `assurance: "company_attested"`
+(the live citizen flow yields `"citizen_signed"`). Send only the PDF **hash** by
+default; upload the bytes only if you opt in.
+
+```ts
+const recorded = await agreely.manualConsents.record({
+  customerId: "cust_8812",
+  documentVersionId: "<docVersionId>",
+  effectiveDate: "2026-06-01",
+  validUntil: "2031-01-01",
+  items: ["<catalogEntryId>", { category: "Email address", purpose: "Newsletter" }],
+  evidence: { pdfSha256: "0x…64hex" }, // pdf?: "<base64>" to opt into uploading the bytes
+});
+// { consentId, merkleRoot, consentRefs: ["0x…"], assurance: "company_attested", anchored: false }
+
+// Hand the subject a link to self-claim the attestation:
+const link = await agreely.manualConsents.createClaimLink({ customerId: "cust_8812" });
+// { claimUrl, token, expiresAt }
+
+await agreely.manualConsents.revoke("0x…", { reason: "withdrawn" });
+await agreely.manualConsents.erase("0x…");
+```
+
+Like `consentRequests.create`, `record` is **never auto-retried**; it attaches a
+unique `Idempotency-Key` per call (override it to make a retry replay).
+
 ### List / get / catalog
 
 ```ts

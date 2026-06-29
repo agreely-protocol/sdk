@@ -6,6 +6,14 @@
 export type Decision = "allow" | "deny";
 
 /**
+ * How an enforcement record was established:
+ *   "citizen_signed"   -> the subject signed it themselves (the live consent flow)
+ *   "company_attested" -> the company recorded it offline (the manual / offline path)
+ * Present on a check whenever an enforcement record exists; absent for status "none".
+ */
+export type Assurance = "citizen_signed" | "company_attested";
+
+/**
  * The resolved status of an enforcement cell.
  *
  *   "active"  -> allow
@@ -25,6 +33,12 @@ export interface CheckResult {
   consentRef?: string;
   /** ISO-8601 timestamp the decision was made at. */
   checkedAt: string;
+  /**
+   * How the enforcement record was established (citizen-signed vs company-
+   * attested). Present whenever an enforcement record exists; absent for status
+   * "none" and never set on a degraded (synthesized) result.
+   */
+  assurance?: Assurance;
   /**
    * True when this result did NOT come from the server but from the local
    * degrade policy (fail-open / break-glass) during an outage. Never set on a
@@ -100,6 +114,87 @@ export interface ListConsentRequestsInput {
 export interface ConsentRequestPage {
   items: ConsentRequestRecord[];
   nextCursor: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Manual / offline (company-attested) consent. The company records a consent it
+// gathered out of band (a signed paper/PDF), attesting to it under its own name.
+// The result carries assurance "company_attested" (vs the citizen-signed path).
+// ---------------------------------------------------------------------------
+
+/**
+ * The evidence for a manual consent. `pdfSha256` is ALWAYS sent (the integrity
+ * commitment, "0x" + 64 lowercase hex of the source PDF). `pdf` is an OPTIONAL
+ * opt-in upload of the document bytes (base64); omit it to keep the file local
+ * and commit only to its hash (data minimization).
+ */
+export interface ManualConsentEvidence {
+  /** "0x" + 64 hex SHA-256 of the source PDF. Required. */
+  pdfSha256: string;
+  /** Optional base64 of the PDF bytes (opt-in upload). Omit to stay minimal. */
+  pdf?: string;
+}
+
+export interface RecordManualConsentInput {
+  customerId: string;
+  /** The id of the signed document version the consent attests to. */
+  documentVersionId: string;
+  /** When the consent took effect (ISO date, e.g. the signature date). */
+  effectiveDate: string;
+  /** The consent lifespan (ISO date). */
+  validUntil: string;
+  /** Catalog entry ids and/or {category, purpose} pairs. At least one. */
+  items: IssueItem[];
+  evidence: ManualConsentEvidence;
+}
+
+/** The 201 body from recording a manual consent. */
+export interface ManualConsentResult {
+  /** The internal consent id for the recorded attestation. */
+  consentId: string;
+  /** The merkle root committing to the recorded cells. */
+  merkleRoot: string;
+  /** One 0x-hex enforcement handle per recorded (category, purpose) cell. */
+  consentRefs: string[];
+  /** Always "company_attested" for the manual path. */
+  assurance: "company_attested";
+  /** Whether the attestation is already anchored on-chain (false at record time). */
+  anchored: boolean;
+}
+
+export interface CreateClaimLinkInput {
+  customerId: string;
+  /** An optional company-side reference to stamp on the claim. */
+  reference?: string;
+}
+
+/** A claim link the company hands to the subject to self-claim the attestation. */
+export interface ClaimLink {
+  claimUrl: string;
+  token: string;
+  expiresAt: string;
+}
+
+/** Options for revoking/erasing a manual consent by its consentRef. */
+export interface ManualConsentMutationInput {
+  /** An optional operator reason recorded with the mutation. */
+  reason?: string;
+}
+
+/** The 200 body from revoking a manual consent. */
+export interface ManualConsentRevocation {
+  consentRef: string;
+  revoked: boolean;
+  /** True when the consent was already revoked (the call is idempotent). */
+  alreadyRevoked: boolean;
+}
+
+/** The 200 body from erasing a manual consent. */
+export interface ManualConsentErasure {
+  consentRef: string;
+  erased: boolean;
+  /** True when the consent was already erased (the call is idempotent). */
+  alreadyErased: boolean;
 }
 
 /** A declared active catalog entry, for issuance discovery. */

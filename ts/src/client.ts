@@ -3,6 +3,7 @@ import { DegradePolicy } from "./degrade.js";
 import { AgreelyConfigError, AgreelyUnavailableError } from "./errors.js";
 import { Catalog } from "./resources/catalog.js";
 import { ConsentRequests } from "./resources/consentRequests.js";
+import { ManualConsents } from "./resources/manualConsents.js";
 import { Transport } from "./transport.js";
 import type { AgreelyOptions, CheckOptions, CheckResult } from "./types.js";
 import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
@@ -19,6 +20,8 @@ const DEFAULT_TIMEOUT_MS = 800;
  */
 export class Agreely {
   readonly consentRequests: ConsentRequests;
+  /** The manual / offline (company-attested) consent resource (scope: 'attest'). */
+  readonly manualConsents: ManualConsents;
   readonly catalog: Catalog;
   /** The break-glass operator lever (degrade gate 3). */
   readonly breakGlass: BreakGlass;
@@ -50,6 +53,7 @@ export class Agreely {
     this.degrade = new DegradePolicy(options.degradeOnOutage, this.breakGlass, maxDegradeWindowMs);
 
     this.consentRequests = new ConsentRequests(this.transport);
+    this.manualConsents = new ManualConsents(this.transport);
     this.catalog = new Catalog(this.transport);
   }
 

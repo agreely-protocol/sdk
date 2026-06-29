@@ -13,6 +13,7 @@ use Agreely\Sdk\Http\RequestSpec;
 use Agreely\Sdk\Http\Transport;
 use Agreely\Sdk\Resources\Catalog;
 use Agreely\Sdk\Resources\ConsentRequests;
+use Agreely\Sdk\Resources\ManualConsents;
 use Agreely\Sdk\Types\CheckResult;
 
 /**
@@ -34,6 +35,7 @@ final class Agreely
     private readonly Transport $transport;
     private readonly DegradePolicy $degrade;
     private readonly ConsentRequests $consentRequests;
+    private readonly ManualConsents $manualConsents;
     private readonly Catalog $catalog;
 
     /**
@@ -77,6 +79,7 @@ final class Agreely
         $this->degrade = new DegradePolicy($degradeConfig, $maxDegradeWindowMs);
 
         $this->consentRequests = new ConsentRequests($this->transport);
+        $this->manualConsents = new ManualConsents($this->transport);
         $this->catalog = new Catalog($this->transport);
     }
 
@@ -84,6 +87,12 @@ final class Agreely
     public function consentRequests(): ConsentRequests
     {
         return $this->consentRequests;
+    }
+
+    /** The manual / offline (company-attested) consent resource (scope 'attest'). */
+    public function manualConsents(): ManualConsents
+    {
+        return $this->manualConsents;
     }
 
     /** The catalog resource (discovery, scope 'check' OR 'issue'). */

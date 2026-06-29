@@ -14,6 +14,9 @@ namespace Agreely\Sdk\Types;
  *   degraded  -> true ONLY when synthesized by the local degrade policy on an
  *                outage (never set on a real server decision)
  *   mode      -> the degrade mode that produced a degraded allow ("fail-open")
+ *   assurance -> how the enforcement record was established
+ *                ("citizen_signed" | "company_attested"); present whenever a
+ *                record exists, null for status "none" and on a degraded result
  */
 final class CheckResult
 {
@@ -24,6 +27,7 @@ final class CheckResult
         public readonly string $checkedAt,
         public readonly bool $degraded = false,
         public readonly ?string $mode = null,
+        public readonly ?string $assurance = null,
     ) {
     }
 
@@ -35,6 +39,7 @@ final class CheckResult
             Wire::str($wire['status'] ?? null),
             Wire::nullableStr($wire['consentRef'] ?? null),
             Wire::str($wire['checkedAt'] ?? null),
+            assurance: Wire::nullableStr($wire['assurance'] ?? null),
         );
     }
 

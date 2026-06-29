@@ -27,6 +27,27 @@ final class Wire
     }
 
     /**
+     * Coerce a wire array field into a list of strings (non-scalar entries dropped).
+     *
+     * @param array<string,mixed> $wire
+     * @return list<string>
+     */
+    public static function strings(array $wire, string $key): array
+    {
+        $value = $wire[$key] ?? null;
+        if (!is_array($value)) {
+            return [];
+        }
+        $out = [];
+        foreach (array_values($value) as $entry) {
+            if (is_scalar($entry)) {
+                $out[] = (string) $entry;
+            }
+        }
+        return $out;
+    }
+
+    /**
      * @param array<string,mixed> $wire
      * @return list<array<string,mixed>>
      */
