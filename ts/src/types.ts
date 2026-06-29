@@ -188,7 +188,7 @@ export interface BreakGlassEngageInput {
 export interface AgreelyOptions {
   /** The Agreely API key (agr_live_...). Required. */
   apiKey: string;
-  /** API base URL. Defaults to https://api.agreely.org. */
+  /** API base URL. Defaults to https://api.agreely.ca. */
   baseUrl?: string;
   /** Per-call total time budget in ms, including retries. Default 800. */
   timeout?: number;

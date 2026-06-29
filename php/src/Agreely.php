@@ -28,7 +28,7 @@ use Agreely\Sdk\Types\CheckResult;
  */
 final class Agreely
 {
-    private const DEFAULT_BASE_URL = 'https://api.agreely.org';
+    private const DEFAULT_BASE_URL = 'https://api.agreely.ca';
     private const DEFAULT_TIMEOUT_MS = 800;
 
     private readonly Transport $transport;

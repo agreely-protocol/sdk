@@ -7,7 +7,7 @@ import { Transport } from "./transport.js";
 import type { AgreelyOptions, CheckOptions, CheckResult } from "./types.js";
 import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
 
-const DEFAULT_BASE_URL = "https://api.agreely.org";
+const DEFAULT_BASE_URL = "https://api.agreely.ca";
 const DEFAULT_TIMEOUT_MS = 800;
 
 /**
