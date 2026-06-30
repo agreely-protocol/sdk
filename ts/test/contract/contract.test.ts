@@ -87,7 +87,7 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
         assertExactKeys(
           r as unknown as Record<string, unknown>,
           ["decision", "status", "checkedAt"],
-          ["consentRef"],
+          ["consentRef", "assurance"],
         );
         expect(r.decision).toBe(vec.expect.decision);
         expect(r.status).toBe(vec.expect.status);
