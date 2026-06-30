@@ -6,7 +6,7 @@ ref tables, no local mirror — every `check()` is a fresh call to Agreely (cach
 an allow while a revoke lands is a correctness failure, spec §16).
 
 This is the PHP port of [`@agreely/sdk`](../sdk) (the TypeScript reference). Both
-SDKs assert the **same shared golden vectors** (`sdk/test/golden/vectors.json`)
+SDKs assert the **same shared golden vectors** (`../vectors/vectors.json`)
 against the live API, so neither drifts from the contract.
 
 - **One-call DX.** `if ($agreely->check($id, $category, $purpose)) { ... }`
@@ -209,5 +209,5 @@ make php-sdk-contract  # from the repo root — seeds a fixture, runs the contra
 ```
 
 The contract suite asserts the PHP SDK against the live API **and** the shared
-golden vectors (`sdk/test/golden/vectors.json`) — the cross-SDK anti-drift gate
+golden vectors (`../vectors/vectors.json`) — the cross-SDK anti-drift gate
 (PHP == TS == the contract).

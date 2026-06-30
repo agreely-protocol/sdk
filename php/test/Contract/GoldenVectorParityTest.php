@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * THE cross-SDK anti-drift gate. Loads the SHARED golden vectors
- * (sdk/test/golden/vectors.json — the very file the TS SDK asserts) and drives
+ * (../../vectors/vectors.json — the very file the TS SDK asserts) and drives
  * the PHP SDK against the LIVE /v1 API, asserting the SAME decision / status /
  * consentRef-presence and the SAME typed error per vector that the TS SDK does.
  * If the contract drifts, BOTH SDKs fail on this file.
@@ -26,7 +26,7 @@ final class GoldenVectorParityTest extends TestCase
 
     private static function golden(): string
     {
-        return dirname(__DIR__, 3) . '/sdk/test/golden/vectors.json';
+        return dirname(__DIR__, 3) . '/vectors/vectors.json';
     }
 
     protected function setUp(): void

@@ -13,7 +13,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const fixturePath = resolve(here, "fixture.json");
-const goldenPath = resolve(here, "../golden/vectors.json");
+const goldenPath = resolve(here, "../../../vectors/vectors.json");
 
 interface Fixture {
   baseUrl: string;
