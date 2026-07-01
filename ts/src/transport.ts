@@ -36,16 +36,54 @@ export class Transport {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly timeoutMs: number;
+  private readonly maxRetries: number;
+  private readonly respectRetryAfter: boolean;
   private fetchImpl: FetchLike | undefined;
 
-  constructor(opts: { baseUrl: string; apiKey: string; timeoutMs: number; fetch?: FetchLike }) {
+  constructor(opts: {
+    baseUrl: string;
+    apiKey: string;
+    timeoutMs: number;
+    fetch?: FetchLike;
+    maxRetries?: number;
+    respectRetryAfter?: boolean;
+  }) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
     this.apiKey = opts.apiKey;
     this.timeoutMs = opts.timeoutMs;
+    this.maxRetries = opts.maxRetries ?? 0;
+    this.respectRetryAfter = opts.respectRetryAfter ?? true;
     this.fetchImpl = opts.fetch;
   }
 
+  /**
+   * Send a request. On a 429 for an IDEMPOTENT call, opt-in retry up to
+   * `maxRetries` times, honoring Retry-After (outside the per-attempt time
+   * budget). A mutating call never auto-retries a 429.
+   */
   async request<T>(spec: RequestSpec): Promise<T> {
+    const rateRetries = spec.idempotentRetry ? this.maxRetries : 0;
+    let rateAttempt = 0;
+    for (;;) {
+      try {
+        return await this.attempt<T>(spec);
+      } catch (error) {
+        if (error instanceof AgreelyRateLimitError && rateAttempt < rateRetries) {
+          rateAttempt++;
+          const waitMs =
+            this.respectRetryAfter && error.retryAfterSeconds !== undefined
+              ? error.retryAfterSeconds * 1000
+              : jitterBackoff(rateAttempt);
+          await sleep(waitMs);
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  /** One budgeted send with transient-outage retries inside a single time budget. */
+  private async attempt<T>(spec: RequestSpec): Promise<T> {
     const fetchImpl = await this.resolveFetch();
     const url = this.buildUrl(spec.path, spec.query);
     const headers: Record<string, string> = {

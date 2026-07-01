@@ -27,14 +27,45 @@ final class Transport
         private readonly string $apiKey,
         private readonly int $timeoutMs,
         private readonly HttpClient $http,
+        private readonly int $maxRetries = 0,
+        private readonly bool $respectRetryAfter = true,
     ) {
         $this->baseUrl = rtrim($baseUrl, '/');
     }
 
     /**
+     * Send a request. On a 429 for an IDEMPOTENT call, opt-in retry up to
+     * `maxRetries` times, honoring Retry-After (outside the per-attempt time
+     * budget). A mutating call never auto-retries a 429.
+     *
      * @return array<string,mixed> the decoded JSON object
      */
     public function request(RequestSpec $spec): array
+    {
+        $rateRetries = $spec->idempotentRetry ? $this->maxRetries : 0;
+        $rateAttempt = 0;
+        while (true) {
+            try {
+                return $this->attempt($spec);
+            } catch (AgreelyRateLimitError $error) {
+                if ($rateAttempt >= $rateRetries) {
+                    throw $error;
+                }
+                $rateAttempt++;
+                $waitMs = ($this->respectRetryAfter && $error->retryAfter !== null)
+                    ? $error->retryAfter * 1000
+                    : $this->jitterBackoff($rateAttempt);
+                usleep($waitMs * 1000);
+            }
+        }
+    }
+
+    /**
+     * One budgeted send with transient-outage retries inside a single time budget.
+     *
+     * @return array<string,mixed> the decoded JSON object
+     */
+    private function attempt(RequestSpec $spec): array
     {
         $url = $this->buildUrl($spec->path, $spec->query);
         $headers = array_merge([

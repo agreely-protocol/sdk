@@ -1,11 +1,27 @@
+import { AgreelyRateLimitError, AgreelyTimeoutError } from "../errors.js";
 import type { Transport } from "../transport.js";
 import type {
   ConsentRequestPage,
   ConsentRequestRecord,
+  ConsentRequestStatus,
   CreateConsentRequestInput,
   IssuedRequest,
+  ListAllConsentRequestsInput,
   ListConsentRequestsInput,
+  WaitForSettlementOptions,
 } from "../types.js";
+import { sleep } from "../util.js";
+
+/** The terminal (settled) consent-request statuses. */
+const TERMINAL_STATUSES: ReadonlySet<ConsentRequestStatus> = new Set([
+  "approved",
+  "refused",
+  "expired",
+  "revoked_before_action",
+]);
+
+/** Default guard so an unbounded list can never spin forever. */
+const DEFAULT_MAX_PAGES = 1000;
 
 interface CreateOptions {
   /**
@@ -69,6 +85,90 @@ export class ConsentRequests {
       path: `/v1/consent-requests/${encodeURIComponent(requestId)}`,
       idempotentRetry: true,
     });
+  }
+
+  /**
+   * Auto-paginate over ALL requests as an async iterable, looping `nextCursor`
+   * for you. Bounded by `maxPages` (default 1000) so a runaway cursor can never
+   * spin forever.
+   *
+   *   for await (const req of agreely.consentRequests.listAll()) { … }
+   */
+  async *listAll(
+    input: ListAllConsentRequestsInput = {},
+  ): AsyncGenerator<ConsentRequestRecord, void, unknown> {
+    const maxPages = input.maxPages ?? DEFAULT_MAX_PAGES;
+    let cursor = input.cursor;
+    for (let page = 0; page < maxPages; page++) {
+      const result = await this.list({
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(cursor !== undefined ? { cursor } : {}),
+      });
+      for (const item of result.items) yield item;
+      if (result.nextCursor === null) return;
+      cursor = result.nextCursor;
+    }
+  }
+
+  /** Collect {@link listAll} into a single array (convenience). */
+  async collect(input: ListAllConsentRequestsInput = {}): Promise<ConsentRequestRecord[]> {
+    const out: ConsentRequestRecord[] = [];
+    for await (const item of this.listAll(input)) out.push(item);
+    return out;
+  }
+
+  /**
+   * Poll GET /v1/consent-requests/{id} until it reaches a terminal state
+   * (approved | refused | expired | revoked_before_action), or throw
+   * AgreelyTimeoutError when the budget elapses. Honors Retry-After on a 429.
+   * Abortable via an AbortSignal.
+   */
+  async waitForSettlement(
+    requestId: string,
+    opts: WaitForSettlementOptions = {},
+  ): Promise<ConsentRequestRecord> {
+    const intervalMs = opts.intervalMs ?? 2000;
+    const timeoutMs = opts.timeoutMs ?? 120_000;
+    const deadline = Date.now() + timeoutMs;
+    let lastStatus: ConsentRequestStatus | undefined;
+
+    for (;;) {
+      if (opts.signal?.aborted) {
+        throw new AgreelyTimeoutError("waitForSettlement was aborted.", {
+          ...(lastStatus !== undefined ? { lastStatus } : {}),
+        });
+      }
+
+      let record: ConsentRequestRecord;
+      try {
+        record = await this.get(requestId);
+      } catch (error) {
+        // Honor a 429's Retry-After, then keep polling within the budget.
+        if (error instanceof AgreelyRateLimitError) {
+          const waitMs = (error.retryAfterSeconds ?? Math.ceil(intervalMs / 1000)) * 1000;
+          if (Date.now() + waitMs >= deadline) {
+            throw new AgreelyTimeoutError(
+              `waitForSettlement timed out after ${String(timeoutMs)}ms while rate-limited.`,
+              { ...(lastStatus !== undefined ? { lastStatus } : {}) },
+            );
+          }
+          await sleep(waitMs);
+          continue;
+        }
+        throw error;
+      }
+
+      lastStatus = record.status;
+      if (TERMINAL_STATUSES.has(record.status)) return record;
+
+      if (Date.now() + intervalMs >= deadline) {
+        throw new AgreelyTimeoutError(
+          `waitForSettlement timed out after ${String(timeoutMs)}ms; last status "${record.status}".`,
+          { lastStatus: record.status },
+        );
+      }
+      await sleep(intervalMs);
+    }
   }
 }
 

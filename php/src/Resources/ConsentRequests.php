@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Agreely\Sdk\Resources;
 
 use Agreely\Sdk\Errors\AgreelyConfigError;
+use Agreely\Sdk\Errors\AgreelyRateLimitError;
+use Agreely\Sdk\Errors\AgreelyTimeoutError;
 use Agreely\Sdk\Http\RequestSpec;
 use Agreely\Sdk\Http\Transport;
 use Agreely\Sdk\Types\ConsentRequestPage;
 use Agreely\Sdk\Types\ConsentRequestRecord;
 use Agreely\Sdk\Types\IssuedRequest;
+use Generator;
 
 /**
  * The consent-request resource (scope: 'issue'). Keyed throughout on the PROTOCOL
@@ -17,6 +20,12 @@ use Agreely\Sdk\Types\IssuedRequest;
  */
 final class ConsentRequests
 {
+    /** The terminal (settled) consent-request statuses. */
+    private const TERMINAL_STATUSES = ['approved', 'refused', 'expired', 'revoked_before_action'];
+
+    /** Default guard so an unbounded list can never spin forever. */
+    private const DEFAULT_MAX_PAGES = 1000;
+
     public function __construct(private readonly Transport $transport)
     {
     }
@@ -86,6 +95,99 @@ final class ConsentRequests
             idempotentRetry: true,
         ));
         return ConsentRequestRecord::fromWire($wire);
+    }
+
+    /**
+     * Auto-paginate over ALL requests as a Generator, looping `nextCursor` for
+     * you. Bounded by `maxPages` (default 1000) so a runaway cursor can never spin
+     * forever.
+     *
+     *   foreach ($agreely->consentRequests()->iterate() as $req) { … }
+     *
+     * @param array{status?:string,cursor?:string,maxPages?:int} $input
+     * @return Generator<int, ConsentRequestRecord>
+     */
+    public function iterate(array $input = []): Generator
+    {
+        $maxPages = isset($input['maxPages']) && is_int($input['maxPages']) ? $input['maxPages'] : self::DEFAULT_MAX_PAGES;
+        $cursor = $input['cursor'] ?? null;
+        for ($page = 0; $page < $maxPages; $page++) {
+            $listInput = [];
+            if (isset($input['status'])) {
+                $listInput['status'] = $input['status'];
+            }
+            if ($cursor !== null) {
+                $listInput['cursor'] = $cursor;
+            }
+            $result = $this->list($listInput);
+            foreach ($result->items as $item) {
+                yield $item;
+            }
+            if ($result->nextCursor === null) {
+                return;
+            }
+            $cursor = $result->nextCursor;
+        }
+    }
+
+    /**
+     * Collect {@see iterate} into a single array (convenience).
+     *
+     * @param array{status?:string,cursor?:string,maxPages?:int} $input
+     * @return list<ConsentRequestRecord>
+     */
+    public function collect(array $input = []): array
+    {
+        return iterator_to_array($this->iterate($input), false);
+    }
+
+    /**
+     * Poll GET /v1/consent-requests/{id} until it reaches a terminal state
+     * (approved | refused | expired | revoked_before_action), or throw
+     * AgreelyTimeoutError when the budget elapses. Honors Retry-After on a 429.
+     *
+     * @param array{intervalMs?:int,timeoutMs?:int} $opts
+     */
+    public function waitForSettlement(string $requestId, array $opts = []): ConsentRequestRecord
+    {
+        $intervalMs = isset($opts['intervalMs']) && is_int($opts['intervalMs']) ? $opts['intervalMs'] : 2000;
+        $timeoutMs = isset($opts['timeoutMs']) && is_int($opts['timeoutMs']) ? $opts['timeoutMs'] : 120000;
+        $deadline = $this->nowMs() + $timeoutMs;
+        $lastStatus = null;
+
+        while (true) {
+            try {
+                $record = $this->get($requestId);
+            } catch (AgreelyRateLimitError $error) {
+                $waitMs = ($error->retryAfter ?? (int) ceil($intervalMs / 1000)) * 1000;
+                if ($this->nowMs() + $waitMs >= $deadline) {
+                    throw new AgreelyTimeoutError(
+                        "waitForSettlement timed out after {$timeoutMs}ms while rate-limited.",
+                        $lastStatus,
+                    );
+                }
+                usleep($waitMs * 1000);
+                continue;
+            }
+
+            $lastStatus = $record->status;
+            if (in_array($record->status, self::TERMINAL_STATUSES, true)) {
+                return $record;
+            }
+
+            if ($this->nowMs() + $intervalMs >= $deadline) {
+                throw new AgreelyTimeoutError(
+                    "waitForSettlement timed out after {$timeoutMs}ms; last status \"{$record->status}\".",
+                    $record->status,
+                );
+            }
+            usleep($intervalMs * 1000);
+        }
+    }
+
+    private function nowMs(): float
+    {
+        return microtime(true) * 1000;
     }
 
     /** A unique Idempotency-Key per create call (a v4-style uuid). */

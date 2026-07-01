@@ -9,6 +9,8 @@ class AgreelyRateLimitError extends AgreelyError
 {
     /** Seconds until the window resets (from the Retry-After header), when given. */
     public readonly ?int $retryAfter;
+    /** Alias of {@see $retryAfter} with an explicit unit in the name. */
+    public readonly ?int $retryAfterSeconds;
 
     public function __construct(
         string $message,
@@ -19,5 +21,6 @@ class AgreelyRateLimitError extends AgreelyError
     ) {
         parent::__construct($message, $code, $status, null, $previous);
         $this->retryAfter = $retryAfter;
+        $this->retryAfterSeconds = $retryAfter;
     }
 }

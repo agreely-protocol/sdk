@@ -107,6 +107,25 @@ export interface ListConsentRequestsInput {
   cursor?: string;
 }
 
+/** Options for the auto-paginating listAll/collect. */
+export interface ListAllConsentRequestsInput {
+  status?: ConsentRequestStatus;
+  /** Start paging after this requestId (a prior `nextCursor`). */
+  cursor?: string;
+  /** Hard guard on pages fetched (default 1000) so a runaway cursor can't spin forever. */
+  maxPages?: number;
+}
+
+/** Options for waitForSettlement. */
+export interface WaitForSettlementOptions {
+  /** Poll interval in ms. Default 2000. */
+  intervalMs?: number;
+  /** Total wait budget in ms before AgreelyTimeoutError. Default 120000. */
+  timeoutMs?: number;
+  /** Abort the wait (throws AgreelyTimeoutError with the last-seen status). */
+  signal?: AbortSignal;
+}
+
 /**
  * A page of consent requests. Note the SDK surfaces `items` (the server wire
  * field is `requests`); `nextCursor` is null when the list is exhausted.
@@ -302,6 +321,17 @@ export interface AgreelyOptions {
    * global fetch (Node 18+), falling back to a lazily-imported `undici`.
    */
   fetch?: typeof fetch;
+  /**
+   * Opt-in: how many EXTRA attempts to make on a 429 for IDEMPOTENT calls
+   * (GET / check). Default 0 (surface AgreelyRateLimitError immediately, as
+   * before). A mutating call is never auto-retried on a 429.
+   */
+  maxRetries?: number;
+  /**
+   * When retrying a 429 (see {@link maxRetries}), wait the server's Retry-After
+   * header before the next attempt. Default true.
+   */
+  respectRetryAfter?: boolean;
 }
 
 /** Per-call options for check / checkDetailed. */
