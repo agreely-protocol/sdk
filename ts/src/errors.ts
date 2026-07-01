@@ -10,6 +10,7 @@ export type AgreelyErrorCode =
   | "not_found"
   | "rate_limited"
   | "unavailable"
+  | "timeout"
   | "config";
 
 export interface AgreelyErrorInit {
@@ -50,10 +51,29 @@ export class AgreelyNotFoundError extends AgreelyError {}
 export class AgreelyRateLimitError extends AgreelyError {
   /** Seconds until the window resets (from the Retry-After header), when given. */
   readonly retryAfter: number | undefined;
+  /** Alias of {@link retryAfter} with an explicit unit in the name. */
+  readonly retryAfterSeconds: number | undefined;
 
   constructor(message: string, init: AgreelyErrorInit & { retryAfter?: number }) {
     super(message, init);
     this.retryAfter = init.retryAfter;
+    this.retryAfterSeconds = init.retryAfter;
+  }
+}
+
+/**
+ * The client-side poll budget (e.g. waitForSettlement) elapsed before the
+ * resource reached a terminal state. NOT a server outage — the last-seen state
+ * is attached so a caller can decide whether to keep waiting.
+ */
+export class AgreelyTimeoutError extends AgreelyError {
+  /** The last status observed before the timeout, when known. */
+  readonly lastStatus: string | undefined;
+
+  constructor(message: string, init: { lastStatus?: string; cause?: unknown } = {}) {
+    super(message, { code: "timeout", ...(init.cause !== undefined ? { cause: init.cause } : {}) });
+    this.name = "AgreelyTimeoutError";
+    this.lastStatus = init.lastStatus;
   }
 }
 

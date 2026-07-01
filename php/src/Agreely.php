@@ -15,6 +15,8 @@ use Agreely\Sdk\Resources\Catalog;
 use Agreely\Sdk\Resources\ConsentRequests;
 use Agreely\Sdk\Resources\ManualConsents;
 use Agreely\Sdk\Types\CheckResult;
+use Agreely\Sdk\Verify\ReceiptVerification;
+use Agreely\Sdk\Verify\ReceiptVerifier;
 
 /**
  * The Agreely client: a thin, near-stateless gate over the /v1 API. It holds an
@@ -64,7 +66,10 @@ final class Agreely
             ? $options['timeout']
             : self::DEFAULT_TIMEOUT_MS;
 
-        $this->transport = new Transport($baseUrl, $apiKey, $timeout, $httpClient);
+        $maxRetries = isset($options['maxRetries']) && is_int($options['maxRetries']) ? $options['maxRetries'] : 0;
+        $respectRetryAfter = !isset($options['respectRetryAfter']) || $options['respectRetryAfter'] !== false;
+
+        $this->transport = new Transport($baseUrl, $apiKey, $timeout, $httpClient, $maxRetries, $respectRetryAfter);
 
         // The shared upper bound for the maxOutageWindow.
         $maxDegradeWindowMs = isset($options['maxDegradeWindow']) && is_string($options['maxDegradeWindow'])
@@ -99,6 +104,39 @@ final class Agreely
     public function catalog(): Catalog
     {
         return $this->catalog;
+    }
+
+    /**
+     * Verify a consent receipt OFFLINE (the headline). Reports exactly what is
+     * PROVED vs merely trusted: a company-attested receipt is fully offline-sound;
+     * a citizen receipt is honestly PARTIAL offline (the sound company-signature
+     * check needs the server receipts/verify endpoint). Static — no API key needed.
+     *
+     * @param mixed $receipt a parsed receipt VC (assoc array)
+     * @param array<string,mixed> $opts see {@see ReceiptVerifier}
+     */
+    public static function verifyReceipt(mixed $receipt, array $opts = []): ReceiptVerification
+    {
+        return (new ReceiptVerifier($opts))->verify($receipt);
+    }
+
+    /**
+     * Hash PDF bytes to the EXACT `evidence.pdfSha256` form the API expects:
+     * "0x" + lowercase sha256 hex. Static; no network.
+     */
+    public static function hashPdf(string $bytes): string
+    {
+        return '0x' . hash('sha256', $bytes);
+    }
+
+    /** Read a PDF from disk and hash it — see {@see Agreely::hashPdf}. */
+    public static function hashPdfFile(string $path): string
+    {
+        $bytes = @file_get_contents($path);
+        if ($bytes === false) {
+            throw new AgreelyConfigError("hashPdfFile: could not read \"{$path}\".");
+        }
+        return self::hashPdf($bytes);
     }
 
     /**

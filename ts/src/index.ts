@@ -3,6 +3,7 @@
 
 export { Agreely } from "./client.js";
 export { BreakGlass } from "./breakGlass.js";
+export { ReceiptVerifier } from "./verify/receipt.js";
 
 export {
   AgreelyError,
@@ -11,6 +12,7 @@ export {
   AgreelyNotFoundError,
   AgreelyRateLimitError,
   AgreelyUnavailableError,
+  AgreelyTimeoutError,
   AgreelyConfigError,
 } from "./errors.js";
 export type { AgreelyErrorCode } from "./errors.js";
@@ -29,6 +31,8 @@ export type {
   ConsentRequestStatus,
   ConsentRequestRecord,
   ListConsentRequestsInput,
+  ListAllConsentRequestsInput,
+  WaitForSettlementOptions,
   ConsentRequestPage,
   ManualConsentEvidence,
   RecordManualConsentInput,
@@ -45,3 +49,14 @@ export type {
   BreakGlassEvent,
   BreakGlassEngageInput,
 } from "./types.js";
+
+export type {
+  ReceiptVerification,
+  ReceiptType,
+  CheckStatus,
+  OverallStatus,
+  DidDocument,
+  DidVerificationMethod,
+  DidResolver,
+  VerifyReceiptOptions,
+} from "./verify/types.js";

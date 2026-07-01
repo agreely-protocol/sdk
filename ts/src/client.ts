@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { BreakGlass } from "./breakGlass.js";
 import { DegradePolicy } from "./degrade.js";
 import { AgreelyConfigError, AgreelyUnavailableError } from "./errors.js";
@@ -7,6 +9,8 @@ import { ManualConsents } from "./resources/manualConsents.js";
 import { Transport } from "./transport.js";
 import type { AgreelyOptions, CheckOptions, CheckResult } from "./types.js";
 import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
+import { ReceiptVerifier } from "./verify/receipt.js";
+import type { ReceiptVerification, VerifyReceiptOptions } from "./verify/types.js";
 
 const DEFAULT_BASE_URL = "https://api.agreely.ca";
 const DEFAULT_TIMEOUT_MS = 800;
@@ -39,6 +43,10 @@ export class Agreely {
       apiKey: options.apiKey,
       timeoutMs: options.timeout ?? DEFAULT_TIMEOUT_MS,
       ...(options.fetch !== undefined ? { fetch: options.fetch } : {}),
+      ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
+      ...(options.respectRetryAfter !== undefined
+        ? { respectRetryAfter: options.respectRetryAfter }
+        : {}),
     });
 
     // The shared upper bound for both break-glass ttl and maxOutageWindow.
@@ -55,6 +63,32 @@ export class Agreely {
     this.consentRequests = new ConsentRequests(this.transport);
     this.manualConsents = new ManualConsents(this.transport);
     this.catalog = new Catalog(this.transport);
+  }
+
+  /**
+   * Verify a consent receipt OFFLINE (the headline). Reports exactly what is
+   * PROVED vs merely trusted: a company-attested receipt is fully offline-sound;
+   * a citizen receipt is honestly PARTIAL offline (the sound company-signature
+   * check needs the server receipts/verify endpoint). Static — no API key needed.
+   */
+  static verifyReceipt(
+    receipt: unknown,
+    opts: VerifyReceiptOptions = {},
+  ): Promise<ReceiptVerification> {
+    return new ReceiptVerifier(opts).verify(receipt);
+  }
+
+  /**
+   * Hash PDF bytes to the EXACT `evidence.pdfSha256` form the API expects:
+   * "0x" + lowercase sha256 hex. Static; no network.
+   */
+  static hashPdf(bytes: Uint8Array): string {
+    return "0x" + createHash("sha256").update(bytes).digest("hex");
+  }
+
+  /** Read a PDF from disk and hash it (Node) — see {@link Agreely.hashPdf}. */
+  static async hashPdfFile(path: string): Promise<string> {
+    return Agreely.hashPdf(await readFile(path));
   }
 
   /**
