@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Agreely, AgreelyRateLimitError, AgreelyTimeoutError } from "../../src/index.js";
+import { Agreely, AgreelyAbortError, AgreelyRateLimitError, AgreelyTimeoutError } from "../../src/index.js";
 import { mockFetch } from "./helpers.js";
 
 function client(fetchImpl: typeof globalThis.fetch, extra: Record<string, unknown> = {}): Agreely {
@@ -80,13 +80,31 @@ describe("consentRequests.waitForSettlement", () => {
     ).rejects.toMatchObject({ name: "AgreelyTimeoutError", lastStatus: "pending" });
   });
 
-  it("aborts immediately on an aborted signal", async () => {
+  it("throws AgreelyAbortError (NOT a timeout) on an already-aborted signal", async () => {
     const { fetch } = mockFetch([() => ({ json: rec("0xr", "pending") })]);
     const ctrl = new AbortController();
     ctrl.abort();
-    await expect(
-      client(fetch).consentRequests.waitForSettlement("0xr", { signal: ctrl.signal }),
-    ).rejects.toBeInstanceOf(AgreelyTimeoutError);
+    const err = await client(fetch)
+      .consentRequests.waitForSettlement("0xr", { signal: ctrl.signal })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AgreelyAbortError);
+    expect(err).not.toBeInstanceOf(AgreelyTimeoutError);
+  });
+
+  it("honors an abort PROMPTLY mid-sleep, not up to intervalMs later", async () => {
+    // A long interval: without prompt abort this would hang ~10s. The abort fires
+    // during the inter-poll sleep and must reject almost immediately.
+    const { fetch } = mockFetch([() => ({ json: rec("0xr", "pending") })]);
+    const ctrl = new AbortController();
+    const started = Date.now();
+    const pending = client(fetch)
+      .consentRequests.waitForSettlement("0xr", { intervalMs: 10_000, timeoutMs: 60_000, signal: ctrl.signal })
+      .catch((e: unknown) => e);
+    setTimeout(() => ctrl.abort(), 20);
+    const err = await pending;
+    expect(err).toBeInstanceOf(AgreelyAbortError);
+    expect((err as AgreelyAbortError).lastStatus).toBe("pending");
+    expect(Date.now() - started).toBeLessThan(2000); // woke promptly, not after 10s
   });
 });
 

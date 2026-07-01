@@ -11,6 +11,7 @@ export type AgreelyErrorCode =
   | "rate_limited"
   | "unavailable"
   | "timeout"
+  | "aborted"
   | "config";
 
 export interface AgreelyErrorInit {
@@ -73,6 +74,23 @@ export class AgreelyTimeoutError extends AgreelyError {
   constructor(message: string, init: { lastStatus?: string; cause?: unknown } = {}) {
     super(message, { code: "timeout", ...(init.cause !== undefined ? { cause: init.cause } : {}) });
     this.name = "AgreelyTimeoutError";
+    this.lastStatus = init.lastStatus;
+  }
+}
+
+/**
+ * A caller-initiated abort (the AbortSignal fired) stopped a poll loop (e.g.
+ * waitForSettlement). DISTINCT from AgreelyTimeoutError (the budget elapsing):
+ * an abort is intentional cancellation, not a timeout. The last-seen state is
+ * attached so a caller can decide whether to resume.
+ */
+export class AgreelyAbortError extends AgreelyError {
+  /** The last status observed before the abort, when known. */
+  readonly lastStatus: string | undefined;
+
+  constructor(message: string, init: { lastStatus?: string; cause?: unknown } = {}) {
+    super(message, { code: "aborted", ...(init.cause !== undefined ? { cause: init.cause } : {}) });
+    this.name = "AgreelyAbortError";
     this.lastStatus = init.lastStatus;
   }
 }

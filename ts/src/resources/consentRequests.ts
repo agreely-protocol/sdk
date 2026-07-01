@@ -1,4 +1,4 @@
-import { AgreelyRateLimitError, AgreelyTimeoutError } from "../errors.js";
+import { AgreelyAbortError, AgreelyRateLimitError, AgreelyTimeoutError } from "../errors.js";
 import type { Transport } from "../transport.js";
 import type {
   ConsentRequestPage,
@@ -124,7 +124,11 @@ export class ConsentRequests {
    * Poll GET /v1/consent-requests/{id} until it reaches a terminal state
    * (approved | refused | expired | revoked_before_action), or throw
    * AgreelyTimeoutError when the budget elapses. Honors Retry-After on a 429.
-   * Abortable via an AbortSignal.
+   *
+   * Abortable via an AbortSignal: the abort is honored PROMPTLY (it interrupts the
+   * inter-poll sleep immediately, not up to intervalMs later) and throws a DISTINCT
+   * AgreelyAbortError (NOT AgreelyTimeoutError) so a caller can tell an intentional
+   * cancellation from a budget timeout. Both carry the last-seen status.
    */
   async waitForSettlement(
     requestId: string,
@@ -137,7 +141,7 @@ export class ConsentRequests {
 
     for (;;) {
       if (opts.signal?.aborted) {
-        throw new AgreelyTimeoutError("waitForSettlement was aborted.", {
+        throw new AgreelyAbortError("waitForSettlement was aborted.", {
           ...(lastStatus !== undefined ? { lastStatus } : {}),
         });
       }
@@ -155,7 +159,7 @@ export class ConsentRequests {
               { ...(lastStatus !== undefined ? { lastStatus } : {}) },
             );
           }
-          await sleep(waitMs);
+          await this.sleepOrAbort(waitMs, opts.signal, lastStatus);
           continue;
         }
         throw error;
@@ -170,8 +174,39 @@ export class ConsentRequests {
           { lastStatus: record.status },
         );
       }
-      await sleep(intervalMs);
+      await this.sleepOrAbort(intervalMs, opts.signal, lastStatus);
     }
+  }
+
+  /**
+   * Sleep for `ms`, but wake and throw AgreelyAbortError the instant the signal
+   * fires — so an abort is honored promptly, not only at the next poll tick.
+   */
+  private sleepOrAbort(
+    ms: number,
+    signal: AbortSignal | undefined,
+    lastStatus: ConsentRequestStatus | undefined,
+  ): Promise<void> {
+    if (signal === undefined) return sleep(ms);
+    return new Promise<void>((resolve, reject) => {
+      const abort = (): void => {
+        clearTimeout(timer);
+        reject(
+          new AgreelyAbortError("waitForSettlement was aborted.", {
+            ...(lastStatus !== undefined ? { lastStatus } : {}),
+          }),
+        );
+      };
+      if (signal.aborted) {
+        abort();
+        return;
+      }
+      const timer = setTimeout(() => {
+        signal.removeEventListener("abort", abort);
+        resolve();
+      }, ms);
+      signal.addEventListener("abort", abort, { once: true });
+    });
   }
 }
 

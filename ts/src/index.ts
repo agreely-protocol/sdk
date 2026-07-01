@@ -13,6 +13,7 @@ export {
   AgreelyRateLimitError,
   AgreelyUnavailableError,
   AgreelyTimeoutError,
+  AgreelyAbortError,
   AgreelyConfigError,
 } from "./errors.js";
 export type { AgreelyErrorCode } from "./errors.js";
