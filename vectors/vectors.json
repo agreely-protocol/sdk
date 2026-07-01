@@ -606,5 +606,76 @@
         }
       }
     ]
+  },
+  "issuanceRequest": {
+    "description": "OFFLINE golden vectors for the consentRequests.create ISSUANCE wire envelope. Both SDKs assert these against a mocked transport: the POST /v1/consent-requests body carries customerId + recipientEmail + validUntil + EXACTLY ONE of consentDocumentId / documentCode (the Law 25 s. 8 information document reference), and NEVER an `items` list (items derive from the document server-side; a caller-supplied list is dropped by the SDK and rejected by the API). Zero or two document references fail client-side with a config error BEFORE any request is sent.",
+    "base": {
+      "customerId": "cust-042",
+      "recipientEmail": "citizen@example.com",
+      "validUntil": "2031-01-01T00:00:00Z"
+    },
+    "consentDocumentId": "3f6f2c1e-9f6a-4d2b-8a53-0d6a4c9d1b2e",
+    "documentCode": "marketing",
+    "rejectedItems": [
+      {
+        "category": "Email Address",
+        "purpose": "Marketing Outreach"
+      }
+    ],
+    "cases": [
+      {
+        "name": "consentDocumentId only: exact envelope, caller-supplied items dropped",
+        "use": [
+          "consentDocumentId"
+        ],
+        "includeItems": true,
+        "expect": {
+          "method": "POST",
+          "path": "/v1/consent-requests",
+          "body": {
+            "customerId": "cust-042",
+            "recipientEmail": "citizen@example.com",
+            "validUntil": "2031-01-01T00:00:00Z",
+            "consentDocumentId": "3f6f2c1e-9f6a-4d2b-8a53-0d6a4c9d1b2e"
+          }
+        }
+      },
+      {
+        "name": "documentCode only: exact envelope, caller-supplied items dropped",
+        "use": [
+          "documentCode"
+        ],
+        "includeItems": true,
+        "expect": {
+          "method": "POST",
+          "path": "/v1/consent-requests",
+          "body": {
+            "customerId": "cust-042",
+            "recipientEmail": "citizen@example.com",
+            "validUntil": "2031-01-01T00:00:00Z",
+            "documentCode": "marketing"
+          }
+        }
+      },
+      {
+        "name": "no document reference: client-side config error, nothing sent",
+        "use": [],
+        "includeItems": false,
+        "expect": {
+          "error": "config"
+        }
+      },
+      {
+        "name": "both document references: client-side config error, nothing sent",
+        "use": [
+          "consentDocumentId",
+          "documentCode"
+        ],
+        "includeItems": false,
+        "expect": {
+          "error": "config"
+        }
+      }
+    ]
   }
 }
