@@ -139,6 +139,46 @@ final class ReceiptVerificationTest extends TestCase
         $this->assertSame('pass', $result->documentAnchor);
     }
 
+    public function testCorruptedCitizenKeyFailsCleanlyWithNoOpensslWarning(): void
+    {
+        // Corrupt the resolved passkey to an off-curve P-256 point (y = all zeros).
+        // openssl_verify would otherwise emit a noisy PHP Warning on the malformed
+        // key; the SDK swallows it so the check returns 'fail' CLEANLY. failOnWarning
+        // is on in phpunit.xml, and this handler makes the intent explicit: any
+        // leaked warning throws and fails the test.
+        $docs = self::didDocuments();
+        $citizenDid = 'did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08';
+        /** @var array<string,mixed> $doc */
+        $doc = $docs[$citizenDid];
+        /** @var array<int,array<string,mixed>> $vms */
+        $vms = $doc['verificationMethod'];
+        $cose = Wire::str($vms[0]['publicKeyCose']);
+        $hex = str_starts_with($cose, '0x') ? substr($cose, 2) : $cose;
+        // Replace the trailing y coordinate (32 bytes) with zeros -> not on the curve.
+        $corruptHex = '0x' . substr($hex, 0, -64) . str_repeat('00', 32);
+        $vms[0]['publicKeyCose'] = $corruptHex;
+        $doc['verificationMethod'] = $vms;
+        $docs[$citizenDid] = $doc;
+
+        $body = (string) json_encode(self::rv()['fixtures']['ipfsBody']);
+
+        set_error_handler(static function (int $severity, string $message): bool {
+            throw new \RuntimeException("unexpected PHP warning/notice leaked: {$message}");
+        });
+        try {
+            $result = Agreely::verifyReceipt(self::citizenReceipt(), [
+                'resolver' => static fn (string $did): ?array => $docs[$did] ?? null,
+                'ipfsGateway' => static fn (string $cid): string => "https://ipfs.test/{$cid}",
+                'httpGet' => static fn (string $url): string => $body,
+            ]);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame('fail', $result->citizenAssertion);
+        $this->assertSame('failed', $result->overall);
+    }
+
     /** @return array<string,mixed> */
     private static function citizenReceipt(): array
     {

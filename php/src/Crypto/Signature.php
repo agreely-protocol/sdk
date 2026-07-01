@@ -46,13 +46,30 @@ final class Signature
             if ($pem === null) {
                 return false;
             }
-            $ok = openssl_verify($message, $signature, $pem, OPENSSL_ALGO_SHA256);
-            return $ok === 1;
+            return self::opensslVerifyQuietly($message, $signature, $pem);
         }
         if ($cose['alg'] === 'EdDSA') {
             return self::verifyEd25519($cose['x'], $message, $signature);
         }
         return false;
+    }
+
+    /**
+     * openssl_verify over a caller-supplied (possibly attacker-controlled) P-256
+     * key. A malformed key makes openssl_verify emit a noisy PHP Warning ("cannot
+     * be coerced into a public key") while still correctly returning a non-1 result.
+     * We swallow that warning so a bad key returns false CLEANLY (matching the TS
+     * try/catch), instead of leaking a warning on every attacker-supplied bad key.
+     */
+    private static function opensslVerifyQuietly(string $message, string $signature, string $pem): bool
+    {
+        set_error_handler(static fn (): bool => true);
+        try {
+            $result = openssl_verify($message, $signature, $pem, OPENSSL_ALGO_SHA256);
+        } finally {
+            restore_error_handler();
+        }
+        return $result === 1;
     }
 
     /** Build a PEM SubjectPublicKeyInfo for a P-256 point from raw x,y (32 bytes each). */
