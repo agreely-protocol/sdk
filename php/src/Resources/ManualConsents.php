@@ -28,10 +28,13 @@ final class ManualConsents
      * Record a company-attested consent. Items are catalog ids and/or raw
      * {category, purpose} pairs, sent RAW and resolved server-side. Evidence ALWAYS
      * carries the pdfSha256 commitment ("0x" + 64 hex); the pdf bytes (base64) are
-     * uploaded only when explicitly provided. NEVER auto-retried (it mutates): an
-     * Idempotency-Key is auto-generated per call (override via
-     * $options['idempotencyKey']) so a caller-driven retry replays the original 201
-     * byte-for-byte rather than double-recording.
+     * uploaded only when explicitly provided. NEVER auto-retried (it mutates).
+     *
+     * IDEMPOTENCY CAVEAT: an Idempotency-Key is auto-generated per call (override
+     * via $options['idempotencyKey']) and sent, but the server does NOT yet honor
+     * it for POST /v1/manual-consents (unlike consentRequests()->create). A
+     * retried record CAN therefore create a DUPLICATE company-attested consent;
+     * guard against duplicate submits yourself.
      *
      * @param array{
      *     customerId:string,

@@ -92,7 +92,10 @@ await agreely.manualConsents.erase("0x…");
 ```
 
 Like `consentRequests.create`, `record` is **never auto-retried**; it attaches a
-unique `Idempotency-Key` per call (override it to make a retry replay).
+unique `Idempotency-Key` per call. Note: unlike `consentRequests.create`, the
+server does **not** currently honor `Idempotency-Key` for manual consents, so a
+retried `record` can create a **duplicate** attested consent. Guard against
+duplicate submits yourself.
 
 ### List / get / catalog
 

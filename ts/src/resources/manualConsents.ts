@@ -11,8 +11,13 @@ import type {
 
 interface RecordOptions {
   /**
-   * Override the auto-generated Idempotency-Key. Reuse the SAME key across a
-   * retry to replay the original 201 byte-for-byte (no double-record).
+   * Override the auto-generated Idempotency-Key sent with the request.
+   *
+   * WARNING: the server does NOT currently honor Idempotency-Key for
+   * POST /v1/manual-consents (unlike consentRequests.create, which does). A
+   * retried record may therefore create a DUPLICATE company-attested consent.
+   * The header is sent (harmless, and forward-compatible if the server adds
+   * support) but callers MUST guard against duplicate submits themselves.
    */
   idempotencyKey?: string;
 }
@@ -30,9 +35,11 @@ export class ManualConsents {
    * Record a company-attested consent. Items are catalog ids and/or raw
    * {category, purpose} pairs, sent RAW and resolved server-side. Evidence
    * ALWAYS carries the pdfSha256 commitment; the pdf bytes are uploaded only when
-   * explicitly provided. NEVER auto-retried (it mutates): an Idempotency-Key is
-   * auto-generated per call (overridable) so a caller-driven retry replays rather
-   * than double-records.
+   * explicitly provided. NEVER auto-retried (it mutates).
+   *
+   * IDEMPOTENCY CAVEAT: an Idempotency-Key is auto-generated per call (overridable)
+   * and sent, but the server does NOT yet honor it for manual consents, so a
+   * retried record CAN double-record. Guard against duplicate submits yourself.
    */
   record(input: RecordManualConsentInput, options: RecordOptions = {}): Promise<ManualConsentResult> {
     const idempotencyKey = options.idempotencyKey ?? generateIdempotencyKey();
