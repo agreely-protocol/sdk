@@ -66,10 +66,19 @@ export class Agreely {
   }
 
   /**
-   * Verify a consent receipt OFFLINE (the headline). Reports exactly what is
-   * PROVED vs merely trusted: a company-attested receipt is fully offline-sound;
-   * a citizen receipt is honestly PARTIAL offline (the sound company-signature
-   * check needs the server receipts/verify endpoint). Static — no API key needed.
+   * Verify a consent receipt OFFLINE-FIRST (the headline). Reports exactly what is
+   * PROVED vs merely trusted: a company-attested receipt is offline-sound; a citizen
+   * receipt is honestly PARTIAL offline (the sound company-signature check needs the
+   * server receipts/verify endpoint). "Offline-first", not fully offline: the
+   * signature/assertion checks need the signing key from the DID document (one HTTPS
+   * resolution by default, or supply a local `resolver` for an air-gapped verify);
+   * the IPFS disclosure copy and on-chain anchor are the opt-in extra calls. When a
+   * DID cannot be resolved the check is "unavailable" (inconclusive), never "fail".
+   * Static — no API key needed.
+   *
+   * SECURITY: when verifying UNTRUSTED receipts, inject your own `resolver` (or
+   * supply DID documents locally) — the default did:web resolver fetches a host
+   * taken from the receipt (HTTPS-only; it can never yield a false "verified").
    */
   static verifyReceipt(
     receipt: unknown,

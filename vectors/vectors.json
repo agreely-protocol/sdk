@@ -116,7 +116,7 @@
     }
   ],
   "receiptVerification": {
-    "description": "OFFLINE receipt-verification golden vectors for Agreely.verifyReceipt / Agreely::verifyReceipt. Both the TS and PHP SDKs assert these BYTE-IDENTICALLY (the same JCS canonicalizer, multibase decode, Ed25519 + WebAuthn/COSE verification). Tests inject a resolver (from `didDocuments`) and an IPFS fetch (from `ipfsBody`) — no network. A company-attested receipt is fully offline-sound; a citizen receipt is honestly PARTIAL offline (companySignature unsupported — use the server receipts/verify). documentAnchor is skipped offline (no rpcUrl).",
+    "description": "OFFLINE receipt-verification golden vectors for Agreely.verifyReceipt / Agreely::verifyReceipt. Both the TS and PHP SDKs assert these BYTE-IDENTICALLY (the same JCS canonicalizer, multibase decode, Ed25519 + WebAuthn/COSE verification). Tests inject a resolver (from `didDocuments`) and an IPFS fetch (from `ipfsBody`) — no network. A company-attested receipt is fully offline-sound; a citizen receipt is honestly PARTIAL offline (companySignature unsupported — use the server receipts/verify). documentAnchor is skipped offline (no rpcUrl). A case with resolveDids \"none\" simulates an unresolvable DID (outage): the decisive check is \"unavailable\" and overall is \"unavailable\" (inconclusive), NEVER \"failed\" (a tamper).",
     "fixtures": {
       "companyDid": "did:web:api.agreely.ca:c:acme",
       "citizenDid": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
@@ -431,6 +431,153 @@
             "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. Use the server receipts/verify endpoint for a sound company-signature check.",
             "Citizen passkey assertion verified against did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1: the holder of the registered passkey signed over the committed challenge 0x1017fd21f146774730f8cdd2ad9e127d2531d283dcc2804e476f71f0dbb37b49.",
             "This proves passkey POSSESSION over a committed challenge; it does NOT by itself prove the cell-level consent semantics.",
+            "Disclosure copy verified: the IPFS document body matches the receipt disclosureHash 0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
+          ]
+        }
+      },
+      {
+        "name": "unresolvable issuer DID reports company signature unavailable, not failed",
+        "resolveDids": "none",
+        "ipfs": false,
+        "receipt": {
+          "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://agreely.ca/credentials/consent/v1"
+          ],
+          "type": [
+            "VerifiableCredential",
+            "ConsentReceipt",
+            "CompanyAttestedConsentReceipt"
+          ],
+          "id": "urn:agreely:receipt:mc-golden-1",
+          "issuer": "did:web:api.agreely.ca:c:acme",
+          "assuranceLevel": "company_attested",
+          "validFrom": "2026-01-15",
+          "validUntil": "2031-01-15",
+          "credentialSubject": {
+            "consent": {
+              "action": "grant",
+              "items": [
+                {
+                  "itemId": "0x01",
+                  "category": "email address",
+                  "purpose": "marketing outreach"
+                }
+              ],
+              "documentVersion": "docver-golden-1",
+              "document": {
+                "code": "marketing",
+                "name": "Marketing Consent",
+                "version": "1.0",
+                "effectiveDate": "2026-01-01"
+              },
+              "effectiveDate": "2026-01-15",
+              "grantedAt": "2026-01-15"
+            }
+          },
+          "evidence": {
+            "type": "HandSignedPaperConsent",
+            "pdfHash": "0xabababababababababababababababababababababababababababababababab",
+            "pdfHeldBy": "company",
+            "documentVersion": "docver-golden-1"
+          },
+          "proof": [
+            {
+              "type": "DataIntegrityProof",
+              "cryptosuite": "eddsa-jcs-2022",
+              "created": "2026-01-15T00:00:00Z",
+              "verificationMethod": "did:web:api.agreely.ca:c:acme#kms-1",
+              "proofPurpose": "assertionMethod",
+              "proofValue": "zyEMTLBKdRZctavYt87mfv7oNAQiLie8meovZGrckj5WLMa1DUuJBoUFw431UYnEMpvHUBmky7gU5bx2G72veDMJ"
+            }
+          ]
+        },
+        "expect": {
+          "receiptType": "company_attested",
+          "companySignature": "unavailable",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "overall": "unavailable",
+          "notes": [
+            "Company signature UNVERIFIABLE: could not resolve the issuer DID did:web:api.agreely.ca:c:acme (key did:web:api.agreely.ca:c:acme#kms-1) to an Ed25519 key (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
+          ]
+        }
+      },
+      {
+        "name": "unresolvable citizen DID reports citizen assertion unavailable, not failed",
+        "resolveDids": "none",
+        "ipfs": true,
+        "receipt": {
+          "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://agreely.ca/credentials/consent/v1"
+          ],
+          "type": [
+            "VerifiableCredential",
+            "ConsentReceipt"
+          ],
+          "id": "urn:agreely:receipt:cz-golden-1",
+          "issuer": "did:web:api.agreely.ca:c:acme",
+          "validFrom": "2026-01-15T12:00:00Z",
+          "validUntil": "2031-01-15T00:00:00Z",
+          "credentialSubject": {
+            "id": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+            "consent": {
+              "action": "grant",
+              "items": [
+                {
+                  "itemId": "0x01",
+                  "category": "email address",
+                  "purpose": "marketing outreach"
+                }
+              ],
+              "requestId": "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+              "grantedAt": "2026-01-15T12:00:00Z",
+              "document": {
+                "code": "marketing",
+                "name": "Marketing Consent",
+                "version": "1.0",
+                "effectiveDate": "2026-01-01",
+                "ipfsCid": "bafkreigolden0000000000000000000000000000000000000000000000000001"
+              },
+              "disclosureHash": "0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec"
+            }
+          },
+          "proof": [
+            {
+              "type": "DataIntegrityProof",
+              "cryptosuite": "eddsa-jcs-2022",
+              "created": "2026-01-15T12:00:00Z",
+              "verificationMethod": "did:web:api.agreely.ca:c:acme#kms-1",
+              "proofPurpose": "assertionMethod",
+              "proofValue": "z99eUso3aSbE9tqGSTXzo3TLfKb9RkMTURrHKQ1K7Zh3BbeqPevr5E1iCbpTjqHuTFLtfxTTD5ekfVuZFzQyEQf8"
+            },
+            {
+              "type": "WebAuthnAssertion",
+              "verificationMethod": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1",
+              "nonce": "0xefefefefefefefefefefefefefefefef",
+              "challenge": "0x1017fd21f146774730f8cdd2ad9e127d2531d283dcc2804e476f71f0dbb37b49",
+              "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAABA",
+              "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiRUJmOUlmRkdkMGN3LU0zU3JaNFNmU1V4MG9QY3dvQk9SMjl4OE51emUwayIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA4MCIsImNyb3NzT3JpZ2luIjpmYWxzZX0",
+              "signature": "MEUCIFnKke_JiOdkLMZGvXoTINWHKuljgmss6VVslFGpKIXIAiEAmtoAD9RQHxOGWcYduyUEs7Zenz3tlFMphlSy1PI45FI"
+            }
+          ]
+        },
+        "expect": {
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "pass",
+          "documentAnchor": "skipped",
+          "overall": "unavailable",
+          "notes": [
+            "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. Use the server receipts/verify endpoint for a sound company-signature check.",
+            "Citizen assertion UNVERIFIABLE: could not resolve the citizen DID did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08 (passkey did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1) (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
             "Disclosure copy verified: the IPFS document body matches the receipt disclosureHash 0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
           ]

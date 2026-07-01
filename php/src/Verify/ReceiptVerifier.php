@@ -12,14 +12,25 @@ use Agreely\Sdk\Crypto\Signature;
 use Throwable;
 
 /**
- * The OFFLINE-first, honest consent-receipt verifier — a byte-for-byte behavioural
+ * The offline-first, honest consent-receipt verifier — a byte-for-byte behavioural
  * port of the TS SDK's ReceiptVerifier. Its ReceiptVerification result canonicalizes
  * (JCS) identically to the TS output, asserted by the shared golden vectors.
+ *
+ * "Offline-first", not "fully offline": the signature/assertion checks need the
+ * signing key from the issuer/citizen DID document (by default one HTTPS resolution,
+ * or supply the DID document(s) via an injected `resolver` for an air-gapped verify).
+ * IPFS/anchor are the opt-in extra calls. When a DID cannot be resolved the affected
+ * check is reported "unavailable" (inconclusive) — never "fail" (a real tamper).
  *
  * A company-attested receipt is fully offline-sound (Ed25519 over the JCS body). A
  * citizen receipt is HONESTLY PARTIAL offline (the company half signed the original
  * offer, omitted for unlinkability; use the server receipts/verify). The citizen
  * WebAuthn assertion IS checkable (passkey-possession over the committed challenge).
+ *
+ * SECURITY: the default did:web resolver fetches a host TAKEN FROM THE RECEIPT (it
+ * can never yield a false "verified" — the key must still verify — but when
+ * verifying UNTRUSTED receipts, inject your own `resolver` or supply DID documents
+ * locally to control the request surface). HTTPS is enforced (no http/file).
  *
  * Options (all network seams injectable, so tests run with NO network):
  *   - resolver:            callable(string $did): ?array  — DID document or null
@@ -114,8 +125,9 @@ final class ReceiptVerifier
 
         $key = $this->resolveEd25519Key($issuer, $vm);
         if ($key === null) {
-            $notes[] = "Company signature UNVERIFIABLE: could not resolve an Ed25519 key for issuer DID {$issuer} (key {$vm}).";
-            return 'fail';
+            $notes[] = "Company signature UNVERIFIABLE: could not resolve the issuer DID {$issuer} (key {$vm}) to an Ed25519 key "
+                . '(network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.';
+            return 'unavailable';
         }
 
         if (Signature::verifyEd25519($key, $canonical, $signature)) {
@@ -147,8 +159,9 @@ final class ReceiptVerifier
         $vm = self::asString($proof['verificationMethod'] ?? null);
         $coseHex = $this->resolveCoseKey($citizenDid, $vm);
         if ($coseHex === null) {
-            $notes[] = "Citizen assertion UNVERIFIABLE: could not resolve a passkey for {$vm}.";
-            return 'fail';
+            $notes[] = "Citizen assertion UNVERIFIABLE: could not resolve the citizen DID {$citizenDid} (passkey {$vm}) "
+                . '(network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.';
+            return 'unavailable';
         }
 
         try {
@@ -320,7 +333,13 @@ final class ReceiptVerifier
     {
         $resolver = $this->opts['resolver'] ?? null;
         if (is_callable($resolver)) {
-            $doc = $resolver($did);
+            try {
+                // A throwing resolver is a resolution FAILURE, not a tamper: null
+                // flows through to an "unavailable" check, never a "fail".
+                $doc = $resolver($did);
+            } catch (Throwable) {
+                return null;
+            }
             return is_array($doc) ? $doc : null;
         }
         // Default HTTPS resolver: did:web -> /c/{slug}/did.json; did:agreely -> /did/{did}.
@@ -469,13 +488,22 @@ final class ReceiptVerifier
         string $anchor,
     ): string {
         if ($type === 'company_attested') {
-            if ($company !== 'pass' || $disclosure === 'fail' || $anchor === 'fail') {
+            // An ACTIVE failure (a tamper / wrong key / bad disclosure) always wins:
+            // a real negative verdict is never masked by an inconclusive resolution.
+            if ($company === 'fail' || $disclosure === 'fail' || $anchor === 'fail') {
                 return 'failed';
+            }
+            // The decisive check could not COMPLETE (DID unresolved): inconclusive.
+            if ($company === 'unavailable') {
+                return 'unavailable';
             }
             return 'verified';
         }
         if ($citizen === 'fail' || $disclosure === 'fail' || $anchor === 'fail') {
             return 'failed';
+        }
+        if ($citizen === 'unavailable') {
+            return 'unavailable';
         }
         return 'partial';
     }

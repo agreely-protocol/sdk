@@ -10,8 +10,10 @@ namespace Agreely\Sdk\Verify;
  * was PROVED vs merely trusted, and `overall` never overstates it (a citizen
  * receipt is at most "partial" offline).
  *
- * Statuses are strings: 'pass' | 'fail' | 'skipped' | 'unsupported'.
- * overall: 'verified' | 'partial' | 'failed'. receiptType: 'company_attested' | 'citizen'.
+ * Statuses are strings: 'pass' | 'fail' | 'unavailable' | 'skipped' | 'unsupported'
+ * ('unavailable' = the DID could not be resolved, so the check could not complete —
+ * distinct from 'fail', a real signature mismatch). overall: 'verified' | 'partial'
+ * | 'failed' | 'unavailable'. receiptType: 'company_attested' | 'citizen'.
  */
 final class ReceiptVerification
 {

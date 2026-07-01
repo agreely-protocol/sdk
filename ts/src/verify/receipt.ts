@@ -1,4 +1,11 @@
-// The headline: an OFFLINE-first, honest consent-receipt verifier.
+// The headline: an offline-first, honest consent-receipt verifier.
+//
+// "Offline-first", not "fully offline": the signature/assertion checks need the
+// signing key from the issuer/citizen DID document. By default that is one HTTPS
+// resolution (or supply the DID document(s) via an injected `resolver` for a truly
+// air-gapped verify). The IPFS disclosure copy and the on-chain anchor are the
+// two OPT-IN extra network calls. When a DID cannot be resolved, the affected
+// check is reported "unavailable" (inconclusive) — never "fail" (a real tamper).
 //
 // A company-attested receipt is fully offline-sound: strip the proof, JCS-
 // canonicalize the body (byte-identical to CompanyAttestedConsentReceipt::body),
@@ -114,9 +121,10 @@ export class ReceiptVerifier {
     const key = await this.resolveEd25519Key(issuer, vm);
     if (!key) {
       notes.push(
-        `Company signature UNVERIFIABLE: could not resolve an Ed25519 key for issuer DID ${issuer} (key ${vm}).`,
+        `Company signature UNVERIFIABLE: could not resolve the issuer DID ${issuer} (key ${vm}) to an Ed25519 key ` +
+          "(network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
       );
-      return "fail";
+      return "unavailable";
     }
 
     const ok = verifyEd25519(key, canonical, signature);
@@ -147,8 +155,11 @@ export class ReceiptVerifier {
     const vm = asString(proof["verificationMethod"]);
     const coseHex = await this.resolveCoseKey(citizenDid, vm);
     if (!coseHex) {
-      notes.push(`Citizen assertion UNVERIFIABLE: could not resolve a passkey for ${vm}.`);
-      return "fail";
+      notes.push(
+        `Citizen assertion UNVERIFIABLE: could not resolve the citizen DID ${citizenDid} (passkey ${vm}) ` +
+          "(network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
+      );
+      return "unavailable";
     }
 
     let cose;
@@ -320,7 +331,13 @@ export class ReceiptVerifier {
 
   private async resolveDid(did: string): Promise<DidDocument | null> {
     const resolver = this.opts.resolver ?? this.defaultResolver();
-    return resolver(did);
+    try {
+      // A throwing (or rejecting) resolver is a resolution FAILURE, not a tamper:
+      // null flows through to an "unavailable" check, never a "fail".
+      return await resolver(did);
+    } catch {
+      return null;
+    }
   }
 
   /** The default HTTPS resolver: did:web -> /c/{slug}/did.json; did:agreely -> /did/{did}. */
@@ -396,11 +413,16 @@ function decideOverall(
   anchor: CheckStatus,
 ): ReceiptVerification["overall"] {
   if (type === "company_attested") {
-    if (company !== "pass" || disclosure === "fail" || anchor === "fail") return "failed";
+    // An ACTIVE failure (a tamper / wrong key / bad disclosure) always wins: it
+    // is a real negative verdict, never masked by an inconclusive resolution.
+    if (company === "fail" || disclosure === "fail" || anchor === "fail") return "failed";
+    // The decisive check could not COMPLETE (DID unresolved): inconclusive, not a forgery.
+    if (company === "unavailable") return "unavailable";
     return "verified";
   }
   // Citizen: never "verified" offline.
   if (citizen === "fail" || disclosure === "fail" || anchor === "fail") return "failed";
+  if (citizen === "unavailable") return "unavailable";
   return "partial";
 }
 

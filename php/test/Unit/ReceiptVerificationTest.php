@@ -59,7 +59,11 @@ final class ReceiptVerificationTest extends TestCase
     {
         $docs = self::didDocuments();
         $opts = [];
-        if (($case['resolveDids'] ?? false) === true) {
+        if (($case['resolveDids'] ?? false) === 'none') {
+            // Simulate an unresolvable DID (network/outage): the resolver always
+            // returns null, so the decisive check is "unavailable", not "fail".
+            $opts['resolver'] = static fn (string $did): ?array => null;
+        } elseif (($case['resolveDids'] ?? false) === true) {
             $opts['resolver'] = static fn (string $did): ?array => $docs[$did] ?? null;
         }
         if (($case['ipfs'] ?? false) === true) {
@@ -98,12 +102,25 @@ final class ReceiptVerificationTest extends TestCase
         $this->assertSame('failed', $result->overall);
     }
 
-    public function testCompanySignatureFailsWhenIssuerCannotBeResolved(): void
+    public function testCompanySignatureIsUnavailableWhenIssuerCannotBeResolved(): void
     {
         $manual = self::rv()['cases'][0]['receipt'];
         $result = Agreely::verifyReceipt($manual, ['resolver' => static fn (): ?array => null]);
-        $this->assertSame('fail', $result->companySignature);
-        $this->assertSame('failed', $result->overall);
+        // A DID-resolution outage is INCONCLUSIVE, never byte-identical to a forgery.
+        $this->assertSame('unavailable', $result->companySignature);
+        $this->assertSame('unavailable', $result->overall);
+    }
+
+    public function testAThrowingResolverIsTreatedAsUnavailable(): void
+    {
+        $manual = self::rv()['cases'][0]['receipt'];
+        $result = Agreely::verifyReceipt($manual, [
+            'resolver' => static function (): ?array {
+                throw new \RuntimeException('network down');
+            },
+        ]);
+        $this->assertSame('unavailable', $result->companySignature);
+        $this->assertSame('unavailable', $result->overall);
     }
 
     public function testDocumentAnchorPassesWithAnInjectedMatchingLog(): void

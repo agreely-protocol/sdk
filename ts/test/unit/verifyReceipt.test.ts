@@ -12,7 +12,7 @@ const vectors = JSON.parse(
     fixtures: { didDocuments: Record<string, DidDocument>; ipfsBody: unknown };
     cases: Array<{
       name: string;
-      resolveDids: boolean;
+      resolveDids: boolean | "none";
       ipfs: boolean;
       receipt: unknown;
       expect: unknown;
@@ -24,7 +24,11 @@ const { fixtures, cases } = vectors.receiptVerification;
 
 function optionsFor(c: (typeof cases)[number]): VerifyReceiptOptions {
   const opts: VerifyReceiptOptions = {};
-  if (c.resolveDids) {
+  if (c.resolveDids === "none") {
+    // Simulate an unresolvable DID (network/outage): the resolver always returns
+    // null, so the decisive check is "unavailable" (inconclusive), not "fail".
+    opts.resolver = () => null;
+  } else if (c.resolveDids) {
     opts.resolver = (did: string) => fixtures.didDocuments[did] ?? null;
   }
   if (c.ipfs) {
@@ -68,11 +72,23 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     expect(result.overall).toBe("failed");
   });
 
-  it("company signature is UNVERIFIABLE (fail) when the issuer DID cannot be resolved", async () => {
+  it("company signature is UNAVAILABLE (not fail) when the issuer DID cannot be resolved", async () => {
     const manual = cases[0]!.receipt;
     const result = await Agreely.verifyReceipt(manual, { resolver: () => null });
-    expect(result.companySignature).toBe("fail");
-    expect(result.overall).toBe("failed");
+    // A DID-resolution outage is INCONCLUSIVE, never byte-identical to a forgery.
+    expect(result.companySignature).toBe("unavailable");
+    expect(result.overall).toBe("unavailable");
+  });
+
+  it("a throwing resolver is treated as unavailable, not a hard failure", async () => {
+    const manual = cases[0]!.receipt;
+    const result = await Agreely.verifyReceipt(manual, {
+      resolver: () => {
+        throw new Error("network down");
+      },
+    });
+    expect(result.companySignature).toBe("unavailable");
+    expect(result.overall).toBe("unavailable");
   });
 
   it("disclosureCopy is skipped for a manual receipt (no ipfsCid + disclosureHash)", async () => {
