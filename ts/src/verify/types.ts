@@ -94,7 +94,7 @@ export interface VerifyReceiptOptions {
    * (SSRF) rather than letting an attacker-chosen host be fetched.
    */
   resolver?: DidResolver;
-  /** Host used to build a company did:web from a slug in resolveCompanyDid. Default api.agreely.ca. */
+  /** Host used to build a company did:web from a slug in resolveCompanyDid. Default agreely.ca (the apex host that serves /c/{slug}/did.json). */
   companyDidHost?: string;
   /** Base URL for the default citizen DID resolver's `/did/{did}`. Default https://api.agreely.ca. */
   citizenResolverBaseUrl?: string;

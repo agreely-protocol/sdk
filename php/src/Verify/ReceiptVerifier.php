@@ -34,7 +34,7 @@ use Throwable;
  *
  * Options (all network seams injectable, so tests run with NO network):
  *   - resolver:            callable(string $did): ?array  — DID document or null
- *   - companyDidHost:      string (default api.agreely.ca) for resolveCompanyDid
+ *   - companyDidHost:      string (default agreely.ca, the apex host serving /c/{slug}/did.json) for resolveCompanyDid
  *   - citizenResolverBaseUrl: string (default https://api.agreely.ca)
  *   - ipfsGateway:         callable(string $cid): string  — CID -> URL
  *   - httpGet:             callable(string $url): ?string — fetch body (IPFS)
@@ -43,7 +43,7 @@ use Throwable;
  */
 final class ReceiptVerifier
 {
-    private const DEFAULT_COMPANY_HOST = 'api.agreely.ca';
+    private const DEFAULT_COMPANY_HOST = 'agreely.ca';
     private const DEFAULT_CITIZEN_BASE = 'https://api.agreely.ca';
     private const DEFAULT_IPFS_GATEWAY = 'https://gateway.lighthouse.storage/ipfs/';
     private const DEFAULT_CHAIN_ID = 84532;

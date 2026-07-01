@@ -7,6 +7,7 @@ namespace Agreely\Sdk\Test\Unit;
 use Agreely\Sdk\Agreely;
 use Agreely\Sdk\Crypto\Canonicalizer;
 use Agreely\Sdk\Types\Wire;
+use Agreely\Sdk\Verify\ReceiptVerifier;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -177,6 +178,43 @@ final class ReceiptVerificationTest extends TestCase
 
         $this->assertSame('fail', $result->citizenAssertion);
         $this->assertSame('failed', $result->overall);
+    }
+
+    /**
+     * A company DID is did:web:agreely.ca:c:{slug}, served at the APEX host
+     * https://agreely.ca/c/{slug}/did.json (never api.agreely.ca).
+     */
+    public function testResolveCompanyDidTargetsTheApexDidJsonUrl(): void
+    {
+        $expected = 'https://agreely.ca/c/acme/did.json';
+        $requested = null;
+        $verifier = new ReceiptVerifier([
+            'httpGet' => static function (string $url) use (&$requested): ?string {
+                $requested = $url;
+                return json_encode(['id' => 'did:web:agreely.ca:c:acme']) ?: null;
+            },
+        ]);
+        $verifier->resolveCompanyDid('acme');
+        $this->assertSame($expected, $requested);
+        $this->assertStringNotContainsString('api.agreely.ca', (string) $requested);
+    }
+
+    /**
+     * Resolving the DID string did:web:agreely.ca:c:acme directly maps to the
+     * same apex URL as the resolveCompanyDid('acme') slug input.
+     */
+    public function testDefaultResolverMapsCompanyDidStringToTheSameUrl(): void
+    {
+        $requested = null;
+        $verifier = new ReceiptVerifier([
+            'companyDidHost' => 'agreely.ca',
+            'httpGet' => static function (string $url) use (&$requested): ?string {
+                $requested = $url;
+                return json_encode(['id' => 'did:web:agreely.ca:c:acme']) ?: null;
+            },
+        ]);
+        $verifier->resolveCompanyDid('acme');
+        $this->assertSame('https://agreely.ca/c/acme/did.json', $requested);
     }
 
     /** @return array<string,mixed> */

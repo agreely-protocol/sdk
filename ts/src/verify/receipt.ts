@@ -43,7 +43,7 @@ import type {
   VerifyReceiptOptions,
 } from "./types.js";
 
-const DEFAULT_COMPANY_HOST = "api.agreely.ca";
+const DEFAULT_COMPANY_HOST = "agreely.ca";
 const DEFAULT_CITIZEN_BASE = "https://api.agreely.ca";
 const DEFAULT_IPFS_GATEWAY = "https://gateway.lighthouse.storage/ipfs/";
 const DEFAULT_CHAIN_ID = 84532;

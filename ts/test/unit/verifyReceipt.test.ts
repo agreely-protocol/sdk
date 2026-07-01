@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { Agreely } from "../../src/index.js";
+import { Agreely, ReceiptVerifier } from "../../src/index.js";
 import { canonicalize } from "../../src/crypto/jcs.js";
 import type { DidDocument, VerifyReceiptOptions } from "../../src/verify/types.js";
 
@@ -119,5 +119,42 @@ describe("verifyReceipt honesty matrix edge cases", () => {
       rpcUrl: "https://rpc.test",
     });
     expect(result.documentAnchor).toBe("pass");
+  });
+});
+
+describe("default did:web resolution targets the apex company DID host", () => {
+  // A company DID is did:web:agreely.ca:c:{slug}, served at
+  // https://agreely.ca/c/{slug}/did.json (apex host, NOT api.agreely.ca).
+  const EXPECTED_URL = "https://agreely.ca/c/acme/did.json";
+
+  it("resolveCompanyDid(slug) fetches the apex /c/{slug}/did.json URL", async () => {
+    let requested: string | undefined;
+    const fetchImpl = ((input: string | URL) => {
+      requested = String(input);
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: "did:web:agreely.ca:c:acme" }), {
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }) as unknown as typeof fetch;
+
+    const verifier = new ReceiptVerifier({ fetch: fetchImpl });
+    await verifier.resolveCompanyDid("acme");
+    expect(requested).toBe(EXPECTED_URL);
+  });
+
+  it("resolveCompanyDid(slug) builds the apex did:web:agreely.ca:c:{slug} id (not api.)", async () => {
+    let seenDid: string | undefined;
+    const verifier = new ReceiptVerifier({
+      resolver: (did) => {
+        seenDid = did;
+        return null;
+      },
+    });
+    await verifier.resolveCompanyDid("acme");
+    // The DID built here maps, via the default resolver above, to EXPECTED_URL.
+    expect(seenDid).toBe("did:web:agreely.ca:c:acme");
+    expect(seenDid).not.toContain("api.agreely.ca");
+    expect(`https://agreely.ca/c/acme/did.json`).toBe(EXPECTED_URL);
   });
 });
