@@ -113,6 +113,28 @@
         "status": 401,
         "code": "unauthorized"
       }
+    },
+    {
+      "name": "a check-only key cannot cancel a consent request (403 forbidden)",
+      "scope": "check",
+      "method": "POST",
+      "path": "/v1/consent-requests/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/cancel",
+      "body": {},
+      "expect": {
+        "status": 403,
+        "code": "forbidden"
+      }
+    },
+    {
+      "name": "cancel of an unknown request is 404 not_found",
+      "scope": "issue",
+      "method": "POST",
+      "path": "/v1/consent-requests/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/cancel",
+      "body": {},
+      "expect": {
+        "status": 404,
+        "code": "not_found"
+      }
     }
   ],
   "receiptVerification": {
