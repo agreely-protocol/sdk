@@ -66,10 +66,13 @@ function assertExactKeys(obj: Record<string, unknown>, required: string[], optio
   }
 }
 
-// The suite is gated on a seeded fixture: `make sdk-contract` (or the seed step)
-// writes test/contract/fixture.json from the LIVE api. Without it (CI without the
-// stack), the suite skips cleanly rather than failing.
-const suite = hasFixture ? describe : describe.skip;
+// The suite is gated on a seeded fixture AND an explicit opt-in: it drives the
+// LIVE /v1 API (stateful, rate-limited), so it is OFF by default and the default
+// `npm test` (test/unit) stays deterministic and green. Run it with
+// `AGREELY_LIVE=1 npm run test:contract` once the stack + fixture are up; without
+// either, the suite skips cleanly rather than failing on live drift / a 429.
+const runLive = hasFixture && process.env.AGREELY_LIVE === "1";
+const suite = runLive ? describe : describe.skip;
 
 suite("contract: @agreely/sdk vs the live /v1 API", () => {
   let agreely: Agreely;

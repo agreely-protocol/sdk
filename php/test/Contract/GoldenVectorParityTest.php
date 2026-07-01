@@ -31,6 +31,13 @@ final class GoldenVectorParityTest extends TestCase
 
     protected function setUp(): void
     {
+        // Gated behind AGREELY_LIVE=1: this drives the LIVE, stateful, rate-limited
+        // /v1 API, so it is OFF by default and the default `phpunit` run stays a
+        // deterministic offline green (the OFFLINE golden-vector parity lives in the
+        // unit ReceiptVerificationTest). Run `AGREELY_LIVE=1 phpunit` with the stack up.
+        if (getenv('AGREELY_LIVE') !== '1') {
+            $this->markTestSkipped('Live contract suite is gated behind AGREELY_LIVE=1 (default run stays offline).');
+        }
         if (!Fixture::exists()) {
             $this->markTestSkipped('No fixture. Run `make php-sdk-contract` to seed from the live api.');
         }
