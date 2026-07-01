@@ -37,6 +37,27 @@ describe("consentRequests.listAll / collect", () => {
     expect(all.length).toBe(3);
     expect(calls.length).toBe(3);
   });
+
+  it("treats a non-positive maxPages as the default bound (not a silent no-op)", async () => {
+    const { fetch, calls } = mockFetch([
+      { json: { requests: [rec("0xa")], nextCursor: "0xa" } },
+      { json: { requests: [rec("0xb")], nextCursor: null } },
+    ]);
+    // A computed 0 must fall back to the default bound and still iterate, not stop.
+    const all = await client(fetch).consentRequests.collect({ maxPages: 0 });
+    expect(all.map((r) => r.requestId)).toEqual(["0xa", "0xb"]);
+    expect(calls.length).toBe(2);
+  });
+
+  it("coerces an absent wire nextCursor to null so listAll stops (TS<->PHP parity)", async () => {
+    const { fetch, calls } = mockFetch([
+      // The wire omits nextCursor entirely — listAll must still terminate.
+      { json: { requests: [rec("0xa")] } },
+    ]);
+    const all = await client(fetch).consentRequests.collect();
+    expect(all.map((r) => r.requestId)).toEqual(["0xa"]);
+    expect(calls.length).toBe(1);
+  });
 });
 
 describe("consentRequests.waitForSettlement", () => {

@@ -100,7 +100,8 @@ final class ConsentRequests
     /**
      * Auto-paginate over ALL requests as a Generator, looping `nextCursor` for
      * you. Bounded by `maxPages` (default 1000) so a runaway cursor can never spin
-     * forever.
+     * forever. A non-positive `maxPages` (a computed 0 / negative) falls back to the
+     * default bound rather than silently iterating nothing.
      *
      *   foreach ($agreely->consentRequests()->iterate() as $req) { … }
      *
@@ -109,7 +110,9 @@ final class ConsentRequests
      */
     public function iterate(array $input = []): Generator
     {
-        $maxPages = isset($input['maxPages']) && is_int($input['maxPages']) ? $input['maxPages'] : self::DEFAULT_MAX_PAGES;
+        $maxPages = isset($input['maxPages']) && is_int($input['maxPages']) && $input['maxPages'] > 0
+            ? $input['maxPages']
+            : self::DEFAULT_MAX_PAGES;
         $cursor = $input['cursor'] ?? null;
         for ($page = 0; $page < $maxPages; $page++) {
             $listInput = [];

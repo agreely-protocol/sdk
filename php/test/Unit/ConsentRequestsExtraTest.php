@@ -57,6 +57,18 @@ final class ConsentRequestsExtraTest extends TestCase
         $this->assertCount(3, $http->calls);
     }
 
+    public function testCollectTreatsNonPositiveMaxPagesAsTheDefaultBound(): void
+    {
+        $http = new MockHttpClient([
+            MockHttpClient::json(200, ['requests' => [$this->rec('0xa')], 'nextCursor' => '0xa']),
+            MockHttpClient::json(200, ['requests' => [$this->rec('0xb')], 'nextCursor' => null]),
+        ]);
+        // A computed 0 must fall back to the default bound and still iterate, not stop.
+        $all = $this->client($http)->consentRequests()->collect(['maxPages' => 0]);
+        $this->assertSame(['0xa', '0xb'], array_map(static fn ($r) => $r->requestId, $all));
+        $this->assertCount(2, $http->calls);
+    }
+
     public function testWaitForSettlementResolvesOnTerminalState(): void
     {
         $http = new MockHttpClient([

@@ -75,7 +75,9 @@ export class ConsentRequests {
       query: { status: input.status, cursor: input.cursor },
       idempotentRetry: true,
     });
-    return { items: wire.requests, nextCursor: wire.nextCursor };
+    // Coerce an absent nextCursor to null so listAll stops exactly like PHP's
+    // fromWire does (the API always emits it; this keeps strict TS<->PHP parity).
+    return { items: wire.requests, nextCursor: wire.nextCursor ?? null };
   }
 
   /** Fetch one request by its protocol requestId (0x + 64hex). */
@@ -90,14 +92,15 @@ export class ConsentRequests {
   /**
    * Auto-paginate over ALL requests as an async iterable, looping `nextCursor`
    * for you. Bounded by `maxPages` (default 1000) so a runaway cursor can never
-   * spin forever.
+   * spin forever. A non-positive `maxPages` (a computed 0 / negative) falls back
+   * to the default bound rather than silently iterating nothing.
    *
    *   for await (const req of agreely.consentRequests.listAll()) { … }
    */
   async *listAll(
     input: ListAllConsentRequestsInput = {},
   ): AsyncGenerator<ConsentRequestRecord, void, unknown> {
-    const maxPages = input.maxPages ?? DEFAULT_MAX_PAGES;
+    const maxPages = input.maxPages !== undefined && input.maxPages > 0 ? input.maxPages : DEFAULT_MAX_PAGES;
     let cursor = input.cursor;
     for (let page = 0; page < maxPages; page++) {
       const result = await this.list({
