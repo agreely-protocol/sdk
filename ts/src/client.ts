@@ -7,7 +7,7 @@ import { Catalog } from "./resources/catalog.js";
 import { ConsentRequests } from "./resources/consentRequests.js";
 import { ManualConsents } from "./resources/manualConsents.js";
 import { Transport } from "./transport.js";
-import type { AgreelyOptions, CheckOptions, CheckResult } from "./types.js";
+import type { AgreelyOptions, CheckOptions, CheckResult, Identity } from "./types.js";
 import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
 import { ReceiptVerifier } from "./verify/receipt.js";
 import type { ReceiptVerification, VerifyReceiptOptions } from "./verify/types.js";
@@ -29,6 +29,8 @@ export class Agreely {
   readonly catalog: Catalog;
   /** The break-glass operator lever (degrade gate 3). */
   readonly breakGlass: BreakGlass;
+  /** The configured API base URL (client-side; the resolved endpoint in use). */
+  readonly baseUrl: string;
 
   private readonly transport: Transport;
   private readonly degrade: DegradePolicy;
@@ -38,8 +40,10 @@ export class Agreely {
       throw new AgreelyConfigError("Agreely requires an apiKey.");
     }
 
+    this.baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+
     this.transport = new Transport({
-      baseUrl: options.baseUrl ?? DEFAULT_BASE_URL,
+      baseUrl: this.baseUrl,
       apiKey: options.apiKey,
       timeoutMs: options.timeout ?? DEFAULT_TIMEOUT_MS,
       ...(options.fetch !== undefined ? { fetch: options.fetch } : {}),
@@ -98,6 +102,20 @@ export class Agreely {
   /** Read a PDF from disk and hash it (Node) — see {@link Agreely.hashPdf}. */
   static async hashPdfFile(path: string): Promise<string> {
     return Agreely.hashPdf(await readFile(path));
+  }
+
+  /**
+   * Identify the presented key against the server (GET /v1/whoami): the REAL,
+   * server-verified scopes it carries. Least-disclosure — the wire response is
+   * scopes-only (no company id, no key name, no PII). Any valid key reaches it.
+   * A read; safe to auto-retry on a transient outage.
+   */
+  identity(): Promise<Identity> {
+    return this.transport.request<Identity>({
+      method: "GET",
+      path: "/v1/whoami",
+      idempotentRetry: true,
+    });
   }
 
   /**

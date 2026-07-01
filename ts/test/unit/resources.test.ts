@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Agreely } from "../../src/index.js";
+import { Agreely, AgreelyAuthError, AgreelyNotFoundError } from "../../src/index.js";
 import { mockFetch } from "./helpers.js";
 
 const BASE = "http://api.test";
@@ -83,6 +83,56 @@ describe("consentRequests.get", () => {
     const r = await agreely.consentRequests.get(REQ_ID);
     expect(r.requestId).toBe(REQ_ID);
     expect(calls[0]!.url).toBe(`${BASE}/v1/consent-requests/${REQ_ID}`);
+  });
+});
+
+describe("client.identity", () => {
+  it("GETs /v1/whoami and returns the server-verified scopes", async () => {
+    const { agreely, calls } = client([{ json: { scopes: ["check", "issue"] } }]);
+    const identity = await agreely.identity();
+    expect(identity.scopes).toEqual(["check", "issue"]);
+    expect(calls[0]!.url).toBe(`${BASE}/v1/whoami`);
+    expect(calls[0]!.method).toBe("GET");
+  });
+
+  it("surfaces a 401 as AgreelyAuthError", async () => {
+    const { agreely } = client([
+      { status: 401, json: { error: { code: "unauthorized", message: "no" } } },
+    ]);
+    await expect(agreely.identity()).rejects.toBeInstanceOf(AgreelyAuthError);
+  });
+
+  it("exposes the configured baseUrl client-side", () => {
+    const { agreely } = client([]);
+    expect(agreely.baseUrl).toBe(BASE);
+  });
+});
+
+describe("consentRequests.cancel", () => {
+  it("POSTs to /{id}/cancel and returns the cancel outcome (cancelled:true)", async () => {
+    const out = { requestId: REQ_ID, status: "revoked_before_action", cancelled: true };
+    const { agreely, calls } = client([{ json: out }]);
+    const r = await agreely.consentRequests.cancel(REQ_ID);
+    expect(r).toEqual(out);
+    expect(calls[0]!.url).toBe(`${BASE}/v1/consent-requests/${REQ_ID}/cancel`);
+    expect(calls[0]!.method).toBe("POST");
+  });
+
+  it("returns cancelled:false idempotently for an already-terminal request", async () => {
+    const out = { requestId: REQ_ID, status: "approved", cancelled: false };
+    const { agreely } = client([{ json: out }]);
+    const r = await agreely.consentRequests.cancel(REQ_ID);
+    expect(r.cancelled).toBe(false);
+    expect(r.status).toBe("approved");
+  });
+
+  it("maps a 404 to AgreelyNotFoundError", async () => {
+    const { agreely } = client([
+      { status: 404, json: { error: { code: "not_found", message: "no such request" } } },
+    ]);
+    await expect(agreely.consentRequests.cancel(REQ_ID)).rejects.toBeInstanceOf(
+      AgreelyNotFoundError,
+    );
   });
 });
 

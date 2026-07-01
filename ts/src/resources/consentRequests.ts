@@ -1,6 +1,7 @@
 import { AgreelyAbortError, AgreelyRateLimitError, AgreelyTimeoutError } from "../errors.js";
 import type { Transport } from "../transport.js";
 import type {
+  CancelledRequest,
   ConsentRequestPage,
   ConsentRequestRecord,
   ConsentRequestStatus,
@@ -86,6 +87,24 @@ export class ConsentRequests {
       method: "GET",
       path: `/v1/consent-requests/${encodeURIComponent(requestId)}`,
       idempotentRetry: true,
+    });
+  }
+
+  /**
+   * Cancel a still-PENDING request by its protocol requestId (0x + 64hex) — the
+   * company-side "revoke before action" path. The request flips to the terminal
+   * revoked_before_action status so its deep link no longer leads to an approval.
+   *
+   * IDEMPOTENT server-side: an already-terminal request is NOT an error — it
+   * returns cancelled=false with its current status. Only a pending->cancelled
+   * transition returns cancelled=true. An unknown/foreign id maps to
+   * AgreelyNotFoundError (404). Never auto-retried (it mutates).
+   */
+  cancel(requestId: string): Promise<CancelledRequest> {
+    return this.transport.request<CancelledRequest>({
+      method: "POST",
+      path: `/v1/consent-requests/${encodeURIComponent(requestId)}/cancel`,
+      idempotentRetry: false,
     });
   }
 

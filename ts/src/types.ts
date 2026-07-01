@@ -6,6 +6,23 @@
 export type Decision = "allow" | "deny";
 
 /**
+ * A /v1 API-key scope: 'check' (the synchronous check), 'issue' (consent-request
+ * issuance + reads), 'attest' (manual / offline consent recording).
+ */
+export type Scope = "check" | "issue" | "attest";
+
+/**
+ * The least-disclosure identity of the presented key, from GET /v1/whoami. The
+ * WIRE response carries ONLY the key's own scopes — no company id, no key name,
+ * no counters, no PII. `baseUrl` is added CLIENT-SIDE (the configured endpoint),
+ * never part of the wire body.
+ */
+export interface Identity {
+  /** The presented key's scopes, exactly as the server reports them. */
+  scopes: Scope[];
+}
+
+/**
  * How an enforcement record was established:
  *   "citizen_signed"   -> the subject signed it themselves (the live consent flow)
  *   "company_attested" -> the company recorded it offline (the manual / offline path)
@@ -99,6 +116,19 @@ export interface ConsentRequestRecord {
   createdAt: string;
   settledAt: string | null;
   items: ItemLabels[];
+}
+
+/**
+ * The 200 body from POST /v1/consent-requests/{id}/cancel. `cancelled` is true
+ * only when THIS call flipped a pending request to revoked_before_action; false
+ * on an idempotent no-op against an already-terminal request (not an error).
+ * `status` is the request's status AFTER the call.
+ */
+export interface CancelledRequest {
+  /** The protocol requestId (0x-prefixed 64-hex). */
+  requestId: string;
+  status: ConsentRequestStatus;
+  cancelled: boolean;
 }
 
 export interface ListConsentRequestsInput {

@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   Agreely,
   AgreelyAuthError,
+  AgreelyNotFoundError,
   AgreelyValidationError,
   type CheckResult,
 } from "../../src/index.js";
@@ -174,6 +175,56 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       // A granted this (subject, labels); B did not. A leak would show allow.
       expect(r.decision).toBe("deny");
       expect(r.status).toBe("none");
+    });
+  });
+
+  describe("identity (GET /v1/whoami)", () => {
+    it("returns the key's scopes, and nothing else (least disclosure)", async () => {
+      const identity = await agreely.identity();
+      assertExactKeys(identity as unknown as Record<string, unknown>, ["scopes"]);
+      expect(identity.scopes).toContain("check");
+      // No company id / name / counters leak into the body.
+      const raw = JSON.stringify(identity);
+      expect(raw).not.toContain("company");
+
+      const issuer = new Agreely({ apiKey: fixture!.keys.issue, baseUrl: fixture!.baseUrl });
+      expect((await issuer.identity()).scopes).toContain("issue");
+    });
+
+    it("rejects a bad key with AgreelyAuthError (401)", async () => {
+      const bad = new Agreely({ apiKey: "agr_live_" + "z".repeat(43), baseUrl: fixture!.baseUrl });
+      await expect(bad.identity()).rejects.toBeInstanceOf(AgreelyAuthError);
+    });
+  });
+
+  describe("cancel (POST /v1/consent-requests/{id}/cancel)", () => {
+    it("cancels a pending request, then is idempotent on the terminal state", async () => {
+      const issuer = new Agreely({ apiKey: fixture!.keys.issue, baseUrl: fixture!.baseUrl });
+      const created = await issuer.consentRequests.create({
+        customerId: fixture!.subject,
+        recipientEmail: fixture!.issue.recipientEmail,
+        items: [fixture!.issue.catalogId],
+        validUntil: fixture!.issue.validUntil,
+      });
+
+      const cancelled = await issuer.consentRequests.cancel(created.requestId);
+      assertExactKeys(cancelled as unknown as Record<string, unknown>, ["requestId", "status", "cancelled"]);
+      expect(cancelled.requestId).toBe(created.requestId);
+      expect(cancelled.status).toBe("revoked_before_action");
+      expect(cancelled.cancelled).toBe(true);
+
+      // Idempotent: a second cancel is not an error and reports cancelled:false.
+      const again = await issuer.consentRequests.cancel(created.requestId);
+      expect(again.cancelled).toBe(false);
+      expect(again.status).toBe("revoked_before_action");
+    });
+
+    it("maps an unknown request to AgreelyNotFoundError (404)", async () => {
+      const issuer = new Agreely({ apiKey: fixture!.keys.issue, baseUrl: fixture!.baseUrl });
+      await expect(issuer.consentRequests.cancel("0x" + "a".repeat(64))).rejects.toMatchObject({
+        name: "AgreelyNotFoundError",
+        status: 404,
+      });
     });
   });
 
