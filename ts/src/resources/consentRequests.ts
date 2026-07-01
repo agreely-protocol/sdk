@@ -1,4 +1,4 @@
-import { AgreelyAbortError, AgreelyRateLimitError, AgreelyTimeoutError } from "../errors.js";
+import { AgreelyAbortError, AgreelyConfigError, AgreelyRateLimitError, AgreelyTimeoutError } from "../errors.js";
 import type { Transport } from "../transport.js";
 import type {
   CancelledRequest,
@@ -47,12 +47,25 @@ export class ConsentRequests {
   constructor(private readonly transport: Transport) {}
 
   /**
-   * Issue a consent request. Items are catalog ids and/or raw {category,
-   * purpose} pairs — sent RAW, resolved server-side. NEVER auto-retried (it
-   * emails): an Idempotency-Key is auto-generated per call (overridable) so a
-   * caller-driven retry replays rather than double-issues.
+   * Issue a consent request under a PUBLISHED consent document (the Law 25
+   * s. 8 disclosure). Exactly ONE of `consentDocumentId` / `documentCode` is
+   * required; the requested items derive from the document server-side. NEVER
+   * auto-retried (it emails): an Idempotency-Key is auto-generated per call
+   * (overridable) so a caller-driven retry replays rather than double-issues.
    */
   create(input: CreateConsentRequestInput, options: CreateOptions = {}): Promise<IssuedRequest> {
+    const hasId = typeof input.consentDocumentId === "string" && input.consentDocumentId.trim() !== "";
+    const hasCode = typeof input.documentCode === "string" && input.documentCode.trim() !== "";
+    if (!hasId && !hasCode) {
+      throw new AgreelyConfigError(
+        "consentRequests.create requires a consent document: pass consentDocumentId or documentCode.",
+      );
+    }
+    if (hasId && hasCode) {
+      throw new AgreelyConfigError(
+        "consentRequests.create takes either consentDocumentId or documentCode, not both.",
+      );
+    }
     const idempotencyKey = options.idempotencyKey ?? generateIdempotencyKey();
     return this.transport.request<IssuedRequest>({
       method: "POST",
@@ -61,7 +74,8 @@ export class ConsentRequests {
         customerId: input.customerId,
         recipientEmail: input.recipientEmail,
         validUntil: input.validUntil,
-        items: input.items,
+        ...(hasId ? { consentDocumentId: input.consentDocumentId } : {}),
+        ...(hasCode ? { documentCode: input.documentCode } : {}),
       },
       headers: { "Idempotency-Key": idempotencyKey },
       idempotentRetry: false,

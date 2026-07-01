@@ -32,34 +32,54 @@ final class ConsentRequests
     }
 
     /**
-     * Issue a consent request. Items are catalog ids and/or raw {category, purpose}
-     * pairs — sent RAW, resolved server-side. NEVER auto-retried (it emails): an
-     * Idempotency-Key is auto-generated per call (override via
-     * $options['idempotencyKey']) so a caller-driven retry replays the original 201
-     * byte-for-byte rather than double-issuing.
+     * Issue a consent request under a PUBLISHED consent document (the Law 25
+     * s. 8 disclosure). Exactly ONE of 'consentDocumentId' / 'documentCode' is
+     * required; the requested (category, purpose) items derive from the document
+     * server-side. NEVER auto-retried (it emails): an Idempotency-Key is
+     * auto-generated per call (override via $options['idempotencyKey']) so a
+     * caller-driven retry replays the original 201 byte-for-byte rather than
+     * double-issuing.
      *
-     * @param array{customerId:string,recipientEmail:string,items:list<string|array{category:string,purpose:string}>,validUntil:string} $input
+     * @param array{customerId:string,recipientEmail:string,consentDocumentId?:string,documentCode?:string,validUntil:string} $input
      * @param array{idempotencyKey?:string} $options
      */
     public function create(array $input, array $options = []): IssuedRequest
     {
-        foreach (['customerId', 'recipientEmail', 'items', 'validUntil'] as $required) {
+        foreach (['customerId', 'recipientEmail', 'validUntil'] as $required) {
             if (!isset($input[$required])) {
                 throw new AgreelyConfigError("consentRequests.create requires \"{$required}\".");
             }
         }
+        $documentId = trim((string) ($input['consentDocumentId'] ?? ''));
+        $documentCode = trim((string) ($input['documentCode'] ?? ''));
+        if ($documentId === '' && $documentCode === '') {
+            throw new AgreelyConfigError(
+                'consentRequests.create requires a consent document: pass "consentDocumentId" or "documentCode".',
+            );
+        }
+        if ($documentId !== '' && $documentCode !== '') {
+            throw new AgreelyConfigError(
+                'consentRequests.create takes either "consentDocumentId" or "documentCode", not both.',
+            );
+        }
 
         $idempotencyKey = $options['idempotencyKey'] ?? self::generateIdempotencyKey();
+
+        $body = [
+            'customerId' => $input['customerId'],
+            'recipientEmail' => $input['recipientEmail'],
+            'validUntil' => $input['validUntil'],
+        ];
+        if ($documentId !== '') {
+            $body['consentDocumentId'] = $documentId;
+        } else {
+            $body['documentCode'] = $documentCode;
+        }
 
         $wire = $this->transport->request(new RequestSpec(
             method: 'POST',
             path: '/v1/consent-requests',
-            body: [
-                'customerId' => $input['customerId'],
-                'recipientEmail' => $input['recipientEmail'],
-                'validUntil' => $input['validUntil'],
-                'items' => $input['items'],
-            ],
+            body: $body,
             headers: ['Idempotency-Key' => $idempotencyKey],
             idempotentRetry: false,
         ));

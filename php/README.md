@@ -56,7 +56,9 @@ $r = $agreely->consentRequests()->create([
     'customerId'     => 'cust_8812',
     'recipientEmail' => 'person@example.com',
     // catalog entry ids AND/OR raw {category, purpose} pairs:
-    'items'          => ['<catalogEntryId>', ['category' => 'Email address', 'purpose' => 'Newsletter']],
+    // REQUIRED: the published consent document (the Law 25 s. 8 disclosure) the
+    // request is issued under; the requested items derive from it server-side.
+    'consentDocumentId' => '<documentVersionId>', // or: 'documentCode' => 'conditions-marketing'
     'validUntil'     => '2031-01-01',
 ]);
 // $r->requestId  "0x…64hex"  (the protocol handle — the public id, NOT a uuid)

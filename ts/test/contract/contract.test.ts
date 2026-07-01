@@ -6,7 +6,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   Agreely,
   AgreelyAuthError,
-  AgreelyNotFoundError,
   AgreelyValidationError,
   type CheckResult,
 } from "../../src/index.js";
@@ -26,6 +25,8 @@ interface Fixture {
     catalogId: string;
     category: string;
     purpose: string;
+    documentId: string;
+    documentCode: string;
     recipientEmail: string;
     validUntil: string;
   };
@@ -203,7 +204,7 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       const created = await issuer.consentRequests.create({
         customerId: fixture!.subject,
         recipientEmail: fixture!.issue.recipientEmail,
-        items: [fixture!.issue.catalogId],
+        consentDocumentId: fixture!.issue.documentId,
         validUntil: fixture!.issue.validUntil,
       });
 
@@ -246,7 +247,7 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       const input = {
         customerId: fixture!.subject,
         recipientEmail: fixture!.issue.recipientEmail,
-        items: [fixture!.issue.catalogId],
+        consentDocumentId: fixture!.issue.documentId,
         validUntil: fixture!.issue.validUntil,
       };
       const key = "sdk-contract-" + Math.random().toString(36).slice(2);
@@ -254,8 +255,9 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       const first = await issuer.consentRequests.create(input, { idempotencyKey: key });
       assertExactKeys(
         first as unknown as Record<string, unknown>,
-        ["requestId", "status", "deepLink", "emailDelivered", "items"],
+        ["requestId", "status", "deepLink", "emailDelivered", "items", "document"],
       );
+      expect(first.document.code).toBe(fixture!.issue.documentCode);
       expect(first.requestId).toMatch(REQUEST_ID);
       expect(first.status).toBe("pending");
 
@@ -267,7 +269,7 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       expect(got.requestId).toBe(first.requestId);
       assertExactKeys(
         got as unknown as Record<string, unknown>,
-        ["requestId", "status", "validUntil", "expiresAt", "createdAt", "settledAt", "items"],
+        ["requestId", "status", "validUntil", "expiresAt", "createdAt", "settledAt", "items", "document"],
       );
 
       // list() surfaces it; the page maps the wire `requests` field to `items`.
@@ -277,15 +279,16 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       expect(page.items.some((r) => r.requestId === first.requestId)).toBe(true);
     });
 
-    it("resolves a {category,purpose} pair item server-side", async () => {
+    it("resolves a documentCode to the published version server-side", async () => {
       const issuer = new Agreely({ apiKey: fixture!.keys.issue, baseUrl: fixture!.baseUrl });
       const created = await issuer.consentRequests.create({
         customerId: fixture!.subject,
         recipientEmail: fixture!.issue.recipientEmail,
-        items: [{ category: fixture!.issue.category, purpose: fixture!.issue.purpose }],
+        documentCode: fixture!.issue.documentCode,
         validUntil: fixture!.issue.validUntil,
       });
       expect(created.requestId).toMatch(REQUEST_ID);
+      expect(created.document.code).toBe(fixture!.issue.documentCode);
       expect(created.items[0]).toMatchObject({
         category: fixture!.issue.category,
         purpose: fixture!.issue.purpose,

@@ -50,11 +50,13 @@ throw. Errors (auth, validation, rate-limit, outage) throw typed errors.
 const r = await agreely.consentRequests.create({
   customerId: "cust_8812",
   recipientEmail: "person@example.com",
-  // catalog entry ids AND/OR raw {category, purpose} pairs:
-  items: ["<catalogEntryId>", { category: "Email address", purpose: "Newsletter" }],
+  // REQUIRED: the published consent document (the Law 25 s. 8 disclosure) the
+  // request is issued under. Pass its version id OR its code (one, not both);
+  // the requested (category, purpose) items derive from the document.
+  consentDocumentId: "<documentVersionId>", // or: documentCode: "conditions-marketing"
   validUntil: "2031-01-01",
 });
-// { requestId: "0x…64hex", status: "pending", deepLink, emailDelivered, items }
+// { requestId: "0x…64hex", status: "pending", deepLink, emailDelivered, items, document }
 ```
 
 `create` is **never auto-retried** (it emails). The SDK attaches a unique

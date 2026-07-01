@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Agreely, AgreelyAuthError, AgreelyNotFoundError } from "../../src/index.js";
+import { Agreely, AgreelyAuthError, AgreelyConfigError, AgreelyNotFoundError } from "../../src/index.js";
 import { mockFetch } from "./helpers.js";
 
 const BASE = "http://api.test";
@@ -14,10 +14,14 @@ describe("consentRequests.create — Idempotency-Key", () => {
   const input = {
     customerId: "c1",
     recipientEmail: "user@example.com",
-    items: ["cat-id-1", { category: "Email", purpose: "News" }],
+    consentDocumentId: "6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b",
     validUntil: "2031-01-01",
   };
-  const created = { requestId: REQ_ID, status: "pending", deepLink: "https://x", emailDelivered: true, items: [{ category: "Email", purpose: "News" }] };
+  const created = {
+    requestId: REQ_ID, status: "pending", deepLink: "https://x", emailDelivered: true,
+    items: [{ category: "Email", purpose: "News" }],
+    document: { code: "terms", name: "Terms", version: "1.0" },
+  };
 
   it("auto-generates a unique Idempotency-Key per call", async () => {
     const { agreely, calls } = client([{ status: 201, json: created }, { status: 201, json: created }]);
@@ -36,22 +40,52 @@ describe("consentRequests.create — Idempotency-Key", () => {
     expect(calls[0]!.headers["Idempotency-Key"]).toBe("my-key-123");
   });
 
-  it("sends items RAW (strings and {category,purpose} pairs untouched)", async () => {
+  it("sends the bound consent document id and NEVER an items list", async () => {
     const { agreely, calls } = client([{ status: 201, json: created }]);
     await agreely.consentRequests.create(input);
     expect(calls[0]!.body).toMatchObject({
       customerId: "c1",
       recipientEmail: "user@example.com",
       validUntil: "2031-01-01",
-      items: ["cat-id-1", { category: "Email", purpose: "News" }],
+      consentDocumentId: "6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b",
     });
+    expect(calls[0]!.body).not.toHaveProperty("items");
   });
 
-  it("returns the issued request keyed on the protocol requestId", async () => {
+  it("sends documentCode when given instead of the id", async () => {
+    const { agreely, calls } = client([{ status: 201, json: created }]);
+    await agreely.consentRequests.create({
+      customerId: "c1", recipientEmail: "user@example.com", documentCode: "terms", validUntil: "2031-01-01",
+    });
+    expect(calls[0]!.body).toMatchObject({ documentCode: "terms" });
+    expect(calls[0]!.body).not.toHaveProperty("consentDocumentId");
+  });
+
+  it("throws AgreelyConfigError without a consent document reference (nothing sent)", async () => {
+    const { agreely, calls } = client([]);
+    expect(() =>
+      agreely.consentRequests.create({ customerId: "c1", recipientEmail: "u@x.com", validUntil: "2031-01-01" }),
+    ).toThrow(AgreelyConfigError);
+    expect(calls.length).toBe(0);
+  });
+
+  it("throws AgreelyConfigError when BOTH consentDocumentId and documentCode are given", async () => {
+    const { agreely, calls } = client([]);
+    expect(() =>
+      agreely.consentRequests.create({
+        customerId: "c1", recipientEmail: "u@x.com", validUntil: "2031-01-01",
+        consentDocumentId: "6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b", documentCode: "terms",
+      }),
+    ).toThrow(AgreelyConfigError);
+    expect(calls.length).toBe(0);
+  });
+
+  it("returns the issued request keyed on the protocol requestId, with its document", async () => {
     const { agreely } = client([{ status: 201, json: created }]);
     const r = await agreely.consentRequests.create(input);
     expect(r.requestId).toBe(REQ_ID);
     expect(r.status).toBe("pending");
+    expect(r.document).toEqual({ code: "terms", name: "Terms", version: "1.0" });
   });
 });
 

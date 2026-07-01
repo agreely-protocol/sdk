@@ -14,6 +14,7 @@ const rec = (id: string, status = "pending") => ({
   createdAt: "2026-01-01T00:00:00Z",
   settledAt: null,
   items: [],
+  document: null,
 });
 
 describe("consentRequests.listAll / collect", () => {

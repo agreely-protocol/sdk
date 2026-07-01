@@ -71,10 +71,10 @@ final class Fixture
         return $r;
     }
 
-    /** @return array{catalogId:string,category:string,purpose:string,recipientEmail:string,validUntil:string} */
+    /** @return array{catalogId:string,category:string,purpose:string,documentId:string,documentCode:string,recipientEmail:string,validUntil:string} */
     public function issue(): array
     {
-        /** @var array{catalogId:string,category:string,purpose:string,recipientEmail:string,validUntil:string} $i */
+        /** @var array{catalogId:string,category:string,purpose:string,documentId:string,documentCode:string,recipientEmail:string,validUntil:string} $i */
         $i = $this->data['issue'];
         return $i;
     }

@@ -79,13 +79,32 @@ export interface ItemLabels {
  */
 export type IssueItem = string | { category: string; purpose: string };
 
+/**
+ * Input for issuing a consent request. Every request is issued under a
+ * PUBLISHED consent document (the Law 25 s. 8 disclosure): exactly ONE of
+ * `consentDocumentId` / `documentCode` is required. The requested (category,
+ * purpose) items derive from the document server-side — there is no caller
+ * items list.
+ */
 export interface CreateConsentRequestInput {
   customerId: string;
   recipientEmail: string;
-  /** Catalog entry ids and/or {category, purpose} pairs. At least one. */
-  items: IssueItem[];
+  /** The published consent document VERSION id to issue under. */
+  consentDocumentId?: string;
+  /** A document code; the server resolves the currently-published version. */
+  documentCode?: string;
   /** The consent lifespan if approved (a future date/time, ISO-8601). */
   validUntil: string;
+}
+
+/**
+ * The bound consent document snapshot (code, name, version) the signed offer
+ * commits to.
+ */
+export interface ConsentDocumentDescriptor {
+  code: string;
+  name: string;
+  version: string;
 }
 
 /** The 201 body from issuance (or an idempotent replay of it). */
@@ -97,6 +116,8 @@ export interface IssuedRequest {
   deepLink: string;
   emailDelivered: boolean;
   items: ItemLabels[];
+  /** The published consent document the request was issued under. */
+  document: ConsentDocumentDescriptor;
 }
 
 export type ConsentRequestStatus =
@@ -116,6 +137,8 @@ export interface ConsentRequestRecord {
   createdAt: string;
   settledAt: string | null;
   items: ItemLabels[];
+  /** Null only on legacy rows issued before the document became mandatory. */
+  document: ConsentDocumentDescriptor | null;
 }
 
 /**

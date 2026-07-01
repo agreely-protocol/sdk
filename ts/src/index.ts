@@ -30,6 +30,7 @@ export type {
   ItemLabels,
   IssueItem,
   CreateConsentRequestInput,
+  ConsentDocumentDescriptor,
   IssuedRequest,
   ConsentRequestStatus,
   ConsentRequestRecord,

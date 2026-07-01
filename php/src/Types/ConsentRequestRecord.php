@@ -21,6 +21,8 @@ final class ConsentRequestRecord
         public readonly string $createdAt,
         public readonly ?string $settledAt,
         public readonly array $items,
+        /** Null only on legacy records issued before the document became mandatory. */
+        public readonly ?ConsentDocumentDescriptor $document = null,
     ) {
     }
 
@@ -35,6 +37,7 @@ final class ConsentRequestRecord
             Wire::str($wire['createdAt'] ?? null),
             Wire::nullableStr($wire['settledAt'] ?? null),
             ItemLabels::listFromWire(Wire::objects($wire, 'items')),
+            ConsentDocumentDescriptor::fromWireNullable($wire['document'] ?? null),
         );
     }
 }

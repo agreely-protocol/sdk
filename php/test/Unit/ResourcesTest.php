@@ -31,18 +31,22 @@ final class ResourcesTest extends TestCase
                 'deepLink' => 'https://link',
                 'emailDelivered' => true,
                 'items' => [['category' => 'Phone Number', 'purpose' => 'Account Security']],
+                'document' => ['code' => 'terms', 'name' => 'Terms', 'version' => '1.0'],
             ]),
         ]);
         $r = $this->client($http)->consentRequests()->create([
             'customerId' => 'cust',
             'recipientEmail' => 'r@e.com',
-            'items' => ['0xcat'],
+            'consentDocumentId' => '6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b',
             'validUntil' => '2031-01-01',
         ]);
         $this->assertInstanceOf(IssuedRequest::class, $r);
         $this->assertSame('pending', $r->status);
         $this->assertCount(1, $r->items);
         $this->assertSame('Phone Number', $r->items[0]->category);
+        $this->assertNotNull($r->document);
+        $this->assertSame('terms', $r->document->code);
+        $this->assertSame('1.0', $r->document->version);
 
         $key = $http->calls[0]->header('Idempotency-Key');
         $this->assertNotNull($key);
@@ -55,7 +59,7 @@ final class ResourcesTest extends TestCase
             MockHttpClient::json(201, ['requestId' => '0x' . str_repeat('a', 64), 'status' => 'pending', 'deepLink' => 'x', 'emailDelivered' => true, 'items' => []]),
         ]);
         $client = $this->client($http);
-        $input = ['customerId' => 'c', 'recipientEmail' => 'r@e.com', 'items' => ['0x'], 'validUntil' => '2031-01-01'];
+        $input = ['customerId' => 'c', 'recipientEmail' => 'r@e.com', 'consentDocumentId' => '6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b', 'validUntil' => '2031-01-01'];
         $client->consentRequests()->create($input);
         $client->consentRequests()->create($input);
         $this->assertNotSame(
@@ -70,13 +74,13 @@ final class ResourcesTest extends TestCase
             MockHttpClient::json(201, ['requestId' => '0x' . str_repeat('a', 64), 'status' => 'pending', 'deepLink' => 'x', 'emailDelivered' => true, 'items' => []]),
         ]);
         $this->client($http)->consentRequests()->create(
-            ['customerId' => 'c', 'recipientEmail' => 'r@e.com', 'items' => ['0x'], 'validUntil' => '2031-01-01'],
+            ['customerId' => 'c', 'recipientEmail' => 'r@e.com', 'consentDocumentId' => '6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b', 'validUntil' => '2031-01-01'],
             ['idempotencyKey' => 'order-4471'],
         );
         $this->assertSame('order-4471', $http->calls[0]->header('Idempotency-Key'));
     }
 
-    public function testCreateSendsRawItemsOnTheWire(): void
+    public function testCreateSendsTheDocumentIdAndNeverAnItemsList(): void
     {
         $http = new MockHttpClient([
             MockHttpClient::json(201, ['requestId' => '0x' . str_repeat('a', 64), 'status' => 'pending', 'deepLink' => 'x', 'emailDelivered' => true, 'items' => []]),
@@ -84,16 +88,55 @@ final class ResourcesTest extends TestCase
         $this->client($http)->consentRequests()->create([
             'customerId' => 'c',
             'recipientEmail' => 'r@e.com',
-            'items' => ['0xcat', ['category' => '  Email ADDRESS ', 'purpose' => 'Newsletter']],
+            'consentDocumentId' => '6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b',
             'validUntil' => '2031-01-01',
         ]);
         $body = $http->calls[0]->body;
         $this->assertNotNull($body);
-        $items = $body['items'];
-        $this->assertIsArray($items);
-        $this->assertSame('0xcat', $items[0]);
-        $this->assertIsArray($items[1]);
-        $this->assertSame('  Email ADDRESS ', $items[1]['category']); // raw, not normalized
+        $this->assertSame('6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b', $body['consentDocumentId']);
+        $this->assertArrayNotHasKey('items', $body);
+        $this->assertArrayNotHasKey('documentCode', $body);
+    }
+
+    public function testCreateSendsDocumentCodeWhenGivenInsteadOfTheId(): void
+    {
+        $http = new MockHttpClient([
+            MockHttpClient::json(201, ['requestId' => '0x' . str_repeat('a', 64), 'status' => 'pending', 'deepLink' => 'x', 'emailDelivered' => true, 'items' => []]),
+        ]);
+        $this->client($http)->consentRequests()->create([
+            'customerId' => 'c',
+            'recipientEmail' => 'r@e.com',
+            'documentCode' => 'conditions-marketing',
+            'validUntil' => '2031-01-01',
+        ]);
+        $body = $http->calls[0]->body;
+        $this->assertNotNull($body);
+        $this->assertSame('conditions-marketing', $body['documentCode']);
+        $this->assertArrayNotHasKey('consentDocumentId', $body);
+    }
+
+    public function testCreateWithoutADocumentThrowsConfigErrorAndSendsNothing(): void
+    {
+        $http = new MockHttpClient([]);
+        try {
+            $this->client($http)->consentRequests()->create([
+                'customerId' => 'c', 'recipientEmail' => 'r@e.com', 'validUntil' => '2031-01-01',
+            ]);
+            $this->fail('A document-less create must throw.');
+        } catch (\Agreely\Sdk\Errors\AgreelyConfigError $e) {
+            $this->assertStringContainsString('consentDocumentId', $e->getMessage());
+        }
+        $this->assertCount(0, $http->calls, 'Nothing was sent.');
+    }
+
+    public function testCreateWithBothIdAndCodeThrowsConfigError(): void
+    {
+        $http = new MockHttpClient([]);
+        $this->expectException(\Agreely\Sdk\Errors\AgreelyConfigError::class);
+        $this->client($http)->consentRequests()->create([
+            'customerId' => 'c', 'recipientEmail' => 'r@e.com', 'validUntil' => '2031-01-01',
+            'consentDocumentId' => '6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b', 'documentCode' => 'terms',
+        ]);
     }
 
     public function testListMapsRequestsToItemsAndCursor(): void

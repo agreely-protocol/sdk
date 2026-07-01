@@ -58,7 +58,7 @@ final class RetryTest extends TestCase
             $this->client($http)->consentRequests()->create([
                 'customerId' => 'c',
                 'recipientEmail' => 'r@e.com',
-                'items' => ['0xcat'],
+                'consentDocumentId' => '6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b',
                 'validUntil' => '2031-01-01',
             ]);
             $this->fail('expected the outage to surface (create is never retried)');

@@ -18,6 +18,8 @@ final class IssuedRequest
         public readonly string $deepLink,
         public readonly bool $emailDelivered,
         public readonly array $items,
+        /** The published consent document the request was issued under. */
+        public readonly ?ConsentDocumentDescriptor $document = null,
     ) {
     }
 
@@ -30,6 +32,7 @@ final class IssuedRequest
             Wire::str($wire['deepLink'] ?? null),
             Wire::bool($wire['emailDelivered'] ?? false),
             ItemLabels::listFromWire(Wire::objects($wire, 'items')),
+            ConsentDocumentDescriptor::fromWireNullable($wire['document'] ?? null),
         );
     }
 }

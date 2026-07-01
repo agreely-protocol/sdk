@@ -47,7 +47,7 @@ describe("retry policy", () => {
       agreely.consentRequests.create({
         customerId: "c",
         recipientEmail: "a@b.co",
-        items: ["id1"],
+        consentDocumentId: "6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b",
         validUntil: "2030-01-01",
       }),
     ).rejects.toMatchObject({ name: "AgreelyUnavailableError" });

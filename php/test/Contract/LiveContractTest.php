@@ -125,7 +125,7 @@ final class LiveContractTest extends TestCase
         $input = [
             'customerId' => $this->fixture->subject(),
             'recipientEmail' => $issue['recipientEmail'],
-            'items' => [$issue['catalogId']],
+            'consentDocumentId' => $issue['documentId'],
             'validUntil' => $issue['validUntil'],
         ];
         $key = 'php-contract-' . bin2hex(random_bytes(6));
@@ -133,6 +133,7 @@ final class LiveContractTest extends TestCase
         $first = $issuer->consentRequests()->create($input, ['idempotencyKey' => $key]);
         $this->assertMatchesRegularExpression(self::REQUEST_ID, $first->requestId);
         $this->assertSame('pending', $first->status);
+        $this->assertSame($issue['documentCode'], $first->document?->code);
 
         // Same key -> replay the original 201 (no new issue, no second email).
         $replay = $issuer->consentRequests()->create($input, ['idempotencyKey' => $key]);
@@ -148,17 +149,18 @@ final class LiveContractTest extends TestCase
         $this->assertNotEmpty($found);
     }
 
-    public function testRawCategoryPurposePairItemResolvedServerSide(): void
+    public function testDocumentCodeResolvedToThePublishedVersionServerSide(): void
     {
         $issuer = $this->client('issue');
         $issue = $this->fixture->issue();
         $created = $issuer->consentRequests()->create([
             'customerId' => $this->fixture->subject(),
             'recipientEmail' => $issue['recipientEmail'],
-            'items' => [['category' => $issue['category'], 'purpose' => $issue['purpose']]],
+            'documentCode' => $issue['documentCode'],
             'validUntil' => $issue['validUntil'],
         ]);
         $this->assertMatchesRegularExpression(self::REQUEST_ID, $created->requestId);
+        $this->assertSame($issue['documentCode'], $created->document?->code);
         $this->assertSame($issue['category'], $created->items[0]->category);
         $this->assertSame($issue['purpose'], $created->items[0]->purpose);
     }
