@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Agreely\Sdk\Test\Unit;
 
 use Agreely\Sdk\Agreely;
+use Agreely\Sdk\Errors\AgreelyAuthError;
+use Agreely\Sdk\Errors\AgreelyNotFoundError;
 use Agreely\Sdk\Test\Support\MockHttpClient;
+use Agreely\Sdk\Types\CancelledRequest;
 use Agreely\Sdk\Types\CatalogEntry;
 use Agreely\Sdk\Types\ConsentRequestPage;
+use Agreely\Sdk\Types\Identity;
 use Agreely\Sdk\Types\IssuedRequest;
 use PHPUnit\Framework\TestCase;
 
@@ -137,6 +141,63 @@ final class ResourcesTest extends TestCase
         $rec = $this->client($http)->consentRequests()->get($rid);
         $this->assertSame($rid, $rec->requestId);
         $this->assertSame('/v1/consent-requests/' . $rid, $http->calls[0]->path());
+    }
+
+    public function testIdentityReturnsServerVerifiedScopes(): void
+    {
+        $http = new MockHttpClient([
+            MockHttpClient::json(200, ['scopes' => ['check', 'issue']]),
+        ]);
+        $identity = $this->client($http)->identity();
+        $this->assertInstanceOf(Identity::class, $identity);
+        $this->assertSame(['check', 'issue'], $identity->scopes);
+        $this->assertSame('https://api.test', $identity->baseUrl);
+        $this->assertSame('GET', $http->calls[0]->method);
+        $this->assertSame('/v1/whoami', $http->calls[0]->path());
+    }
+
+    public function testIdentitySurfacesA401AsAuthError(): void
+    {
+        $http = new MockHttpClient([
+            MockHttpClient::json(401, ['error' => ['code' => 'unauthorized', 'message' => 'no']]),
+        ]);
+        $this->expectException(AgreelyAuthError::class);
+        $this->client($http)->identity();
+    }
+
+    public function testCancelReturnsTheCancelOutcome(): void
+    {
+        $rid = '0x' . str_repeat('a', 64);
+        $http = new MockHttpClient([
+            MockHttpClient::json(200, ['requestId' => $rid, 'status' => 'revoked_before_action', 'cancelled' => true]),
+        ]);
+        $out = $this->client($http)->consentRequests()->cancel($rid);
+        $this->assertInstanceOf(CancelledRequest::class, $out);
+        $this->assertSame($rid, $out->requestId);
+        $this->assertSame('revoked_before_action', $out->status);
+        $this->assertTrue($out->cancelled);
+        $this->assertSame('POST', $http->calls[0]->method);
+        $this->assertSame('/v1/consent-requests/' . $rid . '/cancel', $http->calls[0]->path());
+    }
+
+    public function testCancelIsIdempotentOnTerminalRequest(): void
+    {
+        $rid = '0x' . str_repeat('a', 64);
+        $http = new MockHttpClient([
+            MockHttpClient::json(200, ['requestId' => $rid, 'status' => 'approved', 'cancelled' => false]),
+        ]);
+        $out = $this->client($http)->consentRequests()->cancel($rid);
+        $this->assertFalse($out->cancelled);
+        $this->assertSame('approved', $out->status);
+    }
+
+    public function testCancelMapsA404ToNotFound(): void
+    {
+        $http = new MockHttpClient([
+            MockHttpClient::json(404, ['error' => ['code' => 'not_found', 'message' => 'no such request']]),
+        ]);
+        $this->expectException(AgreelyNotFoundError::class);
+        $this->client($http)->consentRequests()->cancel('0x' . str_repeat('a', 64));
     }
 
     public function testCatalogListReturnsTypedEntries(): void

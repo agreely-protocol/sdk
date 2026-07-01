@@ -9,6 +9,7 @@ use Agreely\Sdk\Errors\AgreelyRateLimitError;
 use Agreely\Sdk\Errors\AgreelyTimeoutError;
 use Agreely\Sdk\Http\RequestSpec;
 use Agreely\Sdk\Http\Transport;
+use Agreely\Sdk\Types\CancelledRequest;
 use Agreely\Sdk\Types\ConsentRequestPage;
 use Agreely\Sdk\Types\ConsentRequestRecord;
 use Agreely\Sdk\Types\IssuedRequest;
@@ -95,6 +96,26 @@ final class ConsentRequests
             idempotentRetry: true,
         ));
         return ConsentRequestRecord::fromWire($wire);
+    }
+
+    /**
+     * Cancel a still-PENDING request by its protocol requestId (0x + 64hex) — the
+     * company-side "revoke before action" path. The request flips to the terminal
+     * revoked_before_action status so its deep link no longer leads to an approval.
+     *
+     * IDEMPOTENT server-side: an already-terminal request is NOT an error — it
+     * returns cancelled=false with its current status. Only a pending->cancelled
+     * transition returns cancelled=true. An unknown/foreign id throws
+     * AgreelyNotFoundError (404). Never auto-retried (it mutates).
+     */
+    public function cancel(string $requestId): CancelledRequest
+    {
+        $wire = $this->transport->request(new RequestSpec(
+            method: 'POST',
+            path: '/v1/consent-requests/' . rawurlencode($requestId) . '/cancel',
+            idempotentRetry: false,
+        ));
+        return CancelledRequest::fromWire($wire);
     }
 
     /**

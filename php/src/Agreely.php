@@ -15,6 +15,7 @@ use Agreely\Sdk\Resources\Catalog;
 use Agreely\Sdk\Resources\ConsentRequests;
 use Agreely\Sdk\Resources\ManualConsents;
 use Agreely\Sdk\Types\CheckResult;
+use Agreely\Sdk\Types\Identity;
 use Agreely\Sdk\Verify\ReceiptVerification;
 use Agreely\Sdk\Verify\ReceiptVerifier;
 
@@ -39,6 +40,7 @@ final class Agreely
     private readonly ConsentRequests $consentRequests;
     private readonly ManualConsents $manualConsents;
     private readonly Catalog $catalog;
+    private readonly string $baseUrl;
 
     /**
      * Recognised keys: apiKey (string, required), baseUrl (string),
@@ -69,6 +71,7 @@ final class Agreely
         $maxRetries = isset($options['maxRetries']) && is_int($options['maxRetries']) ? $options['maxRetries'] : 0;
         $respectRetryAfter = !isset($options['respectRetryAfter']) || $options['respectRetryAfter'] !== false;
 
+        $this->baseUrl = $baseUrl;
         $this->transport = new Transport($baseUrl, $apiKey, $timeout, $httpClient, $maxRetries, $respectRetryAfter);
 
         // The shared upper bound for the maxOutageWindow.
@@ -104,6 +107,29 @@ final class Agreely
     public function catalog(): Catalog
     {
         return $this->catalog;
+    }
+
+    /** The configured API base URL (client-side; the resolved endpoint in use). */
+    public function baseUrl(): string
+    {
+        return $this->baseUrl;
+    }
+
+    /**
+     * Identify the presented key against the server (GET /v1/whoami): the REAL,
+     * server-verified scopes it carries. Least-disclosure — the wire response is
+     * scopes-only (no company id, no key name, no PII). Any valid key reaches it.
+     * The returned Identity also echoes the configured baseUrl (client-side). A
+     * read; safe to auto-retry on a transient outage.
+     */
+    public function identity(): Identity
+    {
+        $wire = $this->transport->request(new RequestSpec(
+            method: 'GET',
+            path: '/v1/whoami',
+            idempotentRetry: true,
+        ));
+        return Identity::fromWire($wire, $this->baseUrl);
     }
 
     /**

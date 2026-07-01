@@ -6,6 +6,7 @@ namespace Agreely\Sdk\Test\Contract;
 
 use Agreely\Sdk\Agreely;
 use Agreely\Sdk\Errors\AgreelyAuthError;
+use Agreely\Sdk\Errors\AgreelyNotFoundError;
 use Agreely\Sdk\Errors\AgreelyRateLimitError;
 use Agreely\Sdk\Errors\AgreelyValidationError;
 use PHPUnit\Framework\TestCase;
@@ -160,6 +161,55 @@ final class LiveContractTest extends TestCase
         $this->assertMatchesRegularExpression(self::REQUEST_ID, $created->requestId);
         $this->assertSame($issue['category'], $created->items[0]->category);
         $this->assertSame($issue['purpose'], $created->items[0]->purpose);
+    }
+
+    public function testIdentityReturnsLeastDisclosureScopes(): void
+    {
+        $identity = $this->client('check')->identity();
+        $this->assertContains('check', $identity->scopes);
+        $this->assertSame($this->fixture->baseUrl(), $identity->baseUrl);
+
+        $issuer = $this->client('issue')->identity();
+        $this->assertContains('issue', $issuer->scopes);
+    }
+
+    public function testIdentityBadKeyThrowsAuthError401(): void
+    {
+        $bad = new Agreely(['apiKey' => 'agr_live_' . str_repeat('z', 43), 'baseUrl' => $this->fixture->baseUrl()]);
+        try {
+            $bad->identity();
+            $this->fail('expected AgreelyAuthError (401)');
+        } catch (AgreelyAuthError $e) {
+            $this->assertSame(401, $e->status);
+        }
+    }
+
+    public function testCancelPendingThenIdempotentOnTerminal(): void
+    {
+        $issuer = $this->client('issue');
+        $issue = $this->fixture->issue();
+        $created = $issuer->consentRequests()->create([
+            'customerId' => $this->fixture->subject(),
+            'recipientEmail' => $issue['recipientEmail'],
+            'items' => [$issue['catalogId']],
+            'validUntil' => $issue['validUntil'],
+        ]);
+
+        $cancelled = $issuer->consentRequests()->cancel($created->requestId);
+        $this->assertSame($created->requestId, $cancelled->requestId);
+        $this->assertSame('revoked_before_action', $cancelled->status);
+        $this->assertTrue($cancelled->cancelled);
+
+        // Idempotent: a second cancel is not an error and reports cancelled=false.
+        $again = $issuer->consentRequests()->cancel($created->requestId);
+        $this->assertFalse($again->cancelled);
+        $this->assertSame('revoked_before_action', $again->status);
+    }
+
+    public function testCancelUnknownRequestThrowsNotFound(): void
+    {
+        $this->expectException(AgreelyNotFoundError::class);
+        $this->client('issue')->consentRequests()->cancel('0x' . str_repeat('a', 64));
     }
 
     public function testRateLimitClassification429(): void
