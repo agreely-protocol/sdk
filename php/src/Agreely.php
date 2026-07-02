@@ -14,6 +14,7 @@ use Agreely\Sdk\Http\Transport;
 use Agreely\Sdk\Resources\Catalog;
 use Agreely\Sdk\Resources\ConsentRequests;
 use Agreely\Sdk\Resources\ManualConsents;
+use Agreely\Sdk\Resources\Relationships;
 use Agreely\Sdk\Types\CheckResult;
 use Agreely\Sdk\Types\Identity;
 use Agreely\Sdk\Verify\ReceiptVerification;
@@ -39,6 +40,7 @@ final class Agreely
     private readonly DegradePolicy $degrade;
     private readonly ConsentRequests $consentRequests;
     private readonly ManualConsents $manualConsents;
+    private readonly Relationships $relationships;
     private readonly Catalog $catalog;
     private readonly string $baseUrl;
 
@@ -88,6 +90,7 @@ final class Agreely
 
         $this->consentRequests = new ConsentRequests($this->transport);
         $this->manualConsents = new ManualConsents($this->transport);
+        $this->relationships = new Relationships($this->transport);
         $this->catalog = new Catalog($this->transport);
     }
 
@@ -101,6 +104,12 @@ final class Agreely
     public function manualConsents(): ManualConsents
     {
         return $this->manualConsents;
+    }
+
+    /** The customer-relationship lifecycle resource (scope 'relationship'). */
+    public function relationships(): Relationships
+    {
+        return $this->relationships;
     }
 
     /** The catalog resource (discovery, scope 'check' OR 'issue'). */
