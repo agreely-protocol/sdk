@@ -122,6 +122,62 @@ describe("verifyReceipt honesty matrix edge cases", () => {
   });
 });
 
+describe("cellLabelBinding cross-checks the human-readable labels (claims-audit P3-F2)", () => {
+  const resolver = (did: string): DidDocument | null => fixtures.didDocuments[did] ?? null;
+  const companyCase = () => cases.find((c) => !(c.receipt as { credentialSubject?: { id?: string } }).credentialSubject?.id)!;
+  const citizenCase = () => cases.find((c) => c.ipfs)!;
+
+  it("a genuine company-attested receipt reports cellLabelBinding: pass and overall: verified", async () => {
+    const result = await Agreely.verifyReceipt(structuredClone(companyCase().receipt), { resolver });
+    expect(result.cellLabelBinding).toBe("pass");
+    expect(result.overall).toBe("verified");
+  });
+
+  it("mutating an item CATEGORY breaks the company signature: cellLabelBinding FAIL, overall failed", async () => {
+    const receipt = structuredClone(companyCase().receipt) as Record<string, unknown>;
+    const items = (receipt.credentialSubject as { consent: { items: Array<Record<string, unknown>> } }).consent.items;
+    items[0]!.category = "HACKED";
+    const result = await Agreely.verifyReceipt(receipt, { resolver });
+    expect(result.companySignature).toBe("fail");
+    expect(result.cellLabelBinding).toBe("fail");
+    expect(result.overall).toBe("failed");
+  });
+
+  it("mutating an item PURPOSE breaks the company signature: cellLabelBinding FAIL, overall failed", async () => {
+    const receipt = structuredClone(companyCase().receipt) as Record<string, unknown>;
+    const items = (receipt.credentialSubject as { consent: { items: Array<Record<string, unknown>> } }).consent.items;
+    items[0]!.purpose = "HACKED";
+    const result = await Agreely.verifyReceipt(receipt, { resolver });
+    expect(result.companySignature).toBe("fail");
+    expect(result.cellLabelBinding).toBe("fail");
+    expect(result.overall).toBe("failed");
+  });
+
+  it("a citizen receipt NEVER reports cellLabelBinding: pass — a mutated label is honestly 'unsupported' offline, never presented as verified", async () => {
+    const genuine = await Agreely.verifyReceipt(structuredClone(citizenCase().receipt), {
+      resolver,
+      ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
+      fetch: (async () =>
+        new Response(JSON.stringify(fixtures.ipfsBody), { headers: { "Content-Type": "application/json" } })) as unknown as typeof fetch,
+    });
+    expect(genuine.cellLabelBinding).toBe("unsupported");
+
+    const receipt = structuredClone(citizenCase().receipt) as Record<string, unknown>;
+    const items = (receipt.credentialSubject as { consent: { items: Array<Record<string, unknown>> } }).consent.items;
+    items[0]!.category = "HACKED"; // offline, no salt/commitment/root to cross-check against — see the note
+    const mutated = await Agreely.verifyReceipt(receipt, {
+      resolver,
+      verifyDisclosure: false,
+    });
+    // Offline the citizen label cannot be cryptographically failed (by design), but it is
+    // never 'pass', and the result is at most 'partial' — a relying party is not misled.
+    expect(mutated.cellLabelBinding).toBe("unsupported");
+    expect(mutated.cellLabelBinding).not.toBe("pass");
+    expect(mutated.overall).not.toBe("verified");
+    expect(mutated.notes.some((n) => n.includes("Do NOT trust the displayed labels"))).toBe(true);
+  });
+});
+
 describe("default did:web resolution targets the apex company DID host", () => {
   // A company DID is did:web:agreely.ca:c:{slug}, served at
   // https://agreely.ca/c/{slug}/did.json (apex host, NOT api.agreely.ca).

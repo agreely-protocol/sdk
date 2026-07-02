@@ -217,6 +217,111 @@ final class ReceiptVerificationTest extends TestCase
         $this->assertSame('https://agreely.ca/c/acme/did.json', $requested);
     }
 
+    public function testGenuineCompanyReceiptReportsCellLabelBindingPass(): void
+    {
+        $docs = self::didDocuments();
+        $result = Agreely::verifyReceipt(self::companyReceipt(), [
+            'resolver' => static fn (string $did): ?array => $docs[$did] ?? null,
+        ]);
+        $this->assertSame('pass', $result->cellLabelBinding);
+        $this->assertSame('verified', $result->overall);
+    }
+
+    public function testMutatingItemCategoryBreaksTheCompanySignatureAndCellLabelBinding(): void
+    {
+        $docs = self::didDocuments();
+        $receipt = self::companyReceipt();
+        /** @var array<string,mixed> $subject */
+        $subject = $receipt['credentialSubject'];
+        /** @var array<string,mixed> $consent */
+        $consent = $subject['consent'];
+        /** @var array<int,array<string,mixed>> $items */
+        $items = $consent['items'];
+        $items[0]['category'] = 'HACKED';
+        $consent['items'] = $items;
+        $subject['consent'] = $consent;
+        $receipt['credentialSubject'] = $subject;
+
+        $result = Agreely::verifyReceipt($receipt, [
+            'resolver' => static fn (string $did): ?array => $docs[$did] ?? null,
+        ]);
+        $this->assertSame('fail', $result->companySignature);
+        $this->assertSame('fail', $result->cellLabelBinding);
+        $this->assertSame('failed', $result->overall);
+    }
+
+    public function testMutatingItemPurposeBreaksTheCompanySignatureAndCellLabelBinding(): void
+    {
+        $docs = self::didDocuments();
+        $receipt = self::companyReceipt();
+        /** @var array<string,mixed> $subject */
+        $subject = $receipt['credentialSubject'];
+        /** @var array<string,mixed> $consent */
+        $consent = $subject['consent'];
+        /** @var array<int,array<string,mixed>> $items */
+        $items = $consent['items'];
+        $items[0]['purpose'] = 'HACKED';
+        $consent['items'] = $items;
+        $subject['consent'] = $consent;
+        $receipt['credentialSubject'] = $subject;
+
+        $result = Agreely::verifyReceipt($receipt, [
+            'resolver' => static fn (string $did): ?array => $docs[$did] ?? null,
+        ]);
+        $this->assertSame('fail', $result->companySignature);
+        $this->assertSame('fail', $result->cellLabelBinding);
+        $this->assertSame('failed', $result->overall);
+    }
+
+    public function testCitizenReceiptNeverReportsCellLabelBindingPassEvenWhenLabelMutated(): void
+    {
+        $docs = self::didDocuments();
+        $body = (string) json_encode(self::rv()['fixtures']['ipfsBody']);
+        $genuine = Agreely::verifyReceipt(self::citizenReceipt(), [
+            'resolver' => static fn (string $did): ?array => $docs[$did] ?? null,
+            'ipfsGateway' => static fn (string $cid): string => "https://ipfs.test/{$cid}",
+            'httpGet' => static fn (string $url): string => $body,
+        ]);
+        $this->assertSame('unsupported', $genuine->cellLabelBinding);
+
+        $receipt = self::citizenReceipt();
+        /** @var array<string,mixed> $subject */
+        $subject = $receipt['credentialSubject'];
+        /** @var array<string,mixed> $consent */
+        $consent = $subject['consent'];
+        /** @var array<int,array<string,mixed>> $items */
+        $items = $consent['items'];
+        $items[0]['category'] = 'HACKED'; // offline: no salt/commitment/root to cross-check against
+        $consent['items'] = $items;
+        $subject['consent'] = $consent;
+        $receipt['credentialSubject'] = $subject;
+
+        $result = Agreely::verifyReceipt($receipt, [
+            'resolver' => static fn (string $did): ?array => $docs[$did] ?? null,
+            'verifyDisclosure' => false,
+        ]);
+        // Offline the citizen label cannot be cryptographically FAILED (by design), but it is
+        // never 'pass', and the result is at most 'partial' — a relying party is not misled.
+        $this->assertSame('unsupported', $result->cellLabelBinding);
+        $this->assertNotSame('pass', $result->cellLabelBinding);
+        $this->assertNotSame('verified', $result->overall);
+        $matched = false;
+        foreach ($result->notes as $note) {
+            if (str_contains($note, 'Do NOT trust the displayed labels')) {
+                $matched = true;
+            }
+        }
+        $this->assertTrue($matched, 'expected the explicit do-not-trust-labels note on a citizen receipt');
+    }
+
+    /** @return array<string,mixed> */
+    private static function companyReceipt(): array
+    {
+        /** @var array<string,mixed> $receipt */
+        $receipt = self::rv()['cases'][0]['receipt'];
+        return $receipt;
+    }
+
     /** @return array<string,mixed> */
     private static function citizenReceipt(): array
     {
