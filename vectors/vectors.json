@@ -300,11 +300,13 @@
           "citizenAssertion": "unsupported",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
+          "cellLabelBinding": "pass",
           "overall": "verified",
           "notes": [
             "Company signature verified against issuer DID did:web:api.agreely.ca:c:acme (key did:web:api.agreely.ca:c:acme#kms-1).",
             "This proves the company ATTESTED to a hand-signed PDF (hash 0xabababababababababababababababababababababababababababababababab); it does NOT prove a human signed.",
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
           ]
@@ -373,10 +375,12 @@
           "citizenAssertion": "unsupported",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
+          "cellLabelBinding": "fail",
           "overall": "failed",
           "notes": [
             "Company signature check FAILED against issuer DID did:web:api.agreely.ca:c:acme (key did:web:api.agreely.ca:c:acme#kms-1): the canonical receipt body does not match the signature. The receipt was altered after signing or the wrong key was resolved.",
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
           ]
@@ -448,11 +452,13 @@
           "citizenAssertion": "pass",
           "disclosureCopy": "pass",
           "documentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
           "overall": "partial",
           "notes": [
             "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. Use the server receipts/verify endpoint for a sound company-signature check.",
             "Citizen passkey assertion verified against did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1: the holder of the registered passkey signed over the committed challenge 0x1017fd21f146774730f8cdd2ad9e127d2531d283dcc2804e476f71f0dbb37b49.",
             "This proves passkey POSSESSION over a committed challenge; it does NOT by itself prove the cell-level consent semantics.",
+            "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. Do NOT trust the displayed labels on this offline result alone; use the server receipts/verify endpoint.",
             "Disclosure copy verified: the IPFS document body matches the receipt disclosureHash 0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
           ]
@@ -521,10 +527,12 @@
           "citizenAssertion": "unsupported",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
+          "cellLabelBinding": "unavailable",
           "overall": "unavailable",
           "notes": [
             "Company signature UNVERIFIABLE: could not resolve the issuer DID did:web:api.agreely.ca:c:acme (key did:web:api.agreely.ca:c:acme#kms-1) to an Ed25519 key (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell-label binding UNVERIFIABLE: the issuer DID could not be resolved, so the company signature that binds the category/purpose labels could not be checked.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
           ]
@@ -596,10 +604,12 @@
           "citizenAssertion": "unavailable",
           "disclosureCopy": "pass",
           "documentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
           "overall": "unavailable",
           "notes": [
             "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. Use the server receipts/verify endpoint for a sound company-signature check.",
             "Citizen assertion UNVERIFIABLE: could not resolve the citizen DID did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08 (passkey did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1) (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. Do NOT trust the displayed labels on this offline result alone; use the server receipts/verify endpoint.",
             "Disclosure copy verified: the IPFS document body matches the receipt disclosureHash 0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
           ]

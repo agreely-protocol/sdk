@@ -84,12 +84,26 @@ export class ReceiptVerifier {
       citizenAssertion = await this.verifyCitizenAssertion(r, notes);
     }
 
+    // Claims-audit P3-F2: an ADDITIONAL, explicit verdict on whether the
+    // human-readable cell labels (category/purpose) are cryptographically bound,
+    // so a relying party never trusts a displayed label off a "passing" receipt.
+    const cellLabelBinding = assessCellLabelBinding(type, companySignature, notes);
+
     const disclosureCopy = await this.verifyDisclosureCopy(r, notes);
     const documentAnchor = await this.verifyDocumentAnchor(r, notes);
 
     const overall = decideOverall(type, companySignature, citizenAssertion, disclosureCopy, documentAnchor);
 
-    return { receiptType: type, companySignature, citizenAssertion, disclosureCopy, documentAnchor, overall, notes };
+    return {
+      receiptType: type,
+      companySignature,
+      citizenAssertion,
+      disclosureCopy,
+      documentAnchor,
+      cellLabelBinding,
+      overall,
+      notes,
+    };
   }
 
   /** COMPANY-ATTESTED: verify the Ed25519 proof over the canonical body. */
@@ -403,6 +417,47 @@ function challengeBinds(clientDataJSON: Uint8Array, receiptChallengeHex: string)
 function decodeMultibase(proofValue: string): Uint8Array {
   // proofValue is a z-base58btc multibase of the raw 64-byte detached signature.
   return multibaseDecode(proofValue);
+}
+
+/**
+ * Is the human-readable cell label (category/purpose) cryptographically bound?
+ *
+ * company_attested: the labels sit INSIDE the Ed25519-signed body, so this tracks
+ *   companySignature — a mutation to any item's category/purpose/itemId breaks the
+ *   signature (a genuine offline cross-check of the labels).
+ * citizen: UNSUPPORTED offline — the receipt deliberately omits the salted
+ *   commitment + Merkle root that bind the labels (unlinkability / crypto-
+ *   shredding), so a mutated label CANNOT be detected offline. Use the server
+ *   receipts/verify endpoint (it holds the salt) for a sound label check.
+ */
+function assessCellLabelBinding(type: ReceiptType, companySignature: CheckStatus, notes: string[]): CheckStatus {
+  if (type !== "company_attested") {
+    notes.push(
+      "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the " +
+        "category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. " +
+        "Do NOT trust the displayed labels on this offline result alone; use the server receipts/verify endpoint.",
+    );
+    return "unsupported";
+  }
+  if (companySignature === "pass") {
+    notes.push(
+      "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature " +
+        "covers them. Mutating any item label breaks it.",
+    );
+    return "pass";
+  }
+  if (companySignature === "unavailable") {
+    notes.push(
+      "Cell-label binding UNVERIFIABLE: the issuer DID could not be resolved, so the company signature that binds the " +
+        "category/purpose labels could not be checked.",
+    );
+    return "unavailable";
+  }
+  notes.push(
+    "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, " +
+      "so the displayed labels are unproven (possibly tampered).",
+  );
+  return "fail";
 }
 
 function decideOverall(

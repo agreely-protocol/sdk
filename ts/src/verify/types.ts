@@ -46,6 +46,14 @@ export type ReceiptType = "company_attested" | "citizen";
  *                       disclosureHash; "skipped" otherwise.
  *   - documentAnchor    pass/fail of the opt-in on-chain check; "skipped" without
  *                       an rpcUrl (or a CID to look up).
+ *   - cellLabelBinding  whether the human-readable cell labels (category/purpose)
+ *                       are CRYPTOGRAPHICALLY bound in THIS offline verification —
+ *                       the one field to read before trusting a displayed label.
+ *                       company_attested: tracks companySignature (the labels sit
+ *                       inside the signed body, so a mutation breaks it). citizen:
+ *                       "unsupported" OFFLINE (the receipt omits the salted
+ *                       commitment + Merkle root that bind the labels for
+ *                       unlinkability); use the server receipts/verify endpoint.
  */
 export interface ReceiptVerification {
   receiptType: ReceiptType;
@@ -53,6 +61,7 @@ export interface ReceiptVerification {
   citizenAssertion: CheckStatus;
   disclosureCopy: CheckStatus;
   documentAnchor: CheckStatus;
+  cellLabelBinding: CheckStatus;
   overall: OverallStatus;
   /** Plain-language notes stating what each result proves vs trusts. */
   notes: string[];

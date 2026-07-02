@@ -24,6 +24,7 @@ final class ReceiptVerification
         public readonly string $citizenAssertion,
         public readonly string $disclosureCopy,
         public readonly string $documentAnchor,
+        public readonly string $cellLabelBinding,
         public readonly string $overall,
         public readonly array $notes,
     ) {
@@ -33,7 +34,7 @@ final class ReceiptVerification
      * The array form, in the SAME field shape as the TS ReceiptVerification, so
      * BOTH SDKs canonicalize to byte-identical JCS (the golden-vector discipline).
      *
-     * @return array{receiptType:string,companySignature:string,citizenAssertion:string,disclosureCopy:string,documentAnchor:string,overall:string,notes:list<string>}
+     * @return array{receiptType:string,companySignature:string,citizenAssertion:string,disclosureCopy:string,documentAnchor:string,cellLabelBinding:string,overall:string,notes:list<string>}
      */
     public function toArray(): array
     {
@@ -43,6 +44,7 @@ final class ReceiptVerification
             'citizenAssertion' => $this->citizenAssertion,
             'disclosureCopy' => $this->disclosureCopy,
             'documentAnchor' => $this->documentAnchor,
+            'cellLabelBinding' => $this->cellLabelBinding,
             'overall' => $this->overall,
             'notes' => $this->notes,
         ];

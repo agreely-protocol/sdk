@@ -79,6 +79,12 @@ final class ReceiptVerifier
             $citizenAssertion = $this->verifyCitizenAssertion($r, $notes);
         }
 
+        // Claims-audit P3-F2: an ADDITIONAL, explicit verdict on whether the
+        // human-readable cell labels (category/purpose) are cryptographically
+        // bound, so a relying party never trusts a displayed label off a
+        // "passing" receipt.
+        $cellLabelBinding = self::assessCellLabelBinding($type, $companySignature, $notes);
+
         $disclosureCopy = $this->verifyDisclosureCopy($r, $notes);
         $documentAnchor = $this->verifyDocumentAnchor($r, $notes);
 
@@ -90,9 +96,46 @@ final class ReceiptVerifier
             $citizenAssertion,
             $disclosureCopy,
             $documentAnchor,
+            $cellLabelBinding,
             $overall,
             $notes,
         );
+    }
+
+    /**
+     * Is the human-readable cell label (category/purpose) cryptographically bound?
+     *
+     * company_attested: the labels sit INSIDE the Ed25519-signed body, so this
+     *   tracks companySignature — a mutation to any item's category/purpose/itemId
+     *   breaks the signature (a genuine offline cross-check of the labels).
+     * citizen: UNSUPPORTED offline — the receipt deliberately omits the salted
+     *   commitment + Merkle root that bind the labels (unlinkability / crypto-
+     *   shredding), so a mutated label CANNOT be detected offline. Use the server
+     *   receipts/verify endpoint (it holds the salt) for a sound label check.
+     *
+     * @param list<string> $notes
+     */
+    private static function assessCellLabelBinding(string $type, string $companySignature, array &$notes): string
+    {
+        if ($type !== 'company_attested') {
+            $notes[] = 'Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the '
+                . 'category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. '
+                . 'Do NOT trust the displayed labels on this offline result alone; use the server receipts/verify endpoint.';
+            return 'unsupported';
+        }
+        if ($companySignature === 'pass') {
+            $notes[] = 'Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature '
+                . 'covers them. Mutating any item label breaks it.';
+            return 'pass';
+        }
+        if ($companySignature === 'unavailable') {
+            $notes[] = 'Cell-label binding UNVERIFIABLE: the issuer DID could not be resolved, so the company signature that binds the '
+                . 'category/purpose labels could not be checked.';
+            return 'unavailable';
+        }
+        $notes[] = 'Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, '
+            . 'so the displayed labels are unproven (possibly tampered).';
+        return 'fail';
     }
 
     /**
