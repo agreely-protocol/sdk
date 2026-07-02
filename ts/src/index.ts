@@ -47,6 +47,8 @@ export type {
   ManualConsentMutationInput,
   ManualConsentRevocation,
   ManualConsentErasure,
+  EndRelationshipInput,
+  RelationshipEnded,
   CatalogEntry,
   DegradeMode,
   DegradeContext,

@@ -7,9 +7,10 @@ export type Decision = "allow" | "deny";
 
 /**
  * A /v1 API-key scope: 'check' (the synchronous check), 'issue' (consent-request
- * issuance + reads), 'attest' (manual / offline consent recording).
+ * issuance + reads), 'attest' (manual / offline consent recording),
+ * 'relationship' (ending a customer relationship, art. 23).
  */
-export type Scope = "check" | "issue" | "attest";
+export type Scope = "check" | "issue" | "attest" | "relationship";
 
 /**
  * The least-disclosure identity of the presented key, from GET /v1/whoami. The
@@ -267,6 +268,38 @@ export interface ManualConsentErasure {
   erased: boolean;
   /** True when the consent was already erased (the call is idempotent). */
   alreadyErased: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// End of a customer relationship (Law 25 art. 23, "les fins sont accomplies").
+// A pure lifecycle OVERLAY keyed on the company's OWN customerRef — never a DID.
+// ---------------------------------------------------------------------------
+
+/** Input for ending a customer relationship. */
+export interface EndRelationshipInput {
+  /** The company's own reference for the customer (the same ref used by check). */
+  customerRef: string;
+  /** The art. 23 justification. Required: a blank reason fails closed client-side. */
+  reason: string;
+}
+
+/**
+ * The 200 body from POST /v1/customers/{customerRef}/relationship/end. Company-
+ * side facts only: the customer's own ref, the terminal lifecycle, when it ended
+ * and the recorded ORIGIN of the wind-down. NEVER a DID or a consent_ref.
+ */
+export interface RelationshipEnded {
+  customerRef: string;
+  /** The terminal lifecycle after the call. */
+  status: "ended";
+  /** ISO-8601 timestamp the relationship was first ended (preserved on a re-end). */
+  endedAt: string;
+  /**
+   * The recorded origin: "company" for a company-initiated end; "citizen_request"
+   * is preserved when a citizen close-account request had already begun the ending
+   * (the origin is never overwritten).
+   */
+  endedBy: "company" | "citizen_request";
 }
 
 /** A declared active catalog entry, for issuance discovery. */

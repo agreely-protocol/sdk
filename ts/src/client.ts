@@ -6,6 +6,7 @@ import { AgreelyConfigError, AgreelyUnavailableError } from "./errors.js";
 import { Catalog } from "./resources/catalog.js";
 import { ConsentRequests } from "./resources/consentRequests.js";
 import { ManualConsents } from "./resources/manualConsents.js";
+import { Relationships } from "./resources/relationships.js";
 import { Transport } from "./transport.js";
 import type { AgreelyOptions, CheckOptions, CheckResult, Identity } from "./types.js";
 import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
@@ -26,6 +27,8 @@ export class Agreely {
   readonly consentRequests: ConsentRequests;
   /** The manual / offline (company-attested) consent resource (scope: 'attest'). */
   readonly manualConsents: ManualConsents;
+  /** The customer-relationship lifecycle resource (scope: 'relationship'). */
+  readonly relationships: Relationships;
   readonly catalog: Catalog;
   /** The break-glass operator lever (degrade gate 3). */
   readonly breakGlass: BreakGlass;
@@ -66,6 +69,7 @@ export class Agreely {
 
     this.consentRequests = new ConsentRequests(this.transport);
     this.manualConsents = new ManualConsents(this.transport);
+    this.relationships = new Relationships(this.transport);
     this.catalog = new Catalog(this.transport);
   }
 
