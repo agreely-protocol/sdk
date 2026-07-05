@@ -48,7 +48,7 @@ const DEFAULT_CITIZEN_BASE = "https://api.agreely.ca";
 const DEFAULT_IPFS_GATEWAY = "https://gateway.lighthouse.storage/ipfs/";
 const DEFAULT_CHAIN_ID = 84532;
 const REGISTRY_BY_CHAIN: Record<number, string | null> = {
-  84532: "0x36eaA3F10744FA3ABF140c1eED68F9B03ED7b65E",
+  84532: "0x3532a9DfF3C910152543afCa49De7c66113C5312",
   8453: null, // Base mainnet — not deployed yet
 };
 // keccak256("IdentityAnchored(bytes32,uint64)") — the document CID is anchored via

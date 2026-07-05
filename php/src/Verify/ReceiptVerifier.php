@@ -48,7 +48,7 @@ final class ReceiptVerifier
     private const DEFAULT_IPFS_GATEWAY = 'https://gateway.lighthouse.storage/ipfs/';
     private const DEFAULT_CHAIN_ID = 84532;
     private const REGISTRY_BY_CHAIN = [
-        84532 => '0x36eaA3F10744FA3ABF140c1eED68F9B03ED7b65E',
+        84532 => '0x3532a9DfF3C910152543afCa49De7c66113C5312',
         8453 => null,
     ];
 
