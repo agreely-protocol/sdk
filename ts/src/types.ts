@@ -67,6 +67,46 @@ export interface CheckResult {
   mode?: DegradeMode;
 }
 
+/** One item for a batch check. */
+export interface BatchCheckItem {
+  customerRef: string;
+  category: string;
+  purpose: string;
+}
+
+/** The decision for one item in a batch check response. */
+export interface BatchDecision {
+  customerRef: string;
+  category: string;
+  purpose: string;
+  decision: Decision;
+  status: Status;
+  /** 0x-hex enforcement handle. Present for every status EXCEPT "none". */
+  consentRef?: string;
+  /**
+   * How the enforcement record was established. Present whenever a record
+   * exists; absent for status "none".
+   */
+  assurance?: Assurance;
+  /** ISO-8601 timestamp the decision was made at. */
+  checkedAt: string;
+}
+
+/**
+ * The result of checkFields: a pre-built lookup for a (customerRef, category,
+ * purpose) cartesian product. Use `isAllowed` to gate field display.
+ */
+export interface CheckFieldsResult {
+  /** The raw decisions array from the server (aligned to the flattened items). */
+  decisions: BatchDecision[];
+  /**
+   * Boolean gate. Returns true ONLY when the decision for this exact
+   * (customerRef, category, purpose) triple is "allow". Strings are compared
+   * as submitted to checkFields (the server normalizes; the SDK sends raw).
+   */
+  isAllowed(customerRef: string, category: string, purpose: string): boolean;
+}
+
 /** One (category, purpose) label pair, as the server echoes it back. */
 export interface ItemLabels {
   category: string;

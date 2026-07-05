@@ -55,6 +55,9 @@ export type {
   DegradeOnOutageConfig,
   BreakGlassEvent,
   BreakGlassEngageInput,
+  BatchCheckItem,
+  BatchDecision,
+  CheckFieldsResult,
 } from "./types.js";
 
 export type {

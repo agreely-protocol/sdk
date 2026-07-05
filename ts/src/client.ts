@@ -8,7 +8,7 @@ import { ConsentRequests } from "./resources/consentRequests.js";
 import { ManualConsents } from "./resources/manualConsents.js";
 import { Relationships } from "./resources/relationships.js";
 import { Transport } from "./transport.js";
-import type { AgreelyOptions, CheckOptions, CheckResult, Identity } from "./types.js";
+import type { AgreelyOptions, CheckOptions, CheckResult, Identity, BatchCheckItem, BatchDecision, CheckFieldsResult } from "./types.js";
 import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
 import { ReceiptVerifier } from "./verify/receipt.js";
 import type { ReceiptVerification, VerifyReceiptOptions } from "./verify/types.js";
@@ -141,6 +141,52 @@ export class Agreely {
       if (error instanceof AgreelyUnavailableError) return false; // fail-closed deny
       throw error; // auth / validation / rate-limit / not-found surface as errors
     }
+  }
+
+  /**
+   * Batch consent check: evaluate many (customerRef, category, purpose) cells in
+   * ONE round-trip instead of N calls to check(). Returns decisions ALIGNED to
+   * the submitted items. Fail-closed: any tuple without an active record returns
+   * deny/none. Sends category/purpose RAW (the server normalizes; the SDK never
+   * does). On an outage throws AgreelyUnavailableError.
+   */
+  async checkBatch(items: BatchCheckItem[]): Promise<BatchDecision[]> {
+    const result = await this.transport.request<{ decisions: BatchDecision[] }>({
+      method: "POST",
+      path: "/v1/check/batch",
+      body: { items },
+      idempotentRetry: true,
+    });
+    return result.decisions;
+  }
+
+  /**
+   * Ergonomic cartesian-product batch check. Builds all (customerRef, field)
+   * pairs, calls checkBatch once, and returns a lookup for `isAllowed` gates.
+   * Sends category/purpose RAW. On an outage throws AgreelyUnavailableError.
+   */
+  async checkFields(
+    customerRefs: string[],
+    fields: Array<{ category: string; purpose: string }>,
+  ): Promise<CheckFieldsResult> {
+    const items: BatchCheckItem[] = [];
+    for (const customerRef of customerRefs) {
+      for (const field of fields) {
+        items.push({ customerRef, category: field.category, purpose: field.purpose });
+      }
+    }
+    const decisions = await this.checkBatch(items);
+    // Build an O(1) lookup map. Key: "customerRef\0category\0purpose" (raw strings).
+    const map = new Map<string, boolean>();
+    for (const d of decisions) {
+      map.set(`${d.customerRef}\0${d.category}\0${d.purpose}`, d.decision === "allow");
+    }
+    return {
+      decisions,
+      isAllowed(customerRef: string, category: string, purpose: string): boolean {
+        return map.get(`${customerRef}\0${category}\0${purpose}`) ?? false;
+      },
+    };
   }
 
   /**

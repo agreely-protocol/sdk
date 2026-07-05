@@ -15,8 +15,12 @@ use Agreely\Sdk\Resources\Catalog;
 use Agreely\Sdk\Resources\ConsentRequests;
 use Agreely\Sdk\Resources\ManualConsents;
 use Agreely\Sdk\Resources\Relationships;
+use Agreely\Sdk\Types\BatchCheckItem;
+use Agreely\Sdk\Types\BatchDecision;
+use Agreely\Sdk\Types\CheckFieldsResult;
 use Agreely\Sdk\Types\CheckResult;
 use Agreely\Sdk\Types\Identity;
+use Agreely\Sdk\Types\Wire;
 use Agreely\Sdk\Verify\ReceiptVerification;
 use Agreely\Sdk\Verify\ReceiptVerifier;
 
@@ -200,6 +204,59 @@ final class Agreely
             return false; // fail-closed deny
         }
         // Auth / validation / rate-limit / not-found surface as thrown errors.
+    }
+
+    /**
+     * Batch consent check: evaluate many (customerRef, category, purpose) cells in
+     * ONE round-trip instead of N calls to check(). Returns decisions ALIGNED to
+     * the submitted items. Fail-closed: any tuple without an active record returns
+     * deny/none. Sends category/purpose RAW (the server normalizes; the SDK never
+     * does). On an outage throws AgreelyUnavailableError.
+     *
+     * @param list<BatchCheckItem|array{customerRef:string,category:string,purpose:string}> $items
+     * @return list<BatchDecision>
+     */
+    public function checkBatch(array $items): array
+    {
+        $wireItems = [];
+        foreach ($items as $item) {
+            if ($item instanceof BatchCheckItem) {
+                $wireItems[] = $item->toArray();
+            } else {
+                $wireItems[] = $item;
+            }
+        }
+        $wire = $this->transport->request(new RequestSpec(
+            method: 'POST',
+            path: '/v1/check/batch',
+            body: ['items' => $wireItems],
+            idempotentRetry: true,
+        ));
+        $out = [];
+        foreach (Wire::objects($wire, 'decisions') as $d) {
+            $out[] = BatchDecision::fromWire($d);
+        }
+        return $out;
+    }
+
+    /**
+     * Ergonomic cartesian-product batch check. Builds all (customerRef, field)
+     * pairs, calls checkBatch once, and returns a lookup for isAllowed() gates.
+     * Sends category/purpose RAW. On an outage throws AgreelyUnavailableError.
+     *
+     * @param list<string> $customerRefs
+     * @param list<array{category:string,purpose:string}> $fields
+     */
+    public function checkFields(array $customerRefs, array $fields): CheckFieldsResult
+    {
+        $items = [];
+        foreach ($customerRefs as $customerRef) {
+            foreach ($fields as $field) {
+                $items[] = new BatchCheckItem($customerRef, $field['category'], $field['purpose']);
+            }
+        }
+        $decisions = $this->checkBatch($items);
+        return new CheckFieldsResult($decisions);
     }
 
     /**
