@@ -44,9 +44,10 @@ describe("checkBatch()", () => {
     expect(body.items[0]!.purpose).toBe("Marketing\tOutreach");
   });
 
-  it("returns an empty array for zero decisions", async () => {
-    const { agreely } = client([{ json: { decisions: [] } }]);
+  it("short-circuits to an empty array without a network call for an empty input", async () => {
+    const { agreely, calls } = client([]);
     expect(await agreely.checkBatch([])).toEqual([]);
+    expect(calls).toHaveLength(0);
   });
 
   it("aligns decisions to items: allow has consentRef, deny/none does not", async () => {

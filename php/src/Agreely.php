@@ -218,6 +218,9 @@ final class Agreely
      */
     public function checkBatch(array $items): array
     {
+        if ($items === []) {
+            return [];
+        }
         $wireItems = [];
         foreach ($items as $item) {
             if ($item instanceof BatchCheckItem) {

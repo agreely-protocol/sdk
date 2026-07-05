@@ -88,12 +88,11 @@ final class CheckBatchTest extends TestCase
         $this->assertCount(2, $call->body['items']);
     }
 
-    public function testEmptyBatchReturnsEmptyDecisions(): void
+    public function testEmptyBatchShortCircuitsWithoutHttpCall(): void
     {
-        $http = new MockHttpClient([
-            MockHttpClient::json(200, ['decisions' => []]),
-        ]);
+        $http = new MockHttpClient([]);
         $this->assertCount(0, $this->client($http)->checkBatch([]));
+        $this->assertCount(0, $http->calls);
     }
 
     // ------------------------------------------------------------------

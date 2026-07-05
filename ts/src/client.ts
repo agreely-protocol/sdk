@@ -151,6 +151,7 @@ export class Agreely {
    * does). On an outage throws AgreelyUnavailableError.
    */
   async checkBatch(items: BatchCheckItem[]): Promise<BatchDecision[]> {
+    if (items.length === 0) return [];
     const result = await this.transport.request<{ decisions: BatchDecision[] }>({
       method: "POST",
       path: "/v1/check/batch",
