@@ -3,19 +3,21 @@
 First public release: `0.1.0`. This package is MAINNET-bound: the verifier
 defaults to Base mainnet (chainId 8453).
 
-## Blocker before publish (must be filled)
+## Mainnet registry address (DONE)
 
-1. **DEPLOY-GATED mainnet registry address.** Fill the ONE constant in
-   `src/verify/receipt.ts`:
+1. **Mainnet registry address is deployed, verified, and filled.** The ONE
+   constant in `src/verify/receipt.ts` now holds the live Base mainnet
+   AgreelyRegistry:
 
    ```ts
-   const MAINNET_REGISTRY_ADDRESS: string | null = null; // <- deployed Base mainnet AgreelyRegistry address
+   const MAINNET_REGISTRY_ADDRESS: string | null = "0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B";
    ```
 
-   Leave it `null` and the on-chain `documentAnchor` check is reported
-   `"skipped"` on mainnet (never a false pass/fail). Set it to the deployed
-   AgreelyRegistry address, then rebuild (`npm run build`) so `dist/` matches.
-   Base Sepolia (84532) stays available as an explicit opt-in for testing.
+   The AgreelyRegistry is deployed and verified on Base mainnet (chainId 8453)
+   at `0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B` (deploy block 48323919). The
+   on-chain `documentAnchor` check now resolves this address by default and
+   performs the lookup. `dist/` has been rebuilt to carry the address. Base
+   Sepolia (84532) stays available as an explicit opt-in for testing.
 
 ## Publish steps
 

@@ -143,23 +143,32 @@ final class ReceiptVerificationTest extends TestCase
         $this->assertSame('pass', $result->documentAnchor);
     }
 
-    public function testDocumentAnchorSkippedOnMainnetDefaultUntilRegistryFilled(): void
+    public function testDocumentAnchorResolvesDeployedMainnetRegistryByDefault(): void
     {
         $docs = self::didDocuments();
         $body = (string) json_encode(self::rv()['fixtures']['ipfsBody']);
+        $anchorRequestBody = null;
 
-        // No chainId passed -> default is Base mainnet (8453). Its registry address is
-        // DEPLOY-GATED (null) until deployment, so the anchor check reports 'skipped'
-        // rather than a false pass/fail.
+        // No chainId passed -> default is Base mainnet (8453). The registry is now DEPLOYED
+        // and VERIFIED, so the anchor check is no longer 'skipped': the verifier resolves the
+        // live mainnet AgreelyRegistry and performs the on-chain documentAnchor lookup.
         $result = Agreely::verifyReceipt(self::citizenReceipt(), [
             'resolver' => static fn (string $did): ?array => $docs[$did] ?? null,
             'ipfsGateway' => static fn (string $cid): string => "https://ipfs.test/{$cid}",
             'httpGet' => static fn (string $url): string => $body,
-            'httpPost' => static fn (string $url, string $b): string => (string) json_encode(['result' => [['blockNumber' => '0x1']]]),
+            'httpPost' => static function (string $url, string $b) use (&$anchorRequestBody): string {
+                $anchorRequestBody = $b;
+
+                return (string) json_encode(['result' => [['blockNumber' => '0x1']]]);
+            },
             'rpcUrl' => 'https://rpc.test',
         ]);
 
-        $this->assertSame('skipped', $result->documentAnchor);
+        $this->assertSame('pass', $result->documentAnchor);
+        // Prove the check targeted the real deployed Base mainnet registry address.
+        $this->assertNotNull($anchorRequestBody);
+        $this->assertStringContainsString('0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B', (string) $anchorRequestBody);
+        $this->assertStringContainsString('eth_getLogs', (string) $anchorRequestBody);
     }
 
     public function testCorruptedCitizenKeyFailsCleanlyWithNoOpensslWarning(): void

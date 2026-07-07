@@ -124,10 +124,13 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     expect(result.documentAnchor).toBe("pass");
   });
 
-  it("documentAnchor is skipped on the Base mainnet default until its registry address is filled", async () => {
+  it("documentAnchor resolves the deployed Base mainnet registry by default and attempts the on-chain check", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
+    let anchorRequestBody: string | undefined;
     const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
       if (init?.method === "POST") {
+        anchorRequestBody = String(init.body);
+        // eth_getLogs — return one matching log.
         return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [{ blockNumber: "0x1" }] }), {
           headers: { "Content-Type": "application/json" },
         });
@@ -137,16 +140,20 @@ describe("verifyReceipt honesty matrix edge cases", () => {
       });
     }) as unknown as typeof fetch;
 
-    // No chainId passed -> default is Base mainnet (8453). Its registry address is
-    // DEPLOY-GATED (null) until deployment, so the anchor check reports "skipped"
-    // rather than a false pass/fail.
+    // No chainId passed -> default is Base mainnet (8453). The registry is now DEPLOYED
+    // and VERIFIED, so the anchor check is no longer "skipped": the verifier resolves the
+    // live mainnet AgreelyRegistry and performs the on-chain documentAnchor lookup.
     const result = await Agreely.verifyReceipt(citizenCase.receipt, {
       resolver: (did) => fixtures.didDocuments[did] ?? null,
       ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
       fetch: fetchImpl,
       rpcUrl: "https://rpc.test",
     });
-    expect(result.documentAnchor).toBe("skipped");
+    expect(result.documentAnchor).toBe("pass");
+    // Prove the check targeted the real deployed Base mainnet registry address.
+    expect(anchorRequestBody).toBeDefined();
+    expect(anchorRequestBody).toContain("0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B");
+    expect(anchorRequestBody).toContain("eth_getLogs");
   });
 });
 

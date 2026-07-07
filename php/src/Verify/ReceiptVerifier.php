@@ -46,10 +46,10 @@ final class ReceiptVerifier
     private const DEFAULT_COMPANY_HOST = 'agreely.ca';
     private const DEFAULT_CITIZEN_BASE = 'https://api.agreely.ca';
     private const DEFAULT_IPFS_GATEWAY = 'https://gateway.lighthouse.storage/ipfs/';
-    // DEPLOY-GATED: fill with the deployed Base mainnet AgreelyRegistry address before publishing.
-    // This is the ONE place the mainnet registry address lives; leave it null and the on-chain
-    // documentAnchor check is reported "skipped" for mainnet (never a false result).
-    private const MAINNET_REGISTRY_ADDRESS = null;
+    // Base mainnet AgreelyRegistry, deployed at block 48323919 (tx 0x299271b2...5e638d).
+    // This is the ONE place the mainnet registry address lives; setting it back to null reports
+    // the on-chain documentAnchor check as "skipped" for mainnet (never a false result).
+    private const MAINNET_REGISTRY_ADDRESS = '0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B';
     // Base mainnet (chainId 8453) is the default. Base Sepolia (84532) remains available as an
     // explicit opt-in for integrators testing against the testnet registry (pass chainId 84532).
     private const DEFAULT_CHAIN_ID = 8453;
