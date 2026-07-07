@@ -98,7 +98,7 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     expect(result.disclosureCopy).toBe("skipped");
   });
 
-  it("documentAnchor passes when a matching on-chain log is returned (opt-in rpcUrl)", async () => {
+  it("documentAnchor passes when a matching on-chain log is returned (opt-in rpcUrl, explicit Base Sepolia)", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
     const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
       if (init?.method === "POST") {
@@ -117,8 +117,36 @@ describe("verifyReceipt honesty matrix edge cases", () => {
       ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
       fetch: fetchImpl,
       rpcUrl: "https://rpc.test",
+      // Base Sepolia (84532) is no longer the default; passing it explicitly still
+      // resolves the known testnet registry, so an integrator can test on Sepolia.
+      chainId: 84532,
     });
     expect(result.documentAnchor).toBe("pass");
+  });
+
+  it("documentAnchor is skipped on the Base mainnet default until its registry address is filled", async () => {
+    const citizenCase = cases.find((c) => c.ipfs)!;
+    const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [{ blockNumber: "0x1" }] }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify(fixtures.ipfsBody), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    // No chainId passed -> default is Base mainnet (8453). Its registry address is
+    // DEPLOY-GATED (null) until deployment, so the anchor check reports "skipped"
+    // rather than a false pass/fail.
+    const result = await Agreely.verifyReceipt(citizenCase.receipt, {
+      resolver: (did) => fixtures.didDocuments[did] ?? null,
+      ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
+      fetch: fetchImpl,
+      rpcUrl: "https://rpc.test",
+    });
+    expect(result.documentAnchor).toBe("skipped");
   });
 });
 

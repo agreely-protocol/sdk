@@ -117,9 +117,9 @@ export interface VerifyReceiptOptions {
   ipfsGateway?: (cid: string) => string;
   /** JSON-RPC URL for the opt-in on-chain documentAnchor check. Omit to skip it. */
   rpcUrl?: string;
-  /** AgreelyRegistry address. Defaults per chainId (Base Sepolia 84532). */
+  /** AgreelyRegistry address. Defaults per chainId (Base mainnet 8453). */
   registryAddress?: string;
-  /** Chain id for the anchor check. Default 84532 (Base Sepolia). */
+  /** Chain id for the anchor check. Default 8453 (Base mainnet); pass 84532 to test on Base Sepolia. */
   chainId?: number;
   /** Injectable fetch (tests / custom transport). Defaults to global fetch. */
   fetch?: typeof fetch;

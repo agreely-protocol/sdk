@@ -210,6 +210,11 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
 ## Notes
 
 - **Never normalize** category/purpose before sending — the server does it.
+- **Category labels are language-sensitive.** The `category` and `purpose` passed
+  to `check()` must match the catalog cell's canonical label (French by default).
+  Matching is case- and whitespace-insensitive but accent- and language-sensitive:
+  the English display label will NOT match. Pass the label exactly as declared in
+  the catalog.
 - The public identifier everywhere is the **protocol `requestId`** (`0x` + 64
   hex), never an internal uuid.
 - Scopes: `check` authorizes `check`; `issue` authorizes the consent-request

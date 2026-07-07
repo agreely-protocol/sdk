@@ -135,9 +135,31 @@ final class ReceiptVerificationTest extends TestCase
             'httpGet' => static fn (string $url): string => $body,
             'httpPost' => static fn (string $url, string $b): string => (string) json_encode(['result' => [['blockNumber' => '0x1']]]),
             'rpcUrl' => 'https://rpc.test',
+            // Base Sepolia (84532) is no longer the default; passing it explicitly still
+            // resolves the known testnet registry, so an integrator can test on Sepolia.
+            'chainId' => 84532,
         ]);
 
         $this->assertSame('pass', $result->documentAnchor);
+    }
+
+    public function testDocumentAnchorSkippedOnMainnetDefaultUntilRegistryFilled(): void
+    {
+        $docs = self::didDocuments();
+        $body = (string) json_encode(self::rv()['fixtures']['ipfsBody']);
+
+        // No chainId passed -> default is Base mainnet (8453). Its registry address is
+        // DEPLOY-GATED (null) until deployment, so the anchor check reports 'skipped'
+        // rather than a false pass/fail.
+        $result = Agreely::verifyReceipt(self::citizenReceipt(), [
+            'resolver' => static fn (string $did): ?array => $docs[$did] ?? null,
+            'ipfsGateway' => static fn (string $cid): string => "https://ipfs.test/{$cid}",
+            'httpGet' => static fn (string $url): string => $body,
+            'httpPost' => static fn (string $url, string $b): string => (string) json_encode(['result' => [['blockNumber' => '0x1']]]),
+            'rpcUrl' => 'https://rpc.test',
+        ]);
+
+        $this->assertSame('skipped', $result->documentAnchor);
     }
 
     public function testCorruptedCitizenKeyFailsCleanlyWithNoOpensslWarning(): void

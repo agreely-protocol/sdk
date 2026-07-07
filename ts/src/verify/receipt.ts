@@ -46,10 +46,16 @@ import type {
 const DEFAULT_COMPANY_HOST = "agreely.ca";
 const DEFAULT_CITIZEN_BASE = "https://api.agreely.ca";
 const DEFAULT_IPFS_GATEWAY = "https://gateway.lighthouse.storage/ipfs/";
-const DEFAULT_CHAIN_ID = 84532;
+// DEPLOY-GATED: fill with the deployed Base mainnet AgreelyRegistry address before publishing.
+// This is the ONE place the mainnet registry address lives; leave it null and the on-chain
+// documentAnchor check is reported "skipped" for mainnet (never a false result).
+const MAINNET_REGISTRY_ADDRESS: string | null = null;
+// Base mainnet (chainId 8453) is the default. Base Sepolia (84532) remains available as an
+// explicit opt-in for integrators testing against the testnet registry (pass chainId 84532).
+const DEFAULT_CHAIN_ID = 8453;
 const REGISTRY_BY_CHAIN: Record<number, string | null> = {
-  84532: "0x3532a9DfF3C910152543afCa49De7c66113C5312",
-  8453: null, // Base mainnet — not deployed yet
+  8453: MAINNET_REGISTRY_ADDRESS, // Base mainnet (default)
+  84532: "0x3532a9DfF3C910152543afCa49De7c66113C5312", // Base Sepolia (optional testing)
 };
 // keccak256("IdentityAnchored(bytes32,uint64)") — the document CID is anchored via
 // anchorIdentity(commitment = keccak256(utf8(cid))).
