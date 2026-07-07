@@ -127,6 +127,11 @@ export class Agreely {
    * false. On an outage, the fail-closed default returns false; the explicit,
    * scoped, audited exception (config + per-call opt, or break-glass) may
    * return true. NEVER throws on an outage — it resolves to a boolean.
+   *
+   * Send RAW category/purpose — the server normalizes. Labels may be French OR
+   * English, with or without accents (case- and whitespace-insensitive); English
+   * resolves only when the company disclosed an English label for that cell, and
+   * an ambiguous/undeclared label fails closed.
    */
   async check(
     customerId: string,

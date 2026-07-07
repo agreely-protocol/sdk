@@ -193,6 +193,9 @@ final class Agreely
      * throws on an outage — it resolves to a boolean.
      *
      * Send RAW category/purpose — the server normalizes; the SDK never does.
+     * Labels may be French OR English, with or without accents (case- and
+     * whitespace-insensitive); English resolves only when the company disclosed an
+     * English label for that cell, and an ambiguous/undeclared label fails closed.
      *
      * @param array{onOutage?:'allow'|'deny'} $opts
      */

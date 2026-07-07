@@ -192,11 +192,12 @@ new Agreely(['apiKey' => $key, 'httpClient' => $myClient]);
 ## Notes
 
 - **Never normalize** category/purpose before sending — the server does it.
-- **Category labels are language-sensitive.** The `category` and `purpose` passed
-  to `check()` must match the catalog cell's canonical label (French by default).
-  Matching is case- and whitespace-insensitive but accent- and language-sensitive:
-  the English display label will NOT match. Pass the label exactly as declared in
-  the catalog.
+- **Labels are bilingual and accent-tolerant.** The `category` and `purpose`
+  passed to `check()` may be sent in French OR English, with or without accents,
+  and are matched case- and whitespace-insensitively. English resolves only when
+  the company actually disclosed an English label for that cell. If a label is
+  ambiguous or undeclared the check fails closed (deny / `none`), so pass the
+  label as declared in the catalog when you can.
 - The public identifier everywhere is the **protocol `requestId`** (`0x` + 64
   hex), never an internal uuid; `consentRef` is `0x`-hex and **absent** when
   status is `none`.
