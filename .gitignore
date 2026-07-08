@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+/php/vendor/
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Test fixtures (seeded from the live API; never committed)
+ts/test/contract/fixture.json
+php/test/Contract/fixture.json
+
+# Env / secrets
+.env
+.env.*
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
