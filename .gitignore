@@ -1,14 +1,12 @@
 # Dependencies
 node_modules/
-/php/vendor/
 
 # Build artifacts
 dist/
 *.tsbuildinfo
 
 # Test fixtures (seeded from the live API; never committed)
-ts/test/contract/fixture.json
-php/test/Contract/fixture.json
+test/contract/fixture.json
 
 # Env / secrets
 .env

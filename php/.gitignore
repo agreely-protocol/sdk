@@ -1,4 +1,0 @@
-/vendor/
-/.phpunit.cache/
-/test/Contract/fixture.json
-.phpunit.result.cache

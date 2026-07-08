@@ -32,7 +32,7 @@ interface IssuanceVectors {
 }
 
 const vectors = JSON.parse(
-  readFileSync(fileURLToPath(new URL("../../../vectors/vectors.json", import.meta.url)), "utf8"),
+  readFileSync(fileURLToPath(new URL("../../vectors/vectors.json", import.meta.url)), "utf8"),
 ) as { issuanceRequest: IssuanceVectors };
 
 const golden = vectors.issuanceRequest;

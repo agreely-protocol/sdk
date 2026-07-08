@@ -6,7 +6,7 @@ import { canonicalize } from "../../src/crypto/jcs.js";
 import type { DidDocument, VerifyReceiptOptions } from "../../src/verify/types.js";
 
 const vectors = JSON.parse(
-  readFileSync(fileURLToPath(new URL("../../../vectors/vectors.json", import.meta.url)), "utf8"),
+  readFileSync(fileURLToPath(new URL("../../vectors/vectors.json", import.meta.url)), "utf8"),
 ) as {
   receiptVerification: {
     fixtures: { didDocuments: Record<string, DidDocument>; ipfsBody: unknown };

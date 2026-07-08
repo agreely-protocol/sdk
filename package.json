@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "description": "The thin, typed TypeScript/Node client for the Agreely /v1 consent API — a one-call consent gate with fail-closed-by-default outage handling.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agreely-protocol/sdk.git"
+  },
+  "homepage": "https://github.com/agreely-protocol/sdk#readme",
+  "bugs": "https://github.com/agreely-protocol/sdk/issues",
   "type": "module",
   "publishConfig": {
     "access": "public"
