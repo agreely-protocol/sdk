@@ -2,12 +2,12 @@
 
 The thin, typed TypeScript/Node client for the Agreely **/v1 consent API**. One
 call to gate data use on a live, authoritative consent check. No database, no ref
-tables, no local mirror — every `check()` is a fresh, synchronous call to
+tables, no local mirror - every `check()` is a fresh, synchronous call to
 Agreely (caching an allow while a revoke lands is a correctness failure).
 
 - **One-call DX.** `if (await agreely.check(id, category, purpose)) { ... }`
 - **Typed end to end.** Strict types, typed errors, ESM + CJS, full `.d.ts`.
-- **Fail-closed by default.** On an outage `check()` denies — unless you opt in,
+- **Fail-closed by default.** On an outage `check()` denies - unless you opt in,
   explicitly and per-category, to a scoped, audited fail-open.
 - **Node 18+** (global `fetch`), with a lazy `undici` fallback. Minimal deps.
 
@@ -24,7 +24,7 @@ import { Agreely } from "@agreely/sdk";
 
 const agreely = new Agreely({ apiKey: process.env.AGREELY_API_KEY! });
 
-// Boolean gate — ALLOW is the only true. Send RAW human labels; Agreely
+// Boolean gate - ALLOW is the only true. Send RAW human labels; Agreely
 // normalizes server-side (never normalize them yourself).
 if (await agreely.check("cust_8812", "Phone number", "Billing")) {
   // ...you may use the phone number for billing
@@ -36,12 +36,16 @@ if (await agreely.check("cust_8812", "Phone number", "Billing")) {
 ```ts
 const d = await agreely.checkDetailed("cust_8812", "Phone number", "Billing");
 // { decision: "allow" | "deny",
-//   status: "active" | "none" | "revoked" | "expired" | "erased",
+//   status: "active" | "none" | "revoked" | "expired" | "erased" | "relationship_ended",
 //   consentRef?: "0x…",        // absent when status is "none"
 //   checkedAt: "2026-…Z" }
 ```
 
-A consent **deny is a normal 200** — `checkDetailed` returns it, it does not
+`active` allows; every other status denies. `relationship_ended` is a
+relationship-level stop (the company attested the purposes are accomplished,
+art. 23) - the per-cell consent stays truthfully active, it was never withdrawn.
+
+A consent **deny is a normal 200** - `checkDetailed` returns it, it does not
 throw. Errors (auth, validation, rate-limit, outage) throw typed errors.
 
 ### Issue a consent request (no UI)
@@ -99,11 +103,37 @@ server does **not** currently honor `Idempotency-Key` for manual consents, so a
 retried `record` can create a **duplicate** attested consent. Guard against
 duplicate submits yourself.
 
+### End / revert a customer relationship (art. 23)
+
+Attest that a customer relationship is over (Law 25 art. 23, "les fins sont
+accomplies") from your own offboarding flow, and undo a mistaken end within the
+correction window (art. 11 / art. 28). Both require a `reason` and fail closed
+client-side on a blank one. Scope: `relationship`.
+
+```ts
+const ended = await agreely.relationships.end({
+  customerRef: "cust_8812",           // your OWN ref (the check ref), never a DID
+  reason: "account closed; purposes accomplished",
+});
+// { customerRef, status: "ended", endedAt, endedBy: "company" | "citizen_request" }
+
+// Undo a premature/mistaken end (a correction, NOT a resurrection of dead consent):
+const restored = await agreely.relationships.revert({
+  customerRef: "cust_8812",
+  reason: "offboarded the wrong account",
+});
+// { customerRef, status: "active", reverted: true }
+```
+
+Ending is a pure lifecycle overlay: it never revokes, erases, or hides any
+per-cell consent. A non-undo-eligible revert (citizen-driven end, past the
+window, or after any destruction) is a clean 404 with nothing written.
+
 ### List / get / catalog
 
 ```ts
 const page = await agreely.consentRequests.list({ status: "pending", cursor });
-// { items, nextCursor }  — nextCursor is null when exhausted; page size 50.
+// { items, nextCursor }  - nextCursor is null when exhausted; page size 50.
 
 const one = await agreely.consentRequests.get("0x…");  // the protocol requestId, NOT a uuid
 const catalog = await agreely.catalog.list();          // discovery for issuance
@@ -111,7 +141,7 @@ const catalog = await agreely.catalog.list();          // discovery for issuance
 
 ## Errors
 
-Every failure is an `AgreelyError` subclass — a **deny is not an error**.
+Every failure is an `AgreelyError` subclass - a **deny is not an error**.
 
 | Error                       | When                                  |
 | --------------------------- | ------------------------------------- |
@@ -145,14 +175,14 @@ jittered, inside the budget. `consentRequests.create` is **never** retried.
 new Agreely({ apiKey, timeout: 1200 }); // ms, including retries
 ```
 
-## Outage behavior — fail-closed by default
+## Outage behavior - fail-closed by default
 
 When Agreely is unreachable (503 / timeout / network), `check()` **denies**
 (returns `false`); `checkDetailed()` **throws** `AgreelyUnavailableError`. A
 real `200` deny is never affected by any of this.
 
 You can opt specific categories into **fail-open**, but only explicitly, scoped,
-and audited — three independent gates:
+and audited - three independent gates:
 
 ```ts
 const agreely = new Agreely({
@@ -161,7 +191,7 @@ const agreely = new Agreely({
     mode: "fail-open",                 // the explicit word
     categories: ["Browsing/usage"],    // ONLY these may ever degrade  (gate 1)
     maxOutageWindow: "5m",             // refuse to degrade past this
-    onDegrade: (ctx) => audit.log(ctx) // MANDATORY — absent, the constructor throws
+    onDegrade: (ctx) => audit.log(ctx) // MANDATORY - absent, the constructor throws
   },
 });
 
@@ -173,7 +203,7 @@ await agreely.check("cust_8812", "Browsing/usage", "Analytics", { onOutage: "all
 Every degraded **allow** emits an evidence record via `onDegrade`:
 `{ customerId, category, purpose, mode, reason?, breakGlass, error, at }`.
 
-### Break-glass (gate 3) — the operator lever for an active outage
+### Break-glass (gate 3) - the operator lever for an active outage
 
 ```ts
 agreely.breakGlass.engage({ reason: "incident-4471", ttl: "30m", scope: ["Browsing/usage"] });
@@ -187,7 +217,7 @@ via the `onBreakGlass` callback.
 
 Every **break-glass-authorized allow** also emits a per-decision `onBreakGlass`
 event `{ action: "authorized", customerId, category, purpose, reason, error, at }`
-— for *every* such allow, even with **no** `degradeOnOutage` config — so the
+- for *every* such allow, even with **no** `degradeOnOutage` config - so the
 evidence trail shows every access permitted inside a break-glass window, not just
 the engage/expire bookends.
 
@@ -203,13 +233,13 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
 ```
 
 > Heads-up: a per-call `{ onOutage: "allow" }` that is **not** backed by a
-> matching `degradeOnOutage.categories` entry has no effect — the check still
+> matching `degradeOnOutage.categories` entry has no effect - the check still
 > **denies**. The SDK logs a one-time dev warning when this happens; silence it
 > with the `AGREELY_SILENCE_WARNINGS` env var.
 
 ## Notes
 
-- **Never normalize** category/purpose before sending — the server does it.
+- **Never normalize** category/purpose before sending - the server does it.
 - **Labels are bilingual and accent-tolerant.** The `category` and `purpose`
   passed to `check()` may be sent in French OR English, with or without accents,
   and are matched case- and whitespace-insensitively. English resolves only when
@@ -219,4 +249,30 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
 - The public identifier everywhere is the **protocol `requestId`** (`0x` + 64
   hex), never an internal uuid.
 - Scopes: `check` authorizes `check`; `issue` authorizes the consent-request
-  endpoints; either reads the catalog.
+  endpoints; `attest` authorizes manual consents; `relationship` authorizes the
+  relationship end/revert; any scope reads the catalog.
+
+## Open and auditable
+
+MIT-licensed and built to be provable, not just trusted:
+
+- **No telemetry, no analytics, no phone-home.** No posthog/sentry/mixpanel/GA,
+  no hidden fetch to an Agreely-controlled server, no data collection. Every
+  network call is in the source.
+- **Only the endpoints you configure.** The client contacts your configured
+  Agreely API base URL (default `https://api.agreely.ca`). The opt-in receipt
+  verifier additionally contacts a chain RPC you pass in (on-chain anchor) and an
+  IPFS gateway (default `gateway.lighthouse.storage`, overridable) for the opt-in
+  disclosure-copy check; its `did:web` resolver fetches the issuer host named in
+  the receipt over HTTPS (inject your own `resolver` for untrusted receipts).
+- **Minimal deps, no install scripts.** Only an optional `undici` fallback.
+- **Audit surface.** `src/transport.ts` and `src/verify/receipt.ts` are the only
+  files that open a socket.
+
+Agreely records and structures consent; it does not certify that your
+organization is compliant.
+
+## Links
+
+- Product and API: https://agreely.ca
+- Organization: https://github.com/agreely-protocol
