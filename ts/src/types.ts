@@ -37,11 +37,13 @@ export type Assurance = "citizen_signed" | "company_attested";
  *   "active"  -> allow
  *   "none"    -> deny (no record; consentRef is ABSENT)
  *   "revoked" / "expired" / "erased" -> deny
+ *   "relationship_ended" -> deny: the company attested the relationship is over
+ *     (art. 23), a prospective relationship-level stop; the per-cell consent stays
+ *     truthfully active (it was never withdrawn).
  *
- * The handoff names active/revoked/expired/none; "erased" is also a server-side
- * deny status in the contract, so it is included to stay faithful to openapi.yaml.
+ * The full deny vocabulary mirrors openapi.yaml (CheckDecision.status).
  */
-export type Status = "active" | "none" | "revoked" | "expired" | "erased";
+export type Status = "active" | "none" | "revoked" | "expired" | "erased" | "relationship_ended";
 
 /** The full result of a check. `check()` returns the boolean; this is the reasoned form. */
 export interface CheckResult {
@@ -340,6 +342,28 @@ export interface RelationshipEnded {
    * (the origin is never overwritten).
    */
   endedBy: "company" | "citizen_request";
+}
+
+/** Input for reverting a mistaken end of a customer relationship (art. 11 / art. 28). */
+export interface RevertRelationshipInput {
+  /** The company's own reference for the customer (the same ref used by check). */
+  customerRef: string;
+  /** The art. 11 / art. 28 correction justification. Required: a blank reason fails closed client-side. */
+  reason: string;
+}
+
+/**
+ * The 200 body from POST /v1/customers/{customerRef}/relationship/revert. Undoing
+ * a mistaken company-attested end (art. 11 / art. 28) returns the relationship to
+ * active; the still-active consents (never withdrawn) apply again. NEVER a DID or
+ * a consent_ref.
+ */
+export interface RelationshipReverted {
+  customerRef: string;
+  /** The lifecycle after the undo; the relationship is active again. */
+  status: "active";
+  /** True: this call undid the end as an art. 11 / art. 28 correction. */
+  reverted: boolean;
 }
 
 /** A declared active catalog entry, for issuance discovery. */

@@ -11,6 +11,7 @@ use Agreely\Sdk\Errors\AgreelyNotFoundError;
 use Agreely\Sdk\Errors\AgreelyValidationError;
 use Agreely\Sdk\Test\Support\MockHttpClient;
 use Agreely\Sdk\Types\RelationshipEnded;
+use Agreely\Sdk\Types\RelationshipReverted;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -112,5 +113,63 @@ final class RelationshipsTest extends TestCase
         ]);
         $this->expectException(AgreelyNotFoundError::class);
         $this->client($http)->relationships()->end(['customerRef' => 'ghost', 'reason' => 'done']);
+    }
+
+    private static function reverted(): MockHttpClient
+    {
+        return new MockHttpClient([
+            MockHttpClient::json(200, [
+                'customerRef' => 'cust-1',
+                'status' => 'active',
+                'reverted' => true,
+            ]),
+        ]);
+    }
+
+    public function testRevertPostsReasonToTheRevertPathAndReturnsTheActiveRelationship(): void
+    {
+        $http = self::reverted();
+        $r = $this->client($http)->relationships()->revert(['customerRef' => 'cust-1', 'reason' => 'ended by mistake']);
+        $this->assertInstanceOf(RelationshipReverted::class, $r);
+        $this->assertSame('active', $r->status);
+        $this->assertTrue($r->reverted);
+        $this->assertSame('/v1/customers/cust-1/relationship/revert', $http->calls[0]->path());
+        $body = $http->calls[0]->body;
+        $this->assertNotNull($body);
+        $this->assertSame('ended by mistake', $body['reason']);
+    }
+
+    public function testRevertPercentEncodesARefWithASlash(): void
+    {
+        $http = self::reverted();
+        $this->client($http)->relationships()->revert(['customerRef' => 'STORE/0042', 'reason' => 'mistake']);
+        $this->assertSame('/v1/customers/STORE%2F0042/relationship/revert', $http->calls[0]->path());
+    }
+
+    public function testRevertFailsClosedOnABlankReasonBeforeAnyWireCall(): void
+    {
+        $http = self::reverted();
+        try {
+            $this->client($http)->relationships()->revert(['customerRef' => 'cust-1', 'reason' => '   ']);
+            $this->fail('Expected an AgreelyConfigError.');
+        } catch (AgreelyConfigError) {
+            $this->assertCount(0, $http->calls, 'A blank reason must never reach the wire.');
+        }
+    }
+
+    public function testRevertFailsClosedOnAMissingCustomerRef(): void
+    {
+        $http = self::reverted();
+        $this->expectException(AgreelyConfigError::class);
+        $this->client($http)->relationships()->revert(['customerRef' => '  ', 'reason' => 'mistake']);
+    }
+
+    public function testRevertMapsANonEligibleOrForeignRefTo404NotFound(): void
+    {
+        $http = new MockHttpClient([
+            MockHttpClient::json(404, ['error' => ['code' => 'not_found', 'message' => 'This end is not undo-eligible.']]),
+        ]);
+        $this->expectException(AgreelyNotFoundError::class);
+        $this->client($http)->relationships()->revert(['customerRef' => 'ghost', 'reason' => 'mistake']);
     }
 }

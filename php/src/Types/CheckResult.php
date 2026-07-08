@@ -9,7 +9,10 @@ namespace Agreely\Sdk\Types;
  * form. Mirrors the openapi CheckDecision shape.
  *
  *   decision  -> "allow" | "deny" (ALLOW is the only true)
- *   status    -> "active" | "none" | "revoked" | "expired" | "erased"
+ *   status    -> "active" | "none" | "revoked" | "expired" | "erased" |
+ *                "relationship_ended" ("relationship_ended" -> deny: the company
+ *                attested the relationship is over (art. 23); the per-cell consent
+ *                stays truthfully active, it was never withdrawn)
  *   consentRef -> 0x-hex enforcement handle; ABSENT (null) when status is "none"
  *   degraded  -> true ONLY when synthesized by the local degrade policy on an
  *                outage (never set on a real server decision)
