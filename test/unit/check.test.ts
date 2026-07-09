@@ -30,6 +30,13 @@ describe("check() boolean mapping", () => {
     expect(await agreely.check("c1", "Phone", "Billing")).toBe(false);
   });
 
+  it("fail-closes to false on a 402 (company subscription lapsed), never an allow", async () => {
+    const { agreely } = client([
+      { status: 402, json: { error: { code: "billing_inactive", message: "subscription lapsed" } } },
+    ]);
+    expect(await agreely.check("c1", "Phone", "Billing")).toBe(false);
+  });
+
   it("sends category/purpose RAW — no client-side normalization", async () => {
     const { agreely, calls } = client([{ json: { decision: "deny", status: "none", checkedAt: "t" } }]);
     await agreely.check("c1", "  Email   ADDRESS ", "Marketing\tOutreach");

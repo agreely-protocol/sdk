@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   Agreely,
   AgreelyAuthError,
+  AgreelyBillingInactiveError,
   AgreelyNotFoundError,
   AgreelyUnavailableError,
   AgreelyValidationError,
@@ -47,6 +48,17 @@ describe("typed errors", () => {
   it("404 -> AgreelyNotFoundError", async () => {
     const { agreely } = client([{ status: 404, json: { error: { code: "not_found", message: "gone" } } }]);
     await expect(agreely.consentRequests.get("0xabc")).rejects.toBeInstanceOf(AgreelyNotFoundError);
+  });
+
+  it("402 -> AgreelyBillingInactiveError with the wire code", async () => {
+    const { agreely } = client([
+      { status: 402, json: { error: { code: "billing_inactive", message: "subscription lapsed" } } },
+    ]);
+    await expect(agreely.checkDetailed("c", "cat", "pur")).rejects.toMatchObject({
+      name: "AgreelyBillingInactiveError",
+      code: "billing_inactive",
+      status: 402,
+    });
   });
 
   it("429 -> AgreelyRateLimitError exposing retryAfter from the header", async () => {

@@ -1,5 +1,6 @@
 import {
   AgreelyAuthError,
+  AgreelyBillingInactiveError,
   AgreelyError,
   AgreelyNotFoundError,
   AgreelyRateLimitError,
@@ -176,6 +177,13 @@ export class Transport {
         });
       case 404:
         throw new AgreelyNotFoundError(message, { code: code ?? "not_found", status: res.status });
+      case 402:
+        // The company's Agreely subscription is inactive/lapsed. Fail-closed for
+        // gating, but distinct from an outage: not transient, not retryable.
+        throw new AgreelyBillingInactiveError(message, {
+          code: code ?? "billing_inactive",
+          status: res.status,
+        });
       case 429: {
         const header = res.headers.get("Retry-After");
         const retryAfter = header !== null ? Number(header) : undefined;

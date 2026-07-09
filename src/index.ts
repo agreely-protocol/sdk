@@ -10,6 +10,7 @@ export {
   AgreelyAuthError,
   AgreelyValidationError,
   AgreelyNotFoundError,
+  AgreelyBillingInactiveError,
   AgreelyRateLimitError,
   AgreelyUnavailableError,
   AgreelyTimeoutError,

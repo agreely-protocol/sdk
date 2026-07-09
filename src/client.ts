@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { BreakGlass } from "./breakGlass.js";
 import { DegradePolicy } from "./degrade.js";
-import { AgreelyConfigError, AgreelyUnavailableError } from "./errors.js";
+import { AgreelyBillingInactiveError, AgreelyConfigError, AgreelyUnavailableError } from "./errors.js";
 import { Catalog } from "./resources/catalog.js";
 import { ConsentRequests } from "./resources/consentRequests.js";
 import { ManualConsents } from "./resources/manualConsents.js";
@@ -143,7 +143,11 @@ export class Agreely {
       const result = await this.resolve(customerId, category, purpose, opts);
       return result.decision === "allow";
     } catch (error) {
-      if (error instanceof AgreelyUnavailableError) return false; // fail-closed deny
+      // Fail-closed deny. An outage OR a lapsed company subscription (402) must
+      // never resolve to an allow. checkDetailed() still THROWS the typed error
+      // so a caller can surface "billing lapsed" distinctly.
+      if (error instanceof AgreelyUnavailableError) return false;
+      if (error instanceof AgreelyBillingInactiveError) return false;
       throw error; // auth / validation / rate-limit / not-found surface as errors
     }
   }

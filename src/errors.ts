@@ -8,6 +8,7 @@ export type AgreelyErrorCode =
   | "forbidden"
   | "invalid_request"
   | "not_found"
+  | "billing_inactive"
   | "rate_limited"
   | "unavailable"
   | "timeout"
@@ -47,6 +48,15 @@ export class AgreelyValidationError extends AgreelyError {}
 
 /** 404 — no such resource. */
 export class AgreelyNotFoundError extends AgreelyError {}
+
+/**
+ * 402 — the company behind the API key has an inactive/lapsed subscription
+ * (trial ended unpaid, past_due, or canceled). DISTINCT from an outage: NOT
+ * transient and NOT retryable. Treat it as fail-closed for gating (do NOT grant
+ * a gated value) but surface it as actionable — the company must pay to restore
+ * service, it is not "Agreely is down".
+ */
+export class AgreelyBillingInactiveError extends AgreelyError {}
 
 /** 429 — the per-company rate window was exceeded. */
 export class AgreelyRateLimitError extends AgreelyError {

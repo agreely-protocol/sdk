@@ -148,6 +148,7 @@ Every failure is an `AgreelyError` subclass - a **deny is not an error**.
 | `AgreelyAuthError`          | 401 unauthorized / 403 forbidden      |
 | `AgreelyValidationError`    | 400 / 422 (`.field` names the input)  |
 | `AgreelyNotFoundError`      | 404                                   |
+| `AgreelyBillingInactiveError` | 402 - the company's Agreely subscription lapsed |
 | `AgreelyRateLimitError`     | 429 (`.retryAfter` seconds)           |
 | `AgreelyUnavailableError`   | 503 / network / timeout               |
 | `AgreelyConfigError`        | bad client config (thrown at init)    |
@@ -162,6 +163,24 @@ try {
 } catch (e) {
   if (e instanceof AgreelyRateLimitError) await sleep((e.retryAfter ?? 1) * 1000);
   else throw e;
+}
+```
+
+A `402` `AgreelyBillingInactiveError` means the **company's** Agreely subscription
+lapsed (trial ended unpaid, `past_due`, or canceled) - not an outage. `check()`
+**fail-closes** to `false` (a lapsed biller never gets an accidental allow), while
+`checkDetailed()` **throws** it so you can surface it distinctly. It is actionable
+(the company must pay to restore service), so treat it apart from "Agreely is down".
+
+```ts
+import { AgreelyBillingInactiveError } from "@agreely/sdk";
+
+try {
+  await agreely.checkDetailed(id, cat, pur);
+} catch (e) {
+  if (e instanceof AgreelyBillingInactiveError) {
+    // Gate is closed AND the company must fix its billing. Surface, don't retry.
+  } else throw e;
 }
 ```
 
