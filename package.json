@@ -1,6 +1,6 @@
 {
   "name": "@agreely/sdk",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "The thin, typed TypeScript/Node client for the Agreely /v1 consent API — a one-call consent gate with fail-closed-by-default outage handling.",
   "license": "MIT",
   "repository": {
@@ -26,6 +26,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {

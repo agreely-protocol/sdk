@@ -269,7 +269,7 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       expect(got.requestId).toBe(first.requestId);
       assertExactKeys(
         got as unknown as Record<string, unknown>,
-        ["requestId", "status", "validUntil", "expiresAt", "createdAt", "settledAt", "items", "document"],
+        ["requestId", "status", "validUntil", "expiresAt", "createdAt", "settledAt", "customerId", "documentCode", "items", "document"],
       );
 
       // list() surfaces it; the page maps the wire `requests` field to `items`.
@@ -277,6 +277,24 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       expect(page).toHaveProperty("items");
       expect(page).toHaveProperty("nextCursor");
       expect(page.items.some((r) => r.requestId === first.requestId)).toBe(true);
+
+      // The customerId + status + limit filters narrow the page, and the record
+      // carries the new customerId/documentCode metadata.
+      const filtered = await issuer.consentRequests.list({
+        customerId: fixture!.subject,
+        status: "pending",
+        limit: 100,
+      });
+      const mine = filtered.items.find((r) => r.requestId === first.requestId);
+      expect(mine).toBeDefined();
+      expect(mine!.customerId).toBe(fixture!.subject);
+      expect(mine!.documentCode).toBe(fixture!.issue.documentCode);
+
+      // hasPending is the dedup helper: a pending request exists for this customer.
+      expect(await issuer.consentRequests.hasPending(fixture!.subject)).toBe(true);
+      expect(
+        await issuer.consentRequests.hasPending(fixture!.subject, fixture!.issue.documentCode),
+      ).toBe(true);
     });
 
     it("resolves a documentCode to the published version server-side", async () => {

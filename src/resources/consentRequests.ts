@@ -82,17 +82,50 @@ export class ConsentRequests {
     });
   }
 
-  /** List the company's requests, newest first, with optional status filter + cursor. */
+  /**
+   * List the company's requests, newest first (keyset). All filters optional:
+   * `customerId` (the company's own subject ref), `status`, `limit` (page size;
+   * server default 50, max 100), and `cursor` (a requestId from a prior
+   * `nextCursor`). Returns metadata only, tenant-scoped by the API key.
+   */
   async list(input: ListConsentRequestsInput = {}): Promise<ConsentRequestPage> {
     const wire = await this.transport.request<ListWire>({
       method: "GET",
       path: "/v1/consent-requests",
-      query: { status: input.status, cursor: input.cursor },
+      query: {
+        customerId: input.customerId,
+        status: input.status,
+        limit: input.limit !== undefined ? String(input.limit) : undefined,
+        cursor: input.cursor,
+      },
       idempotentRetry: true,
     });
     // Coerce an absent nextCursor to null so listAll stops exactly like PHP's
     // fromWire does (the API always emits it; this keeps strict TS<->PHP parity).
     return { items: wire.requests, nextCursor: wire.nextCursor ?? null };
+  }
+
+  /**
+   * The dedup helper: does an OPEN (still-pending) consent request already exist
+   * for this customer? Lists status:'pending' for the customer (auto-paginating)
+   * and returns true as soon as one is found, optionally narrowed to a specific
+   * documentCode. Use it before consentRequests.create to avoid re-issuing (a
+   * second email) when a request is already outstanding.
+   *
+   * Honest scope: this is a metadata convenience over the list endpoint, NOT a
+   * compliance decision. It reports whether a pending request exists; it does not
+   * assert consent was given.
+   */
+  async hasPending(customerId: string, documentCode?: string): Promise<boolean> {
+    const ref = typeof customerId === "string" ? customerId.trim() : "";
+    if (ref === "") {
+      throw new AgreelyConfigError("consentRequests.hasPending requires a customerId.");
+    }
+    const wanted = typeof documentCode === "string" ? documentCode.trim() : "";
+    for await (const req of this.listAll({ customerId: ref, status: "pending" })) {
+      if (wanted === "" || req.documentCode === wanted) return true;
+    }
+    return false;
   }
 
   /** Fetch one request by its protocol requestId (0x + 64hex). */
@@ -137,7 +170,9 @@ export class ConsentRequests {
     let cursor = input.cursor;
     for (let page = 0; page < maxPages; page++) {
       const result = await this.list({
+        ...(input.customerId !== undefined ? { customerId: input.customerId } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(cursor !== undefined ? { cursor } : {}),
       });
       for (const item of result.items) yield item;

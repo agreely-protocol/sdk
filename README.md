@@ -129,15 +129,39 @@ Ending is a pure lifecycle overlay: it never revokes, erases, or hides any
 per-cell consent. A non-undo-eligible revert (citizen-driven end, past the
 window, or after any destruction) is a clean 404 with nothing written.
 
-### List / get / catalog
+### List / lookup / get / catalog
 
 ```ts
-const page = await agreely.consentRequests.list({ status: "pending", cursor });
-// { items, nextCursor }  - nextCursor is null when exhausted; page size 50.
+const page = await agreely.consentRequests.list({
+  customerId: "cust_8812",   // filter to one subject ref (optional)
+  status: "pending",         // pending | approved | refused | expired | revoked_before_action (optional)
+  limit: 50,                 // page size, default 50, max 100 (optional)
+  cursor,                    // a prior nextCursor (optional)
+});
+// { items, nextCursor }  - metadata only, newest first; nextCursor is null when exhausted.
 
 const one = await agreely.consentRequests.get("0x…");  // the protocol requestId, NOT a uuid
 const catalog = await agreely.catalog.list();          // discovery for issuance
 ```
+
+**Dedup before issuing.** `hasPending` answers "is a consent request already
+outstanding for this customer?" so you do not re-issue (and re-email):
+
+```ts
+if (!(await agreely.consentRequests.hasPending("cust_8812", "conditions-marketing"))) {
+  await agreely.consentRequests.create({
+    customerId: "cust_8812",
+    recipientEmail: "person@example.com",
+    documentCode: "conditions-marketing",
+    validUntil: "2031-01-01",
+  });
+}
+```
+
+The `documentCode` argument is optional; omit it to match any pending request for
+the customer. This is a **metadata convenience** over the list endpoint, not a
+compliance decision: it reports whether a pending request exists, it does not
+assert consent was given. Each record now carries `customerId` and `documentCode`.
 
 ## Errors
 

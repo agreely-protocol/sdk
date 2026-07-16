@@ -179,6 +179,10 @@ export interface ConsentRequestRecord {
   expiresAt: string;
   createdAt: string;
   settledAt: string | null;
+  /** The company's OWN subject reference the request was issued for. */
+  customerId: string;
+  /** The code of the consent document the request was issued under (metadata). */
+  documentCode: string;
   items: ItemLabels[];
   /** Null only on legacy rows issued before the document became mandatory. */
   document: ConsentDocumentDescriptor | null;
@@ -198,14 +202,22 @@ export interface CancelledRequest {
 }
 
 export interface ListConsentRequestsInput {
+  /** Filter to one company subject reference (the company's own customerId). */
+  customerId?: string;
   status?: ConsentRequestStatus;
+  /** Page size (server default 50, max 100). */
+  limit?: number;
   /** The requestId to page after (from a prior `nextCursor`). */
   cursor?: string;
 }
 
 /** Options for the auto-paginating listAll/collect. */
 export interface ListAllConsentRequestsInput {
+  /** Filter to one company subject reference (the company's own customerId). */
+  customerId?: string;
   status?: ConsentRequestStatus;
+  /** Page size per underlying request (server default 50, max 100). */
+  limit?: number;
   /** Start paging after this requestId (a prior `nextCursor`). */
   cursor?: string;
   /** Hard guard on pages fetched (default 1000) so a runaway cursor can't spin forever. */
