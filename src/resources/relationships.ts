@@ -25,6 +25,20 @@ export class Relationships {
    * (the original endedAt + endedBy origin stand). An unknown or foreign
    * customerRef maps to AgreelyNotFoundError (404), with nothing written
    * server-side. Never auto-retried (it mutates).
+   *
+   * WHAT COUNTS AS A KNOWN CUSTOMER (this surprises people). The 404 gate asks whether
+   * the ref has any consent HISTORY with your company: an enforcement record, a consent
+   * request, or a recorded refusal. It does NOT ask whether `check` answers for the ref.
+   * So a customer you only ever served on DECLARED NECESSITY cells (check returns allow
+   * with status "necessity", which creates nothing) has no history, and `end` throws
+   * AgreelyNotFoundError for them even though `check` just allowed. That is not a bug to
+   * work around: there is no consent relationship to end, and the necessity allow is
+   * governed by your catalog declaration, not by a per-subject record. If you need an
+   * art. 23 stop to bite for such a customer, give them a real record first (a consent
+   * request or a company-attested consent), or retire the catalog cell itself.
+   *
+   * Treat AgreelyNotFoundError here as "nothing to end", not as a failure, unless you
+   * know the ref has consent history.
    */
   end(input: EndRelationshipInput): Promise<RelationshipEnded> {
     const customerRef = typeof input.customerRef === "string" ? input.customerRef.trim() : "";

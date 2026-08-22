@@ -32,18 +32,71 @@ export interface Identity {
 export type Assurance = "citizen_signed" | "company_attested";
 
 /**
- * The resolved status of an enforcement cell.
+ * The resolved status of an enforcement cell: the EIGHT-value vocabulary of
+ * openapi.yaml (CheckDecision.status / BatchDecision.status).
  *
- *   "active"  -> allow
- *   "none"    -> deny (no record; consentRef is ABSENT)
- *   "revoked" / "expired" / "erased" -> deny
- *   "relationship_ended" -> deny: the company attested the relationship is over
- *     (art. 23), a prospective relationship-level stop; the per-cell consent stays
- *     truthfully active (it was never withdrawn).
+ * ALLOW:
+ *   "active"    -> a live consent record backs the cell (carries consentRef + assurance).
+ *   "necessity" -> allow WITHOUT a signed consent record: there is no per-subject
+ *     record, but the active catalog cell declares a NON-consent lawful basis that is
+ *     lawful to hold and use on its own. Carries `basis` and NO consentRef/assurance
+ *     (there is no signed proof), and the check CREATES NOTHING. Never present a
+ *     necessity allow to a person or an auditor as "consented".
  *
- * The full deny vocabulary mirrors openapi.yaml (CheckDecision.status).
+ * DENY:
+ *   "none"      -> no record on a consent-basis cell (or no active catalog cell).
+ *     Consent must refuse without a record. This is ALSO what an erased cell reads as.
+ *   "revoked"   -> the consent was withdrawn (art. 14).
+ *   "expired"   -> the consent lifespan elapsed (art. 14 al. 3).
+ *   "erased"    -> listed by openapi.yaml, but NOT currently emitted by the API.
+ *     Erasure is a crypto-shred: it DELETES the enforcement record outright (art. 23),
+ *     so an erased cell reads back as deny/"none". Kept in the union so an exhaustive
+ *     switch stays spec-complete; do not expect it on the wire today.
+ *   "relationship_ended" -> the company attested the relationship is over (art. 23), a
+ *     prospective relationship-level stop; the per-cell consent stays truthfully active
+ *     (it was never withdrawn), which is why this is its own status.
+ *   "sensitive_requires_consent" -> no record, and the company declared the catalog cell
+ *     SENSITIVE, so it fails closed to express consent (art. 12 al. 1 in fine / art. 13).
+ *     Nothing is created; a sensitive cell never greenlights on necessity alone.
+ *
+ * FORWARD COMPATIBILITY: the server may add statuses, and a value outside this union
+ * can reach you at runtime (nothing is validated on decode). Treat ANY unrecognised
+ * status as a DENY and read `decision`, which is only ever "allow" or "deny".
  */
-export type Status = "active" | "none" | "revoked" | "expired" | "erased" | "relationship_ended";
+export type Status =
+  | "active"
+  | "necessity"
+  | "none"
+  | "revoked"
+  | "expired"
+  | "erased"
+  | "relationship_ended"
+  | "sensitive_requires_consent";
+
+/**
+ * The DECLARED non-consent lawful basis behind a `status: "necessity"` allow. Present
+ * ONLY on a necessity allow; absent on every other status.
+ *
+ * Agreely records the company's DECLARED basis and does NOT certify its legal validity.
+ * A necessity allow carries no consent artifact.
+ *
+ *   "contract"              -> art. 12 al. 2 (3 deg)
+ *   "necessary_for_service" -> art. 12 al. 2 (4 deg), supply of a product or service
+ *   "security_fraud"        -> art. 12 al. 2 (3 deg) / art. 9 al. 1 (1 deg)
+ *   "legal_obligation"      -> art. 18 / art. 23
+ *   "professional_contact"  -> art. 1 al. 5. NOTE: a SCOPE CARVE-OUT from Sections II
+ *     and III of the Act, not a necessity ground under art. 12 or art. 9. It appears
+ *     here because it also produces a necessity allow.
+ *
+ * These are the P-39.1 (private sector) bases, which is the whole vocabulary the /v1
+ * check API emits today.
+ */
+export type Basis =
+  | "contract"
+  | "necessary_for_service"
+  | "security_fraud"
+  | "legal_obligation"
+  | "professional_contact";
 
 /** The full result of a check. `check()` returns the boolean; this is the reasoned form. */
 export interface CheckResult {
@@ -59,6 +112,13 @@ export interface CheckResult {
    * "none" and never set on a degraded (synthesized) result.
    */
   assurance?: Assurance;
+  /**
+   * The DECLARED non-consent lawful basis behind a `status: "necessity"` allow.
+   * Present ONLY when status is "necessity"; absent for every other status, and
+   * never set on a degraded (synthesized) result. Agreely records the company's
+   * declared basis, it does not certify its legal validity.
+   */
+  basis?: Basis;
   /**
    * True when this result did NOT come from the server but from the local
    * degrade policy (fail-open / break-glass) during an outage. Never set on a
@@ -87,9 +147,14 @@ export interface BatchDecision {
   consentRef?: string;
   /**
    * How the enforcement record was established. Present whenever a record
-   * exists; absent for status "none".
+   * exists; absent for status "none" and for "necessity".
    */
   assurance?: Assurance;
+  /**
+   * The DECLARED non-consent lawful basis behind a `status: "necessity"` allow.
+   * Present ONLY when status is "necessity".
+   */
+  basis?: Basis;
   /** ISO-8601 timestamp the decision was made at. */
   checkedAt: string;
 }
@@ -466,7 +531,26 @@ export interface AgreelyOptions {
   apiKey: string;
   /** API base URL. Defaults to https://api.agreely.ca. */
   baseUrl?: string;
-  /** Per-call total time budget in ms, including retries. Default 800. */
+  /**
+   * Per-call TOTAL time budget in ms (connect + transfer + any transient-outage
+   * retry). Default 800.
+   *
+   * 800ms is sized for a call inside the SAME datacentre or region as the API. It is
+   * NOT a safe budget over the open internet: a cold TLS handshake plus a cross-region
+   * round trip can exceed it on a perfectly healthy server.
+   *
+   * This matters because the SDK FAILS CLOSED: a timeout is treated as an outage, so
+   * `check` returns false and `checkDetailed` throws AgreelyUnavailableError. An
+   * under-set timeout therefore does not produce a slow answer, it produces a SPURIOUS
+   * DENY, and the person is shown less of their own data than they consented to. If
+   * you call api.agreely.ca from outside its region, RAISE IT. A well-tested
+   * internet-facing pairing is `{ timeout: 8000, maxRetries: 1 }`.
+   *
+   * The default is deliberately left low rather than raised for everyone: this is a
+   * synchronous gate on a request path, and an unattended multi-second default would
+   * turn an Agreely outage into a multi-second hang on every one of your pages. Choose
+   * the budget your deployment can actually pay.
+   */
   timeout?: number;
   /** Opt specific categories into fail-open on an outage. Off by default. */
   degradeOnOutage?: DegradeOnOutageConfig;

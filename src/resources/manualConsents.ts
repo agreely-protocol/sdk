@@ -13,11 +13,15 @@ interface RecordOptions {
   /**
    * Override the auto-generated Idempotency-Key sent with the request.
    *
-   * WARNING: the server does NOT currently honor Idempotency-Key for
-   * POST /v1/manual-consents (unlike consentRequests.create, which does). A
-   * retried record may therefore create a DUPLICATE company-attested consent.
-   * The header is sent (harmless, and forward-compatible if the server adds
-   * support) but callers MUST guard against duplicate submits themselves.
+   * The server HONORS this for POST /v1/manual-consents (since 2026-07-01), exactly
+   * like consentRequests.create: a retry with the same key replays the original 201
+   * and records nothing new.
+   *
+   * The KEY is the whole contract: the replay is keyed on (company, key) alone, NOT
+   * on the request body and NOT on the endpoint. Reusing a key with a different
+   * payload silently replays the FIRST payload and writes nothing, and a key already
+   * spent on consentRequests.create will replay THAT response here. Leave this unset
+   * unless you have a durable, operation-unique id.
    */
   idempotencyKey?: string;
 }
@@ -37,9 +41,11 @@ export class ManualConsents {
    * ALWAYS carries the pdfSha256 commitment; the pdf bytes are uploaded only when
    * explicitly provided. NEVER auto-retried (it mutates).
    *
-   * IDEMPOTENCY CAVEAT: an Idempotency-Key is auto-generated per call (overridable)
-   * and sent, but the server does NOT yet honor it for manual consents, so a
-   * retried record CAN double-record. Guard against duplicate submits yourself.
+   * IDEMPOTENT on retry: an Idempotency-Key is auto-generated per call (overridable)
+   * and the server HONORS it, so a retry with the same key REPLAYS the original 201
+   * body (same consentId, same consentRefs) and records NOTHING new. A dropped
+   * connection can never double-attest a consent. See RecordOptions.idempotencyKey
+   * for the one caveat: keys are scoped to the company, not to the body or endpoint.
    */
   record(input: RecordManualConsentInput, options: RecordOptions = {}): Promise<ManualConsentResult> {
     const idempotencyKey = options.idempotencyKey ?? generateIdempotencyKey();

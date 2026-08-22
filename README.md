@@ -36,17 +36,45 @@ if (await agreely.check("cust_8812", "Phone number", "Billing")) {
 ```ts
 const d = await agreely.checkDetailed("cust_8812", "Phone number", "Billing");
 // { decision: "allow" | "deny",
-//   status: "active" | "none" | "revoked" | "expired" | "erased" | "relationship_ended",
-//   consentRef?: "0x…",        // absent when status is "none"
+//   status: Status,            // the eight values below
+//   consentRef?: "0x…",        // absent for "none" and for "necessity"
+//   assurance?: "citizen_signed" | "company_attested",  // absent for "none"/"necessity"
+//   basis?: Basis,             // ONLY on "necessity"
 //   checkedAt: "2026-…Z" }
 ```
 
-`active` allows; every other status denies. `relationship_ended` is a
-relationship-level stop (the company attested the purposes are accomplished,
-art. 23) - the per-cell consent stays truthfully active, it was never withdrawn.
-
 A consent **deny is a normal 200** - `checkDetailed` returns it, it does not
 throw. Errors (auth, validation, rate-limit, outage) throw typed errors.
+
+### The status vocabulary
+
+Two statuses allow, six deny:
+
+| status | decision | what it means |
+| --- | --- | --- |
+| `active` | allow | a live consent record backs the cell |
+| `necessity` | allow | **no consent record**; the catalog cell declares a non-consent lawful basis. Carries `basis`, no `consentRef`, no `assurance`. Creates nothing. |
+| `none` | deny | no record on a consent-basis cell. Also what an **erased** cell reads as. |
+| `revoked` | deny | the consent was withdrawn (art. 14) |
+| `expired` | deny | the consent lifespan elapsed (art. 14 al. 3) |
+| `relationship_ended` | deny | the company attested the purposes are accomplished (art. 23). A relationship-level stop: the per-cell consent stays truthfully active, it was never withdrawn. |
+| `sensitive_requires_consent` | deny | no record, and the company declared the cell sensitive, so it fails closed to express consent (art. 12 al. 1 in fine / art. 13) |
+| `erased` | deny | listed by `openapi.yaml`, **not currently emitted**. Erasure crypto-shreds the record, so an erased cell reads back as `none`. |
+
+**A `necessity` allow is not a consent.** It rests on a basis the company
+*declared* on its catalog (`contract`, `necessary_for_service`, `security_fraud`,
+`legal_obligation`, `professional_contact`), there is no signed proof behind it,
+and Agreely does not certify its legal validity. Never present it to a person or
+an auditor as "consented":
+
+```ts
+if (d.status === "necessity") {
+  // allowed, but on d.basis, NOT on consent
+}
+```
+
+Treat any status you do not recognise as a **deny**: read `d.decision`, which is
+only ever `allow` or `deny`.
 
 ### Issue a consent request (no UI)
 
@@ -98,10 +126,21 @@ await agreely.manualConsents.erase("0x…");
 ```
 
 Like `consentRequests.create`, `record` is **never auto-retried**; it attaches a
-unique `Idempotency-Key` per call. Note: unlike `consentRequests.create`, the
-server does **not** currently honor `Idempotency-Key` for manual consents, so a
-retried `record` can create a **duplicate** attested consent. Guard against
-duplicate submits yourself.
+unique `Idempotency-Key` per call.
+
+The server honours that key on **both** endpoints: a retry with the same key
+replays the original 201 byte-for-byte and records nothing new, so a dropped
+connection can never double-issue or double-attest.
+
+The key is the whole contract. The replay is keyed on **(company, key)** alone,
+not on the request body and not on the endpoint. So:
+
+- reusing a key with a **different payload** silently replays the *first* payload
+  and writes nothing;
+- a key already spent on `consentRequests.create` will replay **that** response
+  from `manualConsents.record`.
+
+Leave the key unset unless you have a durable, operation-unique id.
 
 ### End / revert a customer relationship (art. 23)
 
@@ -217,6 +256,51 @@ jittered, inside the budget. `consentRequests.create` is **never** retried.
 ```ts
 new Agreely({ apiKey, timeout: 1200 }); // ms, including retries
 ```
+
+### Raise it if you are calling over the internet
+
+800ms is sized for a call inside the **same datacentre or region** as the API. It
+is not a safe budget over the open internet: a cold TLS handshake plus a
+cross-region round trip can exceed it on a perfectly healthy server.
+
+That matters because this SDK **fails closed**. A timeout is treated as an outage,
+so `check()` returns `false` and `checkDetailed()` throws. An under-set timeout
+does not give you a slow answer, it gives you a **spurious deny**, and the person
+is shown less of their own data than they consented to.
+
+```ts
+// Internet-facing caller: give it room.
+new Agreely({ apiKey, timeout: 8000, maxRetries: 1 });
+```
+
+The default is deliberately left low rather than raised for everyone: this is a
+synchronous gate on a request path, and an unattended multi-second default would
+turn an Agreely outage into a multi-second hang on every one of your pages.
+Choose the budget your deployment can actually pay.
+
+## Limits
+
+| limit | value | what happens past it |
+| --- | --- | --- |
+| batch size | **500** cells per `checkBatch` / `checkFields` | the SDK throws `AgreelyConfigError` **before** the wire call (exported as `BATCH_CAP`). Server-side it is a 422 that decides nothing. |
+| rate | **120 requests/minute per company** | 429 with `Retry-After`, surfaced as `AgreelyRateLimitError` (exported as `RATE_LIMIT_PER_MINUTE`) |
+
+The rate limit is per **company**, not per api key, so every key you issue shares
+one allowance. One `checkBatch` of 500 cells costs **one** request, which is the
+whole point of batching.
+
+`checkFields` builds a `refs x fields` product, so it hits the cap sooner than it
+looks: 100 rows x 6 fields is 600 cells. It refuses client-side and tells you the
+safe page size:
+
+```
+checkFields: 100 customerRefs x 6 fields = 600 cells, over the server cap of 500.
+Page the customerRefs (at most 83 per call with 6 fields) or check fewer fields at a time.
+```
+
+The rate limit is a deployment default (`API_RATE_LIMIT_PER_MINUTE`); a
+self-hosted or negotiated deployment may differ. Treat it as the number to design
+against, not a contract.
 
 ## Outage behavior - fail-closed by default
 

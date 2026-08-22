@@ -17,6 +17,27 @@ const DEFAULT_BASE_URL = "https://api.agreely.ca";
 const DEFAULT_TIMEOUT_MS = 800;
 
 /**
+ * SERVER LIMITS, mirrored here so the SDK can fail fast with a clear client-side
+ * error instead of letting you discover them as a 422 / 429 in production.
+ *
+ * BATCH_CAP: POST /v1/check/batch accepts at most 500 items. Over that the server
+ * answers 422 "Batch exceeds the 500-item cap." and decides NOTHING (so a fail-closed
+ * caller must treat the whole batch as deny). checkBatch and checkFields both refuse
+ * over-cap input BEFORE the wire call.
+ */
+export const BATCH_CAP = 500;
+
+/**
+ * The /v1 tier allows 120 requests per minute PER COMPANY (not per api key), a coarse
+ * fixed window. Over it the server answers 429 with a Retry-After header, which this
+ * SDK surfaces as AgreelyRateLimitError (and honours on retry when respectRetryAfter
+ * is on). It is a deployment default and a self-hosted or negotiated deployment may
+ * differ; treat it as the number to design against, not a contract. ONE batch call of
+ * 500 cells costs ONE request, which is exactly why checkBatch exists.
+ */
+export const RATE_LIMIT_PER_MINUTE = 120;
+
+/**
  * The Agreely client: a thin, near-stateless gate over the /v1 API. It holds an
  * api key, a base URL, a fetch client, a timeout, and the degrade policy — NO
  * database, NO ref tables, and NO allow-cache (caching an allow while a revoke
@@ -76,8 +97,10 @@ export class Agreely {
   /**
    * Verify a consent receipt OFFLINE-FIRST (the headline). Reports exactly what is
    * PROVED vs merely trusted: a company-attested receipt is offline-sound; a citizen
-   * receipt is honestly PARTIAL offline (the sound company-signature check needs the
-   * server receipts/verify endpoint). "Offline-first", not fully offline: the
+   * receipt is honestly PARTIAL offline, because its company half signed the OFFER,
+   * which the receipt omits for unlinkability. NO server endpoint re-checks that half;
+   * it travels only in the separate verification bundle Agreely issues with the
+   * receipt, which this verifier does not read. "Offline-first", not fully offline: the
    * signature/assertion checks need the signing key from the DID document (one HTTPS
    * resolution by default, or supply a local `resolver` for an air-gapped verify);
    * the IPFS disclosure copy and on-chain anchor are the opt-in extra calls. When a
@@ -158,9 +181,20 @@ export class Agreely {
    * the submitted items. Fail-closed: any tuple without an active record returns
    * deny/none. Sends category/purpose RAW (the server normalizes; the SDK never
    * does). On an outage throws AgreelyUnavailableError.
+   *
+   * CAP: at most {@link BATCH_CAP} (500) items per call. An over-cap list throws
+   * AgreelyConfigError BEFORE any wire call, rather than spending a request on a 422
+   * that decides nothing. Split into chunks of 500 and note that each chunk costs one
+   * request against the 120/minute company allowance.
    */
   async checkBatch(items: BatchCheckItem[]): Promise<BatchDecision[]> {
     if (items.length === 0) return [];
+    if (items.length > BATCH_CAP) {
+      throw new AgreelyConfigError(
+        `checkBatch: ${items.length} items exceeds the server cap of ${BATCH_CAP}. ` +
+          `Split the batch into chunks of ${BATCH_CAP} or fewer.`,
+      );
+    }
     const result = await this.transport.request<{ decisions: BatchDecision[] }>({
       method: "POST",
       path: "/v1/check/batch",
@@ -174,11 +208,25 @@ export class Agreely {
    * Ergonomic cartesian-product batch check. Builds all (customerRef, field)
    * pairs, calls checkBatch once, and returns a lookup for `isAllowed` gates.
    * Sends category/purpose RAW. On an outage throws AgreelyUnavailableError.
+   *
+   * CAP: this builds refs x fields items, so it reaches the server's 500-item cap
+   * FASTER than it looks: 100 rows x 6 fields is 600 items, over the cap. An over-cap
+   * product throws AgreelyConfigError BEFORE any wire call, naming both multiplicands
+   * so the fix is obvious (page the rows, or trim the field set).
    */
   async checkFields(
     customerRefs: string[],
     fields: Array<{ category: string; purpose: string }>,
   ): Promise<CheckFieldsResult> {
+    const total = customerRefs.length * fields.length;
+    if (total > BATCH_CAP) {
+      const perCall = fields.length > 0 ? Math.floor(BATCH_CAP / fields.length) : BATCH_CAP;
+      throw new AgreelyConfigError(
+        `checkFields: ${customerRefs.length} customerRefs x ${fields.length} fields = ${total} cells, ` +
+          `over the server cap of ${BATCH_CAP}. Page the customerRefs (at most ${perCall} per call with ` +
+          `${fields.length} fields) or check fewer fields at a time.`,
+      );
+    }
     const items: BatchCheckItem[] = [];
     for (const customerRef of customerRefs) {
       for (const field of fields) {

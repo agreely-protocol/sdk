@@ -1,7 +1,7 @@
 // @agreely/sdk — the thin, typed TypeScript/Node client for the Agreely /v1
 // consent API. The CLI (P3-M3) imports from here.
 
-export { Agreely } from "./client.js";
+export { Agreely, BATCH_CAP, RATE_LIMIT_PER_MINUTE } from "./client.js";
 export { BreakGlass } from "./breakGlass.js";
 export { ReceiptVerifier } from "./verify/receipt.js";
 
@@ -25,6 +25,7 @@ export type {
   CheckResult,
   Decision,
   Status,
+  Basis,
   Assurance,
   Scope,
   Identity,
