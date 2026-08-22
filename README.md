@@ -392,6 +392,10 @@ MIT-licensed and built to be provable, not just trusted:
   IPFS gateway (default `gateway.lighthouse.storage`, overridable) for the opt-in
   disclosure-copy check; its `did:web` resolver fetches the issuer host named in
   the receipt over HTTPS (inject your own `resolver` for untrusted receipts).
+  Resolving a citizen DID calls the Agreely CITIZEN tier (default
+  `https://my.agreely.ca/did/{did}`), and `resolveCompanyDid` calls the Agreely WEB
+  tier (default `https://app.agreely.ca/c/{slug}/did.json`); both are overridable,
+  and injecting your own `resolver` removes them entirely.
 - **Minimal deps, no install scripts.** Only an optional `undici` fallback.
 - **Audit surface.** `src/transport.ts` and `src/verify/receipt.ts` are the only
   files that open a socket.

@@ -197,6 +197,56 @@ describe("verifyReceipt honesty matrix edge cases", () => {
   // still works over JSON-RPC (addresses compare case-insensitively on chain), so bad
   // casing is invisible at runtime and only surfaces where a human or a
   // checksum-validating tool reads it.
+  // THE DEFAULT DID HOSTS, read back off the URLs the verifier actually FETCHES.
+  //
+  // Both defaults were wrong in v0.2.0 and both were silent:
+  //
+  //   - the company did:web host defaulted to the apex `agreely.ca`, which is the
+  //     MARKETING SITE and 404s on /c/{slug}/did.json. The document is served by the
+  //     Agreely WEB tier (app.agreely.ca); the route is MODE=WEB only.
+  //   - the citizen resolver base defaulted to `api.agreely.ca`, which does not route
+  //     GET /did/{did} at all (that is MODE=CITIZEN, my.agreely.ca). Every citizen
+  //     receipt verified with the default resolver therefore reported citizenAssertion
+  //     "unavailable" and overall "unavailable": never a false "verified", but never a
+  //     real verification either.
+  //
+  // These assert the composed URL, not a second copy of the constant, so they cannot
+  // pass tautologically. If one fails, confirm the tier that actually serves the route
+  // before touching it: probe `https://<host>/c/<slug>/did.json` (expect 200) and
+  // `https://<host>/did/notadid` (expect 400 "invalid did", which proves the route
+  // exists) rather than assuming.
+  it("resolves a company did:web against the WEB tier by default", async () => {
+    const fetched: string[] = [];
+    const fetchImpl = (async (input: string | URL) => {
+      fetched.push(String(input));
+      return new Response("nope", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    await new ReceiptVerifier({ fetch: fetchImpl }).resolveCompanyDid("acme");
+
+    expect(fetched).toEqual(["https://app.agreely.ca/c/acme/did.json"]);
+  });
+
+  it("resolves a citizen DID against the CITIZEN tier by default", async () => {
+    const citizenCase = cases.find((c) => c.ipfs)!;
+    const citizenDid = "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08";
+    const fetched: string[] = [];
+    const fetchImpl = (async (input: string | URL) => {
+      fetched.push(String(input));
+      return new Response("nope", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    await Agreely.verifyReceipt(citizenCase.receipt, {
+      verifyDisclosure: false,
+      fetch: fetchImpl,
+    });
+
+    expect(fetched).toContain(`https://my.agreely.ca/did/${encodeURIComponent(citizenDid)}`);
+    for (const url of fetched) {
+      expect(url).not.toContain("api.agreely.ca");
+    }
+  });
+
   it("sends an EIP-55 checksummed mainnet registry address", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
     let sent: string | undefined;
@@ -280,28 +330,16 @@ describe("cellLabelBinding cross-checks the human-readable labels (claims-audit 
   });
 });
 
-describe("default did:web resolution targets the apex company DID host", () => {
-  // A company DID is did:web:agreely.ca:c:{slug}, served at
-  // https://agreely.ca/c/{slug}/did.json (apex host, NOT api.agreely.ca).
-  const EXPECTED_URL = "https://agreely.ca/c/acme/did.json";
-
-  it("resolveCompanyDid(slug) fetches the apex /c/{slug}/did.json URL", async () => {
-    let requested: string | undefined;
-    const fetchImpl = ((input: string | URL) => {
-      requested = String(input);
-      return Promise.resolve(
-        new Response(JSON.stringify({ id: "did:web:agreely.ca:c:acme" }), {
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-    }) as unknown as typeof fetch;
-
-    const verifier = new ReceiptVerifier({ fetch: fetchImpl });
-    await verifier.resolveCompanyDid("acme");
-    expect(requested).toBe(EXPECTED_URL);
-  });
-
-  it("resolveCompanyDid(slug) builds the apex did:web:agreely.ca:c:{slug} id (not api.)", async () => {
+describe("default did:web resolution targets the company DID host that actually serves it", () => {
+  // A company DID is did:web:app.agreely.ca:c:{slug}, served at
+  // https://app.agreely.ca/c/{slug}/did.json by the Agreely WEB (dashboard) tier.
+  //
+  // This block previously pinned the APEX `agreely.ca`, which is the marketing site and
+  // 404s on that path: the assertions encoded the bug rather than catching it (one of
+  // them compared a string literal against itself). The composed URL is asserted in
+  // "resolves a company did:web against the WEB tier by default" above; what is left
+  // here is the DID STRING the helper builds, which is what ends up inside a receipt.
+  it("resolveCompanyDid(slug) builds did:web:app.agreely.ca:c:{slug}", async () => {
     let seenDid: string | undefined;
     const verifier = new ReceiptVerifier({
       resolver: (did) => {
@@ -310,9 +348,26 @@ describe("default did:web resolution targets the apex company DID host", () => {
       },
     });
     await verifier.resolveCompanyDid("acme");
-    // The DID built here maps, via the default resolver above, to EXPECTED_URL.
-    expect(seenDid).toBe("did:web:agreely.ca:c:acme");
+    expect(seenDid).toBe("did:web:app.agreely.ca:c:acme");
+    // Neither the apex (marketing, 404s) nor the api tier (does not serve did.json).
+    expect(seenDid).not.toBe("did:web:agreely.ca:c:acme");
     expect(seenDid).not.toContain("api.agreely.ca");
-    expect(`https://agreely.ca/c/acme/did.json`).toBe(EXPECTED_URL);
+  });
+
+  // companyDidHost still overrides the default, which is how a self-hosted or
+  // white-labelled deployment points the resolver at its own domain.
+  it("companyDidHost overrides the default", async () => {
+    const fetched: string[] = [];
+    const fetchImpl = (async (input: string | URL) => {
+      fetched.push(String(input));
+      return new Response("nope", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    await new ReceiptVerifier({
+      companyDidHost: "consent.example.test",
+      fetch: fetchImpl,
+    }).resolveCompanyDid("acme");
+
+    expect(fetched).toEqual(["https://consent.example.test/c/acme/did.json"]);
   });
 });

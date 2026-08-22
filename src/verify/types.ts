@@ -105,9 +105,18 @@ export interface VerifyReceiptOptions {
    * (SSRF) rather than letting an attacker-chosen host be fetched.
    */
   resolver?: DidResolver;
-  /** Host used to build a company did:web from a slug in resolveCompanyDid. Default agreely.ca (the apex host that serves /c/{slug}/did.json). */
+  /**
+   * Host used to build a company did:web from a slug in `resolveCompanyDid`. Default
+   * `app.agreely.ca`, the Agreely WEB (dashboard) tier, which is what serves
+   * `/c/{slug}/did.json`. Not the apex `agreely.ca`, which is the marketing site and
+   * 404s on that path.
+   */
   companyDidHost?: string;
-  /** Base URL for the default citizen DID resolver's `/did/{did}`. Default https://api.agreely.ca. */
+  /**
+   * Base URL for the default citizen DID resolver's `/did/{did}`. Default
+   * `https://my.agreely.ca`, the Agreely CITIZEN tier, which is what serves that
+   * route. Not the api tier, which 404s on it.
+   */
   citizenResolverBaseUrl?: string;
   /**
    * Whether to fetch + compare the IPFS disclosure copy when the receipt carries

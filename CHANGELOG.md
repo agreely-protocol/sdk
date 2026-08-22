@@ -17,6 +17,24 @@ to [Semantic Versioning](https://semver.org/).
   checksummed). Two tests pin it, one of them reading the address back off the
   composed JSON-RPC payload rather than off a second copy of the constant. Anyone
   on 0.2.0 who verifies mainnet anchors should upgrade.
+- **Both default DID resolution hosts pointed at tiers that do not serve the
+  route.** `companyDidHost` defaulted to the apex `agreely.ca`, which is the
+  marketing site and 404s on `/c/{slug}/did.json` (the comment claiming it was "the
+  apex host that serves /c/{slug}/did.json" was simply false); that document is
+  served by the Agreely WEB tier, so the default is now `app.agreely.ca`. Worse,
+  `citizenResolverBaseUrl` defaulted to `api.agreely.ca`, which does not route
+  `GET /did/{did}` at all (that route is MODE=CITIZEN), so **every citizen receipt
+  verified with the default resolver reported `citizenAssertion: "unavailable"` and
+  `overall: "unavailable"`**: never a false "verified", but never a real verification
+  either. The default is now `https://my.agreely.ca`. Verified against production:
+  `app.agreely.ca/c/ophelios/did.json` returns 200 while the apex returns 404, and
+  `my.agreely.ca/did/{did}` routes while `api.agreely.ca` returns 404.
+
+  Company DIDs minted before this change read `did:web:agreely.ca:c:*` and will
+  NEVER resolve, including in receipts already issued. That is not a regression this
+  release introduces: those DIDs never resolved against any spec-compliant resolver.
+  No compatibility shim and no fallback host is provided deliberately: a verifier
+  that silently retries a second host hides which identity actually signed.
 - **Removed every reference to a `receipts/verify` endpoint, which does not
   exist.** Two of them were in the human-readable `reason` notes returned to the
   person verifying a receipt, telling them to go use a server path that has never
