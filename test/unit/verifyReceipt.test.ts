@@ -4,6 +4,29 @@ import { describe, expect, it } from "vitest";
 import { Agreely, ReceiptVerifier } from "../../src/index.js";
 import { canonicalize } from "../../src/crypto/jcs.js";
 import type { DidDocument, VerifyReceiptOptions } from "../../src/verify/types.js";
+import { keccak256Hex } from "../../src/crypto/keccak.js";
+
+/**
+ * The LIVE Base mainnet AgreelyRegistry (deploy block 48889369, the 2026-07-19 redeploy
+ * carrying the DID-tagged anchor events), EIP-55 checksummed. Pinned here so a silent
+ * edit of the SDK constant fails a test instead of shipping.
+ */
+const LIVE_MAINNET_REGISTRY = "0x23577fafFa306375028D33a559D0F95Ced9424DB";
+
+/** Its predecessor. Still deployed, still answers, holds NO anchors. Never query it. */
+const SUPERSEDED_MAINNET_REGISTRY = "0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B";
+
+/** EIP-55 mixed-case checksum of a hex address. */
+function eip55(address: string): string {
+  const lower = address.replace(/^0x/i, "").toLowerCase();
+  const hash = keccak256Hex(lower).replace(/^0x/, "");
+  let out = "0x";
+  for (let i = 0; i < lower.length; i++) {
+    const char = lower[i]!;
+    out += /[0-9]/.test(char) || parseInt(hash[i]!, 16) < 8 ? char : char.toUpperCase();
+  }
+  return out;
+}
 
 const vectors = JSON.parse(
   readFileSync(fileURLToPath(new URL("../../vectors/vectors.json", import.meta.url)), "utf8"),
@@ -150,10 +173,54 @@ describe("verifyReceipt honesty matrix edge cases", () => {
       rpcUrl: "https://rpc.test",
     });
     expect(result.documentAnchor).toBe("pass");
-    // Prove the check targeted the real deployed Base mainnet registry address.
+    // Prove the check targeted the LIVE deployed Base mainnet registry address.
+    //
+    // This assertion is the whole guard against a silent, invisible correctness bug.
+    // The registry address is pinned BY HAND in receipt.ts (the SDK reads no config),
+    // and a SUPERSEDED registry still exists on chain and still answers eth_getLogs: it
+    // simply holds no anchors. Querying the wrong one therefore does not error, it
+    // returns zero logs, which the verifier reports as documentAnchor "fail", i.e. a
+    // confident FALSE ACCUSATION OF TAMPERING on a perfectly valid receipt. v0.2.0
+    // shipped exactly that, pinned to the predecessor 0x1E31...cF8B. If this fails, do
+    // not "fix" the test: confirm the live address against the deployment
+    // (agreely-contracts broadcast/DeployRegistry.s.sol/8453/run-latest.json, and the
+    // registryAddress that verify.agreely.ca publishes) and correct the constant.
     expect(anchorRequestBody).toBeDefined();
-    expect(anchorRequestBody).toContain("0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B");
+    expect(anchorRequestBody).toContain(LIVE_MAINNET_REGISTRY);
+    expect(anchorRequestBody).not.toContain(SUPERSEDED_MAINNET_REGISTRY);
     expect(anchorRequestBody).toContain("eth_getLogs");
+  });
+
+  // The address the verifier ACTUALLY PUTS ON THE WIRE for mainnet must be EIP-55
+  // checksummed. Read back out of the composed eth_getLogs payload, not from the test's
+  // own copy of the constant, so this cannot pass tautologically. A mis-cased address
+  // still works over JSON-RPC (addresses compare case-insensitively on chain), so bad
+  // casing is invisible at runtime and only surfaces where a human or a
+  // checksum-validating tool reads it.
+  it("sends an EIP-55 checksummed mainnet registry address", async () => {
+    const citizenCase = cases.find((c) => c.ipfs)!;
+    let sent: string | undefined;
+    const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        sent = JSON.parse(String(init.body)).params[0].address as string;
+        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [] }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify(fixtures.ipfsBody), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    await Agreely.verifyReceipt(citizenCase.receipt, {
+      resolver: (did) => fixtures.didDocuments[did] ?? null,
+      ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
+      fetch: fetchImpl,
+      rpcUrl: "https://rpc.test",
+    });
+
+    expect(sent).toBeDefined();
+    expect(sent).toBe(eip55(sent!));
   });
 });
 

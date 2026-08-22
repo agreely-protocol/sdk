@@ -16,7 +16,11 @@
 //
 // A citizen receipt is HONESTLY PARTIAL offline: the company half signed the
 // original OFFER (subject ref + full disclosure), which the receipt omits for
-// unlinkability, so it cannot be re-derived here (use the server receipts/verify).
+// unlinkability, so it cannot be re-derived here. NO server endpoint re-checks it
+// either: the company half travels only in the separate self-contained verification
+// bundle Agreely issues with the receipt (signed offer + DID documents + Merkle
+// root), which this verifier does not read. It reads a BARE receipt, so it reports
+// the company check as "unsupported" rather than a verdict it cannot support.
 // The citizen WebAuthn assertion IS checkable and proves passkey-possession over
 // the committed challenge — not the cell semantics.
 //
@@ -46,10 +50,21 @@ import type {
 const DEFAULT_COMPANY_HOST = "agreely.ca";
 const DEFAULT_CITIZEN_BASE = "https://api.agreely.ca";
 const DEFAULT_IPFS_GATEWAY = "https://gateway.lighthouse.storage/ipfs/";
-// Base mainnet AgreelyRegistry, deployed at block 48323919 (tx 0x299271b2...5e638d).
-// This is the ONE place the mainnet registry address lives; setting it back to null reports
-// the on-chain documentAnchor check as "skipped" for mainnet (never a false result).
-const MAINNET_REGISTRY_ADDRESS: string | null = "0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B";
+// The LIVE Base mainnet AgreelyRegistry, deployed at block 48889369 (the 2026-07-19
+// redeploy that carries the DID-tagged anchor events). EIP-55 checksummed.
+//
+// KEEP THIS IN SYNC WITH THE DEPLOYMENT. It is pinned BY HAND here (the SDK has no
+// config to read), and the app resolves its own address from config/anchor-network.json,
+// so a redeploy does NOT propagate here on its own. A stale address is SILENT and WORSE
+// than a missing one: the superseded contract still exists on chain and still answers
+// eth_getLogs, it just holds no anchors, so every documentAnchor check returns "fail",
+// which reads as TAMPERING on a perfectly valid receipt. The predecessor
+// 0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B did exactly that in v0.2.0.
+// verifyReceipt.test.ts pins this value so a silent edit fails a test.
+//
+// Setting it back to null reports the on-chain documentAnchor check as "skipped" for
+// mainnet (never a false result), which is the correct fallback if it is ever unknown.
+const MAINNET_REGISTRY_ADDRESS: string | null = "0x23577fafFa306375028D33a559D0F95Ced9424DB";
 // Base mainnet (chainId 8453) is the default. Base Sepolia (84532) remains available as an
 // explicit opt-in for integrators testing against the testnet registry (pass chainId 84532).
 const DEFAULT_CHAIN_ID = 8453;
@@ -85,7 +100,9 @@ export class ReceiptVerifier {
       notes.push(
         "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer " +
           "(including the subject reference and full disclosure), which the receipt omits for unlinkability. " +
-          "Use the server receipts/verify endpoint for a sound company-signature check.",
+          "No server endpoint re-checks it. The company half can be checked only from the self-contained " +
+          "verification bundle issued with the receipt (it carries the signed offer and the DID documents); " +
+          "this verifier reads a bare receipt, so it reports UNSUPPORTED rather than a verdict it cannot support.",
       );
       citizenAssertion = await this.verifyCitizenAssertion(r, notes);
     }
@@ -431,17 +448,20 @@ function decodeMultibase(proofValue: string): Uint8Array {
  * company_attested: the labels sit INSIDE the Ed25519-signed body, so this tracks
  *   companySignature — a mutation to any item's category/purpose/itemId breaks the
  *   signature (a genuine offline cross-check of the labels).
- * citizen: UNSUPPORTED offline — the receipt deliberately omits the salted
+ * citizen: UNSUPPORTED offline. The receipt deliberately omits the salted
  *   commitment + Merkle root that bind the labels (unlinkability / crypto-
- *   shredding), so a mutated label CANNOT be detected offline. Use the server
- *   receipts/verify endpoint (it holds the salt) for a sound label check.
+ *   shredding), so a mutated label CANNOT be detected offline, and no server
+ *   endpoint re-checks it. The labels are covered only by the company signature
+ *   over the OFFER, which travels in the verification bundle, not in the receipt.
  */
 function assessCellLabelBinding(type: ReceiptType, companySignature: CheckStatus, notes: string[]): CheckStatus {
   if (type !== "company_attested") {
     notes.push(
       "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the " +
         "category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. " +
-        "Do NOT trust the displayed labels on this offline result alone; use the server receipts/verify endpoint.",
+        "Do NOT trust the displayed labels on this offline result alone. No server endpoint re-checks them: the labels " +
+        "are covered only by the company signature over the OFFER, which travels in the verification bundle issued with " +
+        "the receipt (and that proves a label was OFFERED, not which cells were accepted).",
     );
     return "unsupported";
   }

@@ -53,7 +53,9 @@ export type ReceiptType = "company_attested" | "citizen";
  *                       inside the signed body, so a mutation breaks it). citizen:
  *                       "unsupported" OFFLINE (the receipt omits the salted
  *                       commitment + Merkle root that bind the labels for
- *                       unlinkability); use the server receipts/verify endpoint.
+ *                       unlinkability). No server endpoint re-checks it: the
+ *                       labels are covered only by the company signature over
+ *                       the OFFER, which travels in the verification bundle.
  */
 export interface ReceiptVerification {
   receiptType: ReceiptType;

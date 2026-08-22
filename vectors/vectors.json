@@ -138,7 +138,7 @@
     }
   ],
   "receiptVerification": {
-    "description": "OFFLINE receipt-verification golden vectors for Agreely.verifyReceipt / Agreely::verifyReceipt. Both the TS and PHP SDKs assert these BYTE-IDENTICALLY (the same JCS canonicalizer, multibase decode, Ed25519 + WebAuthn/COSE verification). Tests inject a resolver (from `didDocuments`) and an IPFS fetch (from `ipfsBody`) — no network. A company-attested receipt is fully offline-sound; a citizen receipt is honestly PARTIAL offline (companySignature unsupported — use the server receipts/verify). documentAnchor is skipped offline (no rpcUrl). A case with resolveDids \"none\" simulates an unresolvable DID (outage): the decisive check is \"unavailable\" and overall is \"unavailable\" (inconclusive), NEVER \"failed\" (a tamper).",
+    "description": "OFFLINE receipt-verification golden vectors for Agreely.verifyReceipt / Agreely::verifyReceipt. Both the TS and PHP SDKs assert these BYTE-IDENTICALLY (the same JCS canonicalizer, multibase decode, Ed25519 + WebAuthn/COSE verification). Tests inject a resolver (from `didDocuments`) and an IPFS fetch (from `ipfsBody`) — no network. A company-attested receipt is fully offline-sound; a citizen receipt is honestly PARTIAL offline (companySignature unsupported: the company half signed the OFFER and travels only in the verification bundle, which this verifier does not read). documentAnchor is skipped offline (no rpcUrl). A case with resolveDids \"none\" simulates an unresolvable DID (outage): the decisive check is \"unavailable\" and overall is \"unavailable\" (inconclusive), NEVER \"failed\" (a tamper).",
     "fixtures": {
       "companyDid": "did:web:api.agreely.ca:c:acme",
       "citizenDid": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
@@ -455,10 +455,10 @@
           "cellLabelBinding": "unsupported",
           "overall": "partial",
           "notes": [
-            "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. Use the server receipts/verify endpoint for a sound company-signature check.",
+            "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. No server endpoint re-checks it. The company half can be checked only from the self-contained verification bundle issued with the receipt (it carries the signed offer and the DID documents); this verifier reads a bare receipt, so it reports UNSUPPORTED rather than a verdict it cannot support.",
             "Citizen passkey assertion verified against did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1: the holder of the registered passkey signed over the committed challenge 0x1017fd21f146774730f8cdd2ad9e127d2531d283dcc2804e476f71f0dbb37b49.",
             "This proves passkey POSSESSION over a committed challenge; it does NOT by itself prove the cell-level consent semantics.",
-            "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. Do NOT trust the displayed labels on this offline result alone; use the server receipts/verify endpoint.",
+            "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. Do NOT trust the displayed labels on this offline result alone. No server endpoint re-checks them: the labels are covered only by the company signature over the OFFER, which travels in the verification bundle issued with the receipt (and that proves a label was OFFERED, not which cells were accepted).",
             "Disclosure copy verified: the IPFS document body matches the receipt disclosureHash 0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
           ]
@@ -607,9 +607,9 @@
           "cellLabelBinding": "unsupported",
           "overall": "unavailable",
           "notes": [
-            "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. Use the server receipts/verify endpoint for a sound company-signature check.",
+            "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. No server endpoint re-checks it. The company half can be checked only from the self-contained verification bundle issued with the receipt (it carries the signed offer and the DID documents); this verifier reads a bare receipt, so it reports UNSUPPORTED rather than a verdict it cannot support.",
             "Citizen assertion UNVERIFIABLE: could not resolve the citizen DID did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08 (passkey did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1) (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
-            "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. Do NOT trust the displayed labels on this offline result alone; use the server receipts/verify endpoint.",
+            "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. Do NOT trust the displayed labels on this offline result alone. No server endpoint re-checks them: the labels are covered only by the company signature over the OFFER, which travels in the verification bundle issued with the receipt (and that proves a label was OFFERED, not which cells were accepted).",
             "Disclosure copy verified: the IPFS document body matches the receipt disclosureHash 0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
           ]
