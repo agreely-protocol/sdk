@@ -54,11 +54,12 @@ describe("typed errors", () => {
     const { agreely } = client([
       { status: 402, json: { error: { code: "billing_inactive", message: "subscription lapsed" } } },
     ]);
-    await expect(agreely.checkDetailed("c", "cat", "pur")).rejects.toMatchObject({
-      name: "AgreelyBillingInactiveError",
-      code: "billing_inactive",
-      status: 402,
-    });
+    // toBeInstanceOf, like every sibling here: toMatchObject alone would also pass for a
+    // plain object that merely carries the right `name`, so it never proved the typed
+    // class was thrown. The unused import was the tell.
+    const error = await agreely.checkDetailed("c", "cat", "pur").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AgreelyBillingInactiveError);
+    expect(error).toMatchObject({ code: "billing_inactive", status: 402 });
   });
 
   it("429 -> AgreelyRateLimitError exposing retryAfter from the header", async () => {
