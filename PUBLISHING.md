@@ -34,7 +34,7 @@ defaults to Base mainnet (chainId 8453).
      ../agreely-contracts/broadcast/DeployRegistry.s.sol/8453/run-latest.json
 
    # 2. what the live verifier publishes
-   curl -s https://verify.agreely.ca/ | grep -o 'registryAddress"[^,}]*'
+   curl -s https://app.agreely.ca/verify | grep -o 'registryAddress"[^,}]*'
    ```
 
    Both must equal the constant, case-insensitively. The test suite pins the
