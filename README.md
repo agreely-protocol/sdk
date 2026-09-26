@@ -202,6 +202,110 @@ the customer. This is a **metadata convenience** over the list endpoint, not a
 compliance decision: it reports whether a pending request exists, it does not
 assert consent was given. Each record now carries `customerId` and `documentCode`.
 
+### Host retention: read the rules, declare the purges (scope `retention`)
+
+Agreely **decides** the retention rules and **records** what your systems declare.
+Your system reads the rules, runs its own purges, and declares them. Agreely
+observes nothing in your systems and verifies none of it: every write answers
+`status: "declared"`, never "verified".
+
+```ts
+// A nightly purge job.
+const run = await agreely.retention.rulesForPurge({ snapshot: await loadSnapshot() });
+if (run.source === "abstain") return; // Agreely unreachable: do NOT purge this run
+await saveSnapshot(run.snapshot);
+
+for (const rule of run.rules) {
+  const purged = await purgeExpired(rule);           // your code
+  const idempotencyKey = `${jobRunId}:${rule.key}`;  // durable, never random per attempt
+  if (purged.count > 0) {
+    await agreely.retention.declarePurge(rule.key, {
+      ranAt: new Date(),
+      recordsAffected: purged.count,                 // at least 1
+      method: "destroyed",                           // or "anonymized" + anonymizationProcessKey
+      coveredFrom: "2025-01-01",
+      coveredUntil: "2025-01-31",
+      hostSystem: "billing",                         // a STABLE name, never a pod name
+      hostCategory: "invoices",
+    }, { idempotencyKey });
+  } else {
+    await agreely.retention.declareSweep(rule.key, { sweptAt: new Date(), hostSystem: "billing" }, { idempotencyKey });
+  }
+}
+
+const { cells } = await agreely.catalog.listCells(); // each cell with its retentionRuleKey
+```
+
+What the SDK makes impossible rather than merely documents:
+
+- **The `Idempotency-Key` is a header.** It is the required third argument of
+  `declarePurge` / `declareSweep`; leaving it out, or putting `idempotencyKey` in
+  the body, does not compile, and the body is built from the named fields only.
+- **`method` is `"destroyed"` or `"anonymized"`.** There is no third disposition
+  (aggregation is a technique), and a third value, or the rule's own `"destroy"`,
+  does not compile. `"anonymized"` without `anonymizationProcessKey` does not
+  compile either.
+- **`recordsAffected` is at least 1.** A pass that found nothing is a
+  `declareSweep`, refused client-side as a purge of zero.
+- **The sweep floor** (one per rule and `hostSystem` every 15 minutes) throws
+  `AgreelySweepTooFrequentError`, a typed subclass of `AgreelyRateLimitError`
+  carrying `retryAfterSeconds`, and is **never** auto-retried. Do not loop on it.
+  A `sweptAt` older than 24 hours is refused before the wire call.
+- **A 409** is `AgreelyConflictError`: retry with the same idempotency key.
+
+What it can only tell you:
+
+- **The replay is bound to the API key.** After a key rotation, retrying a
+  declaration whose response was lost, with the NEW key, records a **second**
+  declaration. Settle pending declarations before you revoke the old key.
+- **Host-system names are rationed**: 10 per organisation (and 20 host categories
+  per rule) over a rolling 30 days. A pod name, a container id or a hostname as
+  `hostSystem` burns a slot per deploy. The SDK refuses the obvious shapes (a
+  hexadecimal suffix, a run of five digits) but cannot catch `worker-3`.
+
+#### When Agreely is unreachable: the purge job abstains
+
+`rulesForPurge` fails the other way from `check`. For a consent check, failing
+closed means denying. For a purge job it means **not purging**, because the two
+ways stored rules can be wrong are not symmetrical:
+
+- a rule was **shortened** and you missed it: you keep data somewhat too long. A
+  minor lapse, corrected on the next run.
+- a rule was **lengthened** (a legal hold, an investigation) and you missed it: you
+  **destroy what you were required to keep**, and that does not repair.
+
+So an outage returns `source: "abstain"` by default, and the abstain branch has no
+`rules` to purge on (narrow on `source` or it does not compile). Purging on the
+stored snapshot is the explicit exception, bounded and audited like fail-open:
+
+```ts
+const run = await agreely.retention.rulesForPurge({
+  snapshot,
+  onOutage: "use-snapshot",
+  maxSnapshotAge: "26h",             // capped by the client's maxDegradeWindow (default 24h)
+  onDegrade: (ctx) => audit.log(ctx) // mandatory
+});
+```
+
+An auth, billing, validation or rate-limit failure is not an outage: it throws
+rather than abstaining quietly.
+
+### Host inventory (scope `inventory`)
+
+```ts
+await agreely.inventory.replaceCategories({
+  hostSystem: "crm",
+  categories: [{ key: "benevoles", label: "Bénévoles", fields: [{ key: "nom", label: "Nom" }] }],
+});
+const sets = await agreely.inventory.listCategories({ hostSystem: "crm" });
+const statement = await agreely.inventory.getStatement(statementKey); // also readable with a 'check' key
+```
+
+`replaceCategories` sends the **complete** list for that system: every set it
+declared before and that you omit is **withdrawn**. It is not an append. An empty
+list is refused. Fields carry names, never values. A set whose
+`decision.state` is not `"decided"` has no duration: abstain, never invent one.
+
 ## Errors
 
 Every failure is an `AgreelyError` subclass - a **deny is not an error**.
