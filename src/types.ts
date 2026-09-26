@@ -8,19 +8,32 @@ export type Decision = "allow" | "deny";
 /**
  * A /v1 API-key scope: 'check' (the synchronous check), 'issue' (consent-request
  * issuance + reads), 'attest' (manual / offline consent recording),
- * 'relationship' (ending a customer relationship, art. 23).
+ * 'relationship' (ending a customer relationship, art. 23), 'registry' (the
+ * customer registry; no SDK resource wraps it yet), 'retention' (read the decided
+ * retention rules and catalogue cells, declare purges and passes) and 'inventory'
+ * (declare a host system's record sets and read their retention statements).
+ *
+ * FORWARD COMPATIBILITY: the server may add scopes, and `identity()` returns them
+ * as it receives them, so a value outside this union can reach you at runtime.
  */
-export type Scope = "check" | "issue" | "attest" | "relationship";
+export type Scope = "check" | "issue" | "attest" | "relationship" | "registry" | "retention" | "inventory";
 
 /**
- * The least-disclosure identity of the presented key, from GET /v1/whoami. The
- * WIRE response carries ONLY the key's own scopes — no company id, no key name,
- * no counters, no PII. `baseUrl` is added CLIENT-SIDE (the configured endpoint),
- * never part of the wire body.
+ * The least-disclosure identity of the presented key, from GET /v1/whoami: the
+ * key's own scopes, and the minimum needed to DISCOVER the tenant instead of
+ * hard-coding it. Deliberately no company id, no DID, no key metadata, and
+ * nothing about the tenant's size, plan, usage or billing state.
  */
 export interface Identity {
   /** The presented key's scopes, exactly as the server reports them. */
   scopes: Scope[];
+  company: {
+    name: string;
+    sector: Regime["sector"];
+    statute: Regime["statute"];
+    /** The ABSOLUTE url of the tenant's public privacy page, or null when it would not resolve. */
+    publicPolicyUrl: string | null;
+  };
 }
 
 /**
@@ -449,6 +462,431 @@ export interface CatalogEntry {
   category: string;
   purpose: string;
   description: string | null;
+  /**
+   * The ground the company DECLARES for using or communicating this cell. The
+   * value set depends on the tenant's regime (a private P-39.1 tenant and a public
+   * A-2.1 body use disjoint vocabularies), so it is typed as a string: read the
+   * regime before switching on it. It is NOT the basis on which collection is
+   * lawful, and Agreely records the declaration without certifying it.
+   */
+  legalBasis: string;
+  /** The company's own declaration that this cell holds sensitive personal information. */
+  sensitive: boolean;
+}
+
+/** The act governing a tenant, named because `legalBasis` carries two disjoint value sets. */
+export interface Regime {
+  sector: "private" | "public";
+  statute: "P-39.1" | "A-2.1";
+}
+
+/**
+ * One catalogue cell as a host system reads it (GET /v1/catalog/cells, scope
+ * 'retention'): archived cells included, with the rule that governs each one.
+ */
+export interface CatalogCell extends CatalogEntry {
+  categoryEn: string | null;
+  purposeEn: string | null;
+  status: "active" | "archived";
+  /**
+   * The retention rule that governs this cell. NULL is the register's own gap,
+   * surfaced and never filled: the host ABSTAINS from purging under it and never
+   * picks a duration of its own.
+   */
+  retentionRuleKey: string | null;
+}
+
+/** The body of GET /v1/catalog/cells. */
+export interface CatalogCells {
+  regime: Regime;
+  cells: CatalogCell[];
+}
+
+// ---------------------------------------------------------------------------
+// Host retention (scope 'retention'). « Agreely décide et surveille, l'hôte
+// exécute et rend compte »: the host reads decisions it may never invent, and
+// DECLARES the purges and passes it ran. Agreely records the declaration; it
+// observes nothing in the host's systems and verifies none of it.
+// ---------------------------------------------------------------------------
+
+/** What starts a rule's clock. */
+export type RetentionTrigger = "collection" | "purpose_achieved" | "last_activity" | "decision";
+
+/**
+ * The action a RULE sets. Not to be confused with {@link PurgeMethod}, the
+ * disposition a host DECLARES it applied: the rule says `destroy`, the purge says
+ * `destroyed`.
+ */
+export type RetentionAction = "destroy" | "anonymize";
+
+/** One rule the organisation decided. Its duration is never null. */
+export interface RetentionRule {
+  key: string;
+  /** The category of records the rule covers, in the organisation's own words. */
+  label: string;
+  /** Its English name, null when not authored (never a machine translation). */
+  labelEn: string | null;
+  duration: { value: number; unit: "months" };
+  trigger: RetentionTrigger;
+  action: RetentionAction;
+  anonymizationProcessKey: string | null;
+  /** Archived rules are included: a host may still hold data a retired rule governs. */
+  status: "active" | "archived";
+  archivedAt: string | null;
+  updatedAt: string;
+}
+
+/** The body of GET /v1/retention/rules. */
+export interface RetentionRuleList {
+  /**
+   * The next `changedSince`. It deliberately trails the read by a few minutes, so
+   * a rule may be sent twice; it is never missed.
+   */
+  cursor: string;
+  /** Every rule, or only those changed since `changedSince`. */
+  rules: RetentionRule[];
+  /**
+   * The COMPLETE current key set, even on an incremental read: a rule deleted in
+   * Agreely shows up as a key that disappeared from here.
+   */
+  ruleKeys: string[];
+}
+
+export interface ListRetentionRulesInput {
+  /** The `cursor` of a previous response. Refused when malformed or in the future. */
+  changedSince?: string;
+}
+
+/**
+ * One rule, plus the instants of the host's last reports under it: what the host
+ * SAID, beside when Agreely received it. Nothing here is an overdue flag or a
+ * next due date; the declarative register computes neither.
+ */
+export interface RetentionRuleDetail extends RetentionRule {
+  lastReports: {
+    purge: { ranAt: string; declaredAt: string } | null;
+    sweep: { sweptAt: string; declaredAt: string } | null;
+  };
+}
+
+/**
+ * The disposition a host DECLARES it applied: the two the acts know. There is no
+ * `aggregated`: aggregation is a technique, not a third disposition, and a third
+ * value does not compile.
+ */
+export type PurgeMethod = "destroyed" | "anonymized";
+
+/**
+ * An instant: an RFC 3339 string WITH an explicit offset (a naive timestamp is
+ * refused, never guessed), or a Date, which the SDK sends in UTC.
+ */
+export type Instant = string | Date;
+
+/**
+ * A host token (`hostSystem`, `hostCategory`): a slug, `^[a-z0-9][a-z0-9._-]{0,63}$`,
+ * naming a SYSTEM or a KIND of records, never a record. No run of 5 digits and no
+ * hexadecimal identifier.
+ *
+ * NEW VALUES ARE RATIONED. At most 10 distinct `hostSystem` values per
+ * organisation, and 20 distinct `hostCategory` values per rule, may be introduced
+ * in any rolling 30 days; past that a NEW value is a 422 `host_token_limit` (a
+ * value already reported is always accepted). So a pod name, a container id, a
+ * hostname or a deployment slot as `hostSystem` BURNS A SLOT PER DEPLOY and locks
+ * you out within days. Use a stable name you choose once: `billing`, `crm`,
+ * `warehouse`, never `billing-7f9c8d6b5-x2x4k`.
+ */
+export type HostToken = string;
+
+interface PurgeDeclarationFields {
+  /** When the host says the purge ran. Not in the future, not older than 60 months. */
+  ranAt: Instant;
+  /**
+   * How many records the purge covered: a whole number from 1 to 1,000,000,000.
+   * A pass that found NOTHING to purge is a sweep ({@link Retention.declareSweep}),
+   * never a purge of zero records.
+   */
+  recordsAffected: number;
+  /** The first day the purge covered, YYYY-MM-DD. */
+  coveredFrom: string;
+  /** The last day the purge covered, YYYY-MM-DD. Not after the day the purge ran. */
+  coveredUntil: string;
+  hostSystem: HostToken;
+  hostCategory: HostToken;
+  /**
+   * Optional: the host's own identifiers of the records the purge covered, one per
+   * record, at most 1000 and never more than `recordsAffected`. Never stored as
+   * text (a keyed lookup, an encrypted salt and a salted commitment each); a
+   * refusal names the position (`references[3]`), never the value. A larger purge
+   * is declared in several declarations.
+   */
+  references?: string[];
+  /**
+   * NOT HERE. The Idempotency-Key is a HEADER, passed as the third argument of
+   * declarePurge. Typed `never` so putting it in the body does not compile.
+   */
+  idempotencyKey?: never;
+}
+
+/**
+ * A purge declaration. `method` discriminates: `anonymized` REQUIRES the
+ * anonymization process that was applied (never defaulted from the rule), and
+ * `destroyed` refuses one. Both constraints are compile-time.
+ */
+export type DeclarePurgeInput =
+  | (PurgeDeclarationFields & { method: "destroyed"; anonymizationProcessKey?: never })
+  | (PurgeDeclarationFields & { method: "anonymized"; anonymizationProcessKey: string });
+
+/** A pass under a rule that found nothing to purge: the heartbeat. */
+export interface DeclareSweepInput {
+  /** When the pass ran. Within the last 24 hours, and not in the future. */
+  sweptAt: Instant;
+  hostSystem: HostToken;
+  /** NOT HERE: the Idempotency-Key is the third argument of declareSweep. */
+  idempotencyKey?: never;
+}
+
+/**
+ * The replay key of a declaration, sent as the `Idempotency-Key` HEADER. Required.
+ *
+ * Derive it from something DURABLE and unique to the operation (your job-run id
+ * plus the rule key, say), never from a random value generated per attempt: a key
+ * regenerated after a crash is a second declaration, not a retry. 1 to 255
+ * printable ASCII characters, refused (never truncated) beyond.
+ *
+ * THE REPLAY IS BOUND TO THE API KEY THAT DECLARED. Another API key of the same
+ * company sending the same Idempotency-Key records its OWN declaration and never
+ * reads the first one back. So if you ROTATE your API key while a declaration's
+ * response was lost, retrying it with the NEW key records a SECOND declaration.
+ * Settle every pending declaration with the old key before you revoke it.
+ */
+export interface DeclarationOptions {
+  idempotencyKey: string;
+}
+
+/** A divergence Agreely flags without refusing: never « non-compliant ». */
+export interface PurgeWarning {
+  code: "method_differs_from_rule";
+  message: string;
+  ruleAction: string;
+  declaredMethod: string;
+}
+
+/** The stored purge declaration, echoed to the declaring key only. */
+export interface PurgeDeclaration {
+  id: string;
+  ruleKey: string;
+  recorded: true;
+  /** Agreely recorded a declaration. Never "verified". */
+  status: "declared";
+  /** True when this was an idempotent replay (HTTP 200) carrying the STORED values. */
+  replayed: boolean;
+  ranAt: string;
+  recordsAffected: number;
+  method: PurgeMethod;
+  anonymizationProcessKey: string | null;
+  coveredFrom: string;
+  coveredUntil: string;
+  hostSystem: string;
+  hostCategory: string;
+  declaredBy: string;
+  declaredAt: string;
+  /** How many references were recorded (0 when none were sent). */
+  referencesRecorded: number;
+  /** A method that differs from the rule's action is recorded as declared and flagged here. */
+  warnings: PurgeWarning[];
+}
+
+/** The stored pass. */
+export interface RetentionSweep {
+  id: string;
+  ruleKey: string;
+  recorded: true;
+  status: "declared";
+  /** What the host SAID, never a fact Agreely established. */
+  declaredNothingDue: true;
+  replayed: boolean;
+  sweptAt: string;
+  hostSystem: string;
+  declaredBy: string;
+  declaredAt: string;
+}
+
+/**
+ * The rules a host persists between runs, so a purge job can reason about an
+ * outage. Opaque in intent: store it whole (JSON-serialisable) and hand it back.
+ */
+export interface RetentionRuleSnapshot {
+  /** The server cursor, the next `changedSince`. */
+  cursor: string;
+  /** When THIS process last read the rules from Agreely (ISO-8601, local clock). */
+  fetchedAt: string;
+  /** The complete current rule set, keyed by nothing: one entry per rule. */
+  rules: RetentionRule[];
+}
+
+/**
+ * What a purge job may do with the rules for this run. Narrow on `source` before
+ * reading `rules`: the abstain branch carries none, so a job cannot purge on it
+ * without a compile error.
+ *
+ *   "live"     -> read from Agreely now. Persist `snapshot` for the next run.
+ *   "snapshot" -> Agreely was unreachable and you OPTED IN to purging on the stored
+ *                 rules (onOutage: "use-snapshot"). `staleForMs` says how old they
+ *                 are. See the asymmetry on {@link RulesForPurgeOptions.onOutage}.
+ *   "abstain"  -> Agreely was unreachable and no usable snapshot applies. Do NOT
+ *                 purge this run. This is the default outcome of an outage.
+ */
+export type RulesForPurge =
+  | { source: "live"; rules: RetentionRule[]; snapshot: RetentionRuleSnapshot }
+  | { source: "snapshot"; rules: RetentionRule[]; snapshot: RetentionRuleSnapshot; staleForMs: number; error: Error }
+  | { source: "abstain"; reason: "outage" | "no_snapshot" | "snapshot_too_old"; error: Error };
+
+/** The evidence record emitted when a purge run proceeds on stored rules. */
+export interface RetentionDegradeContext {
+  /** When the stored rules were last read from Agreely. */
+  snapshotFetchedAt: string;
+  staleForMs: number;
+  /** The underlying outage error (503 / network / timeout). */
+  error: Error;
+  /** ISO-8601 timestamp of the decision. */
+  at: string;
+}
+
+interface RulesForPurgeBase {
+  /**
+   * The snapshot a previous run persisted. When given and Agreely answers, only
+   * the rules changed since its cursor are read and merged in (a rule whose key
+   * left `ruleKeys` is dropped).
+   */
+  snapshot?: RetentionRuleSnapshot | null;
+}
+
+/**
+ * Options for {@link Retention.rulesForPurge}. `onOutage` defaults to "abstain".
+ *
+ * WHY THE DEFAULT IS TO NOT PURGE. The two ways stored rules can be wrong are not
+ * symmetrical:
+ *   - a rule was SHORTENED and you missed it: you keep data somewhat too long.
+ *     That is a minor lapse, corrected on the next run that reads the rules.
+ *   - a rule was LENGTHENED (a legal hold, an investigation, a litigation) and you
+ *     missed it: you DESTROY what you were required to keep, and that never
+ *     repairs.
+ * So on an outage the job abstains, the opposite of a consent check (where
+ * failing closed means denying). "use-snapshot" accepts the second risk,
+ * explicitly, bounded by `maxSnapshotAge` and audited through `onDegrade`.
+ */
+export type RulesForPurgeOptions =
+  | (RulesForPurgeBase & { onOutage?: "abstain" })
+  | (RulesForPurgeBase & {
+      onOutage: "use-snapshot";
+      /**
+       * The oldest snapshot you accept, e.g. "26h". Capped by the client's
+       * `maxDegradeWindow` (default 24h): raise that option to accept a
+       * snapshot from the previous nightly run.
+       */
+      maxSnapshotAge: string;
+      /** Evidence sink, called once per run that proceeds on stored rules. Mandatory. */
+      onDegrade: (ctx: RetentionDegradeContext) => void;
+    });
+
+// ---------------------------------------------------------------------------
+// Host inventory (scope 'inventory'). A host system declares the record sets it
+// holds and the NAMES of their fields, never a value; Agreely links each set to
+// a catalogue cell and hands back the retention statement the host stamps on a
+// record at collection. What a set says it holds is what the host DECLARED.
+// ---------------------------------------------------------------------------
+
+/**
+ * One field of a record set: its NAME, never a value. A label shaped like a value
+ * (an at sign, a run of five digits, a calendar date) is refused, as is any member
+ * other than these three.
+ */
+export interface InventoryFieldInput {
+  key: HostToken;
+  /** 1 to 120 characters, not starting with = + - or @. */
+  label: string;
+  labelEn?: string | null;
+}
+
+/** One record set a host system holds. */
+export interface InventoryCategoryInput {
+  key: HostToken;
+  label: string;
+  labelEn?: string | null;
+  /** 1 to 60 fields. */
+  fields: InventoryFieldInput[];
+}
+
+/**
+ * A host system's COMPLETE inventory. Every set this system declared before and
+ * that is not in `categories` is WITHDRAWN. 1 to 50 sets.
+ */
+export interface ReplaceInventoryInput {
+  hostSystem: HostToken;
+  categories: InventoryCategoryInput[];
+}
+
+/**
+ * A frozen retention statement: the terms in force when it was frozen. A record
+ * collected under « 3 mois » keeps a key that resolves to « 3 mois » after the
+ * rule becomes 2.
+ */
+export interface RetentionStatement {
+  key: string;
+  revision: number;
+  frozenAt: string;
+  /** False on a gap row: then duration, trigger, action and text are null. */
+  decided: boolean;
+  duration: { value: number; unit: "months" } | null;
+  trigger: RetentionTrigger | null;
+  action: RetentionAction | null;
+  /** The plain-language sentence, in both locales, or null when not decided. */
+  text: { fr: string; en: string } | null;
+}
+
+/** One declared record set, and what Agreely decided for it. */
+export interface InventoryRecordSet {
+  key: string;
+  hostSystem: string;
+  label: string;
+  labelEn: string | null;
+  fields: Array<{ key: string; label: string; labelEn: string | null }>;
+  status: "declared" | "withdrawn";
+  firstDeclaredAt: string | null;
+  lastDeclaredAt: string | null;
+  withdrawnAt: string | null;
+  /**
+   * `decided` when the set is linked to a cell that has a rule; otherwise the gap,
+   * named (`no_cell`, `no_rule`), and the host ABSTAINS: it never invents a number.
+   */
+  decision: {
+    state: "decided" | "no_cell" | "no_rule";
+    cellKey: string | null;
+    ruleKey: string | null;
+  };
+  retentionStatement: RetentionStatement | null;
+}
+
+/** The body of PUT /v1/inventory/categories. */
+export interface InventoryDeclaration {
+  hostSystem: string;
+  /** How many of this system's sets the declaration withdrew (they stay listed, marked withdrawn). */
+  withdrawn: number;
+  categories: InventoryRecordSet[];
+}
+
+export interface ListInventoryInput {
+  /** Narrow to one host system. */
+  hostSystem?: HostToken;
+}
+
+/** One frozen statement, resolved by the key a host stamped on a record. */
+export interface ResolvedRetentionStatement extends RetentionStatement {
+  categoryKey: string;
+  hostSystem: string;
+  /** False once a later statement superseded it; it still resolves, that is the point of freezing. */
+  current: boolean;
+  supersededAt: string | null;
 }
 
 // ---------------------------------------------------------------------------

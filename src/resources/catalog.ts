@@ -1,5 +1,5 @@
 import type { Transport } from "../transport.js";
-import type { CatalogEntry } from "../types.js";
+import type { CatalogCells, CatalogEntry } from "../types.js";
 
 interface CatalogWire {
   catalog: CatalogEntry[];
@@ -20,5 +20,19 @@ export class Catalog {
       idempotentRetry: true,
     });
     return wire.catalog;
+  }
+
+  /**
+   * Every catalogue cell (archived ones included) with the retention rule that
+   * governs it. Scope: 'retention', unlike {@link Catalog.list}. A cell whose
+   * `retentionRuleKey` is null is a gap in the register: the host abstains from
+   * purging under it and never picks a duration of its own.
+   */
+  listCells(): Promise<CatalogCells> {
+    return this.transport.request<CatalogCells>({
+      method: "GET",
+      path: "/v1/catalog/cells",
+      idempotentRetry: true,
+    });
   }
 }

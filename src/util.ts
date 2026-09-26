@@ -77,3 +77,66 @@ export function jitterBackoff(attempt: number): number {
   const base = 25 * attempt;
   return Math.floor(Math.random() * base);
 }
+
+/**
+ * The host-token shape the server enforces, mirrored so a bad value fails before
+ * the wire call: a slug, no run of 5 digits, no run of 8+ hexadecimal characters
+ * containing a digit (a uuid, a hash, a pod suffix). The server stays the
+ * authority; this only saves a round trip, and it cannot catch a well-formed value
+ * that still changes per deploy (see HostToken in types.ts).
+ */
+export function assertHostToken(value: unknown, label: string): string {
+  if (
+    typeof value !== "string" ||
+    !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(value) ||
+    /\d{5}/.test(value) ||
+    /(?=[0-9a-f]*\d)[0-9a-f]{8,}/.test(value)
+  ) {
+    throw new AgreelyConfigError(
+      `${label} must name a system or a kind of records as a stable slug (lowercase letters, digits, . _ -; ` +
+        `at most 64 characters; no run of 5 digits; no hexadecimal identifier). A pod name, a container id or ` +
+        `a record id is refused, and a value that changes per deploy burns one of the 10 host systems allowed ` +
+        `per 30 days.`,
+    );
+  }
+  return value;
+}
+
+/** RFC 3339 with an EXPLICIT offset, as the server requires. */
+const RFC3339_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * An instant for the wire: a Date is sent in UTC; a string must already carry an
+ * explicit offset (a naive timestamp would be read in the server's zone and
+ * silently re-date the evidence, so it is refused rather than guessed). Returns
+ * the wire string and its epoch milliseconds.
+ */
+export function toWireInstant(value: unknown, label: string): { wire: string; ms: number } {
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    if (Number.isNaN(ms)) throw new AgreelyConfigError(`${label} is an invalid Date.`);
+    return { wire: value.toISOString(), ms };
+  }
+  if (typeof value === "string" && RFC3339_WITH_OFFSET.test(value)) {
+    const ms = Date.parse(value);
+    if (!Number.isNaN(ms)) return { wire: value, ms };
+  }
+  throw new AgreelyConfigError(
+    `${label} must be a Date or an RFC 3339 date and time with an explicit offset, e.g. 2026-09-25T03:00:00-04:00.`,
+  );
+}
+
+/**
+ * The Idempotency-Key the declaration endpoints require: 1 to 255 printable ASCII
+ * characters. Refused client-side rather than truncated or sent to a sure 422.
+ */
+export function assertIdempotencyKey(options: unknown, label: string): string {
+  const key = (options as { idempotencyKey?: unknown } | undefined)?.idempotencyKey;
+  if (typeof key !== "string" || !/^[\x21-\x7E]{1,255}$/.test(key)) {
+    throw new AgreelyConfigError(
+      `${label} requires an idempotencyKey option (the Idempotency-Key header): 1 to 255 printable ASCII ` +
+        `characters, derived from something durable such as your job-run id and the rule key.`,
+    );
+  }
+  return key;
+}

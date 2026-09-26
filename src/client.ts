@@ -5,8 +5,10 @@ import { DegradePolicy } from "./degrade.js";
 import { AgreelyBillingInactiveError, AgreelyConfigError, AgreelyUnavailableError } from "./errors.js";
 import { Catalog } from "./resources/catalog.js";
 import { ConsentRequests } from "./resources/consentRequests.js";
+import { Inventory } from "./resources/inventory.js";
 import { ManualConsents } from "./resources/manualConsents.js";
 import { Relationships } from "./resources/relationships.js";
+import { Retention } from "./resources/retention.js";
 import { Transport } from "./transport.js";
 import type { AgreelyOptions, CheckOptions, CheckResult, Identity, BatchCheckItem, BatchDecision, CheckFieldsResult } from "./types.js";
 import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
@@ -51,6 +53,10 @@ export class Agreely {
   /** The customer-relationship lifecycle resource (scope: 'relationship'). */
   readonly relationships: Relationships;
   readonly catalog: Catalog;
+  /** The host-retention resource (scope: 'retention'): decided rules, declared purges and passes. */
+  readonly retention: Retention;
+  /** The host inventory resource (scope: 'inventory', reads also 'retention' / 'check'). */
+  readonly inventory: Inventory;
   /** The break-glass operator lever (degrade gate 3). */
   readonly breakGlass: BreakGlass;
   /** The configured API base URL (client-side; the resolved endpoint in use). */
@@ -92,6 +98,8 @@ export class Agreely {
     this.manualConsents = new ManualConsents(this.transport);
     this.relationships = new Relationships(this.transport);
     this.catalog = new Catalog(this.transport);
+    this.retention = new Retention(this.transport, maxDegradeWindowMs);
+    this.inventory = new Inventory(this.transport);
   }
 
   /**
@@ -133,8 +141,9 @@ export class Agreely {
 
   /**
    * Identify the presented key against the server (GET /v1/whoami): the REAL,
-   * server-verified scopes it carries. Least-disclosure — the wire response is
-   * scopes-only (no company id, no key name, no PII). Any valid key reaches it.
+   * server-verified scopes it carries, plus the tenant's name, regime and public
+   * privacy page. Least-disclosure: no company id, no DID, no key metadata. Any
+   * valid key reaches it.
    * A read; safe to auto-retry on a transient outage.
    */
   identity(): Promise<Identity> {

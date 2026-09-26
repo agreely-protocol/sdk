@@ -5,6 +5,9 @@ import type {
   DegradeContext,
   DegradeMode,
   DegradeOnOutageConfig,
+  RetentionRuleSnapshot,
+  RulesForPurge,
+  RulesForPurgeOptions,
 } from "./types.js";
 import {
   DEFAULT_MAX_DEGRADE_WINDOW_MS,
@@ -174,4 +177,71 @@ export class DegradePolicy {
     };
     this.config.onDegrade(ctx);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Retention: the purge job that cannot read the rules.
+// ---------------------------------------------------------------------------
+
+/**
+ * The OTHER direction of failing closed. For a consent check, failing closed is
+ * denying. For a purge job, it is NOT PURGING: destroying on stale rules can
+ * destroy what a lengthened rule (a legal hold, an investigation) required you to
+ * keep, and that never repairs, whereas abstaining for one run only keeps data a
+ * little longer. So an outage abstains by default, and purging on a stored
+ * snapshot is the explicit, bounded, audited exception, the same shape as the
+ * check's fail-open: an explicit word, a capped window, a mandatory evidence sink.
+ *
+ * Validated BEFORE any wire call (see {@link retentionOutageWindow}), so a
+ * misconfiguration surfaces on a healthy night rather than during the outage.
+ */
+export function retentionOutageWindow(
+  options: RulesForPurgeOptions,
+  maxWindowMs: number = DEFAULT_MAX_DEGRADE_WINDOW_MS,
+): number | undefined {
+  if (options.onOutage === undefined || options.onOutage === "abstain") return undefined;
+  if (options.onOutage !== "use-snapshot") {
+    throw new AgreelyConfigError(
+      `rulesForPurge onOutage must be "abstain" or "use-snapshot"; got "${String(options.onOutage)}".`,
+    );
+  }
+  if (typeof options.onDegrade !== "function") {
+    throw new AgreelyConfigError(
+      'rulesForPurge onDegrade is mandatory with onOutage "use-snapshot": every run that purges on stored rules must leave evidence.',
+    );
+  }
+  return parseDurationCapped(options.maxSnapshotAge, maxWindowMs, "rulesForPurge maxSnapshotAge");
+}
+
+/**
+ * Decide a purge run whose rule read failed with an OUTAGE (never a 4xx: an auth,
+ * billing or validation failure is not "Agreely is down" and surfaces as thrown).
+ * Returns "abstain" unless the caller opted into "use-snapshot", a snapshot exists,
+ * and it is no older than the window; that branch emits the evidence record.
+ */
+export function decideRulesOnOutage(
+  options: RulesForPurgeOptions,
+  maxSnapshotAgeMs: number | undefined,
+  error: Error,
+  now: number = Date.now(),
+): RulesForPurge {
+  if (options.onOutage !== "use-snapshot" || maxSnapshotAgeMs === undefined) {
+    return { source: "abstain", reason: "outage", error };
+  }
+  const snapshot: RetentionRuleSnapshot | null | undefined = options.snapshot;
+  const fetchedAt = snapshot ? Date.parse(snapshot.fetchedAt) : Number.NaN;
+  if (!snapshot || !Array.isArray(snapshot.rules) || Number.isNaN(fetchedAt)) {
+    return { source: "abstain", reason: "no_snapshot", error };
+  }
+  const staleForMs = Math.max(0, now - fetchedAt);
+  if (staleForMs > maxSnapshotAgeMs) {
+    return { source: "abstain", reason: "snapshot_too_old", error };
+  }
+  options.onDegrade({
+    snapshotFetchedAt: snapshot.fetchedAt,
+    staleForMs,
+    error,
+    at: new Date(now).toISOString(),
+  });
+  return { source: "snapshot", rules: snapshot.rules, snapshot, staleForMs, error };
 }

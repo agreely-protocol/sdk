@@ -13,7 +13,30 @@ export type AgreelyErrorCode =
   | "unavailable"
   | "timeout"
   | "aborted"
-  | "config";
+  | "config"
+  // Host retention and inventory (scopes 'retention' / 'inventory'). A refusal
+  // carries one of these as `code`; branch on the code, never on the message.
+  | "unknown_field"
+  | "idempotency_key_required"
+  | "idempotency_key_reused"
+  | "retry"
+  | "invalid_method"
+  | "anonymization_process_required"
+  | "invalid_anonymization_process"
+  | "invalid_records_affected"
+  | "ran_at_in_future"
+  | "swept_at_in_future"
+  | "invalid_covered_period"
+  | "invalid_host_token"
+  | "host_token_limit"
+  | "sweep_too_frequent"
+  | "value_shaped_label"
+  | "invalid_key"
+  | "duplicate_key"
+  | "limit_exceeded"
+  | "host_system_limit"
+  | "empty_declaration"
+  | "body_too_large";
 
 export interface AgreelyErrorInit {
   code: AgreelyErrorCode;
@@ -71,6 +94,27 @@ export class AgreelyRateLimitError extends AgreelyError {
     this.retryAfterSeconds = init.retryAfter;
   }
 }
+
+/**
+ * 429 `sweep_too_frequent`: a pass was already declared under this rule FROM THIS
+ * hostSystem less than 15 minutes ago. It is the per-(rule, hostSystem) floor,
+ * not the company rate window, and two systems sharing a rule never block each
+ * other. A subclass of AgreelyRateLimitError, so a generic rate-limit catch still
+ * catches it.
+ *
+ * Do NOT retry it in a loop: the pass you are declaring is already represented by
+ * the one declared less than 15 minutes ago. Drop it, or wait `retryAfterSeconds`
+ * only if this pass genuinely ran later. The SDK never auto-retries it.
+ */
+export class AgreelySweepTooFrequentError extends AgreelyRateLimitError {}
+
+/**
+ * 409 `retry`: a concurrent retry of the same declaration could not be settled.
+ * Nothing new was recorded under this attempt. Retry with the SAME Idempotency-Key
+ * (and, after a key rotation, the SAME API key): that replays the declaration
+ * rather than recording a second one. Not an outage and not a rate limit.
+ */
+export class AgreelyConflictError extends AgreelyError {}
 
 /**
  * The client-side poll budget (e.g. waitForSettlement) elapsed before the

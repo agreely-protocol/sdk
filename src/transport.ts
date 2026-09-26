@@ -1,9 +1,11 @@
 import {
   AgreelyAuthError,
   AgreelyBillingInactiveError,
+  AgreelyConflictError,
   AgreelyError,
   AgreelyNotFoundError,
   AgreelyRateLimitError,
+  AgreelySweepTooFrequentError,
   AgreelyUnavailableError,
   AgreelyValidationError,
   type AgreelyErrorCode,
@@ -11,7 +13,7 @@ import {
 import { jitterBackoff, sleep } from "./util.js";
 
 export interface RequestSpec {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PUT";
   path: string;
   query?: Record<string, string | undefined>;
   body?: unknown;
@@ -169,6 +171,7 @@ export class Transport {
       case 403:
         throw new AgreelyAuthError(message, { code: code ?? "unauthorized", status: res.status });
       case 400:
+      case 413:
       case 422:
         throw new AgreelyValidationError(message, {
           code: code ?? "invalid_request",
@@ -184,14 +187,21 @@ export class Transport {
           code: code ?? "billing_inactive",
           status: res.status,
         });
+      case 409:
+        // A concurrent retry of a declaration could not be settled: retry with the same key.
+        throw new AgreelyConflictError(message, { code: code ?? "retry", status: res.status });
       case 429: {
         const header = res.headers.get("Retry-After");
         const retryAfter = header !== null ? Number(header) : undefined;
-        throw new AgreelyRateLimitError(message, {
-          code: "rate_limited",
+        const init = {
           status: res.status,
           ...(retryAfter !== undefined && !Number.isNaN(retryAfter) ? { retryAfter } : {}),
-        });
+        };
+        // The sweep floor is its own condition, not the company rate window.
+        if (code === "sweep_too_frequent") {
+          throw new AgreelySweepTooFrequentError(message, { ...init, code: "sweep_too_frequent" });
+        }
+        throw new AgreelyRateLimitError(message, { ...init, code: "rate_limited" });
       }
       default:
         // 503 and any other 5xx: unreachable. 503 is retryable for idempotent calls.
