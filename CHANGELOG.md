@@ -3,6 +3,26 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- **The `retention`, `inventory` and `registry` scopes** on `Scope`. A customer
+  writing TypeScript could not name a valid scope for any of them. (`registry` has
+  no resource yet.)
+- **`agreely.retention`**: `listRules`, `getRule`, `declarePurge`, `declareSweep`,
+  and `rulesForPurge`, which merges an incremental read over a stored snapshot and
+  decides the outage for a purge job (abstain by default, see the README).
+- **`agreely.catalog.listCells()`** (scope `retention`): every cell with its
+  `retentionRuleKey`.
+- **`agreely.inventory`**: `replaceCategories` (a complete list, not an append),
+  `listCategories`, `getStatement`.
+- `AgreelySweepTooFrequentError` (the 15-minute sweep floor, a subclass of
+  `AgreelyRateLimitError`) and `AgreelyConflictError` (a 409: retry with the same
+  idempotency key). A 413 now maps to `AgreelyValidationError` instead of an outage.
+- `legalBasis` and `sensitive` on `CatalogEntry`, and `company` on `Identity`: both
+  were already on the wire.
+
 ## 0.3.0 - 2026-08-22
 
 ### Fixed
