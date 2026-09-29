@@ -7,7 +7,9 @@ export type Decision = "allow" | "deny";
 
 /**
  * A /v1 API-key scope: 'check' (the synchronous check), 'issue' (consent-request
- * issuance + reads), 'attest' (manual / offline consent recording),
+ * issuance + reads), 'attest' (manual / offline consent recording, the paper of a
+ * verbal consent, withdrawal and erasure), 'attest_verbal' (recording a consent given
+ * by telephone; never granted by default, and it withdraws VERBAL consents only),
  * 'relationship' (ending a customer relationship, art. 23), 'registry' (the
  * customer registry; no SDK resource wraps it yet), 'retention' (read the decided
  * retention rules and catalogue cells, declare purges and passes) and 'inventory'
@@ -16,7 +18,15 @@ export type Decision = "allow" | "deny";
  * FORWARD COMPATIBILITY: the server may add scopes, and `identity()` returns them
  * as it receives them, so a value outside this union can reach you at runtime.
  */
-export type Scope = "check" | "issue" | "attest" | "relationship" | "registry" | "retention" | "inventory";
+export type Scope =
+  | "check"
+  | "issue"
+  | "attest"
+  | "attest_verbal"
+  | "relationship"
+  | "registry"
+  | "retention"
+  | "inventory";
 
 /**
  * The least-disclosure identity of the presented key, from GET /v1/whoami: the
@@ -37,24 +47,43 @@ export interface Identity {
 }
 
 /**
- * How an enforcement record was established:
- *   "citizen_signed"   -> the subject signed it themselves (the live consent flow)
- *   "company_attested" -> the company recorded it offline (the manual / offline path)
- * Present on a check whenever an enforcement record exists; absent for status "none".
+ * How the consent behind a decision was established, strongest first:
+ *   "citizen_signed"     -> the person signed it themselves with a passkey (tier "full")
+ *   "company_attested"   -> the organisation recorded a hand-signed paper (tier "manual")
+ *   "company_documented" -> the person consented BY TELEPHONE and the organisation
+ *                           documented it, with no document at all (tier "verbal")
+ *
+ * Present on a check whenever a CONSENT backs the decision. Absent for "none", for
+ * "necessity" and for a line the document gave for information (an acknowledgement is
+ * no consent at any tier). The HOST decides which assurance a use may accept: treat
+ * any value you do not recognise as NOT acceptable.
  */
-export type Assurance = "citizen_signed" | "company_attested";
+export type Assurance = "citizen_signed" | "company_attested" | "company_documented";
 
 /**
- * The resolved status of an enforcement cell: the EIGHT-value vocabulary of
+ * The same proof tier as {@link Assurance}, under its stored name: "full" (passkey) >
+ * "manual" (paper) > "verbal" (telephone). Present exactly when `assurance` is.
+ */
+export type Tier = "full" | "manual" | "verbal";
+
+/**
+ * The resolved status of an enforcement cell: the NINE-value vocabulary of
  * openapi.yaml (CheckDecision.status / BatchDecision.status).
  *
  * ALLOW:
- *   "active"    -> a live consent record backs the cell (carries consentRef + assurance).
+ *   "active"    -> a live consent record backs the cell (carries consentRef + assurance + tier).
  *   "necessity" -> allow WITHOUT a signed consent record: there is no per-subject
- *     record, but the active catalog cell declares a NON-consent lawful basis that is
- *     lawful to hold and use on its own. Carries `basis` and NO consentRef/assurance
- *     (there is no signed proof), and the check CREATES NOTHING. Never present a
- *     necessity allow to a person or an auditor as "consented".
+ *     record, but the active catalog cell declares a NON-consent ground that the act
+ *     governing the tenant lets it use the cell on. Carries `basis` and NO
+ *     consentRef/assurance/tier (there is no signed proof), and the check CREATES
+ *     NOTHING. Never present a necessity allow to a person or an auditor as
+ *     "consented". A cell declared SENSITIVE answers by its basis like any other: on a
+ *     non-consent ground it allows "necessity", on `consent` it denies "none".
+ *
+ *   A line the document gave FOR INFORMATION and the person acknowledged is not a
+ *   consent: it answers exactly like no record (necessity + basis, or the usual
+ *   refusal), with NO consentRef and NO assurance/tier. Once that acknowledgement is
+ *   withdrawn it answers deny "revoked" WITH a consentRef but still no assurance/tier.
  *
  * DENY:
  *   "none"      -> no record on a consent-basis cell (or no active catalog cell).
@@ -68,9 +97,16 @@ export type Assurance = "citizen_signed" | "company_attested";
  *   "relationship_ended" -> the company attested the relationship is over (art. 23), a
  *     prospective relationship-level stop; the per-cell consent stays truthfully active
  *     (it was never withdrawn), which is why this is its own status.
- *   "sensitive_requires_consent" -> no record, and the company declared the catalog cell
- *     SENSITIVE, so it fails closed to express consent (art. 12 al. 1 in fine / art. 13).
- *     Nothing is created; a sensitive cell never greenlights on necessity alone.
+ *   "requires_depersonalization" -> the cell declares a ground the tenant's act carries
+ *     ONLY for depersonalized information (A-2.1 art. 65.1 al. 2 (4 deg)), which cannot be
+ *     met for a named customer at the gate. It is NOT "no consent on record", and it
+ *     must not be answered by collecting a consent.
+ *   "basis_not_in_regime" -> the cell declares a ground the tenant's act does not carry
+ *     at all (typically left in the other sector's vocabulary after a sector change).
+ *     The fix is a catalog re-declaration by the tenant.
+ *
+ * REMOVED in 0.4.0: "sensitive_requires_consent". The API stopped emitting it on
+ * 2026-09-28; a sensitive cell now answers by its declared basis (see "necessity").
  *
  * FORWARD COMPATIBILITY: the server may add statuses, and a value outside this union
  * can reach you at runtime (nothing is validated on decode). Treat ANY unrecognised
@@ -84,47 +120,75 @@ export type Status =
   | "expired"
   | "erased"
   | "relationship_ended"
-  | "sensitive_requires_consent";
+  | "requires_depersonalization"
+  | "basis_not_in_regime";
 
 /**
- * The DECLARED non-consent lawful basis behind a `status: "necessity"` allow. Present
- * ONLY on a necessity allow; absent on every other status.
+ * The DECLARED non-consent ground behind a `status: "necessity"` allow. Present
+ * ONLY on a necessity allow; absent on every other status. The value set is
+ * SECTOR-KEYED and the two halves are disjoint: read `company.sector` from
+ * `identity()` (or `regime` from `catalog.listCells()`) before switching on it.
  *
  * Agreely records the company's DECLARED basis and does NOT certify its legal validity.
  * A necessity allow carries no consent artifact.
  *
- *   "contract"              -> art. 12 al. 2 (3 deg)
+ * Private enterprises (P-39.1), as openapi.yaml cites them:
+ *   "contract"              -> art. 9 al. 1 (1 deg)
  *   "necessary_for_service" -> art. 12 al. 2 (4 deg), supply of a product or service
- *   "security_fraud"        -> art. 12 al. 2 (3 deg) / art. 9 al. 1 (1 deg)
- *   "legal_obligation"      -> art. 18 / art. 23
- *   "professional_contact"  -> art. 1 al. 5. NOTE: a SCOPE CARVE-OUT from Sections II
- *     and III of the Act, not a necessity ground under art. 12 or art. 9. It appears
- *     here because it also produces a necessity allow.
+ *   "security_fraud"        -> art. 12 al. 2 (3 deg)
+ *   "legal_obligation"      -> art. 23 al. 1 in fine, art. 18 al. 1 (4 deg) and (6 deg)
+ *   "professional_contact"  -> art. 1 al. 5. NOTE: a SCOPE CARVE-OUT from Divisions II
+ *     and III of the Act, not a necessity ground. It appears here because it also
+ *     produces a necessity allow.
  *
- * These are the P-39.1 (private sector) bases, which is the whole vocabulary the /v1
- * check API emits today.
+ *
+ * Public bodies (A-2.1):
+ *   "attributions" / "programme" / "entente_collecte" -> collected under art. 64,
+ *     used under art. 65.1 al. 1
+ *   "compatible_use"   -> art. 65.1 al. 2 (1 deg)
+ *   "manifest_benefit" -> art. 65.1 al. 2 (2 deg)
+ *   "law_application"  -> art. 65.1 al. 2 (3 deg)
+ *   "public_character" -> art. 55 al. 1 with art. 57, again a SCOPE CARVE-OUT.
+ *
+ * "depersonalized_research" is deliberately absent: it never produces an allow at the
+ * gate (see status "requires_depersonalization").
  */
 export type Basis =
+  // Private enterprises (P-39.1)
   | "contract"
   | "necessary_for_service"
   | "security_fraud"
   | "legal_obligation"
-  | "professional_contact";
+  | "professional_contact"
+  // Public bodies (A-2.1)
+  | "attributions"
+  | "programme"
+  | "entente_collecte"
+  | "compatible_use"
+  | "manifest_benefit"
+  | "law_application"
+  | "public_character";
 
 /** The full result of a check. `check()` returns the boolean; this is the reasoned form. */
 export interface CheckResult {
   decision: Decision;
   status: Status;
-  /** 0x-hex enforcement handle. Present for every status EXCEPT "none". */
+  /**
+   * 0x-hex enforcement handle. Present for every status backed by a record; absent
+   * for "none" and "necessity" (including an acknowledged information line that
+   * still stands).
+   */
   consentRef?: string;
   /** ISO-8601 timestamp the decision was made at. */
   checkedAt: string;
   /**
-   * How the enforcement record was established (citizen-signed vs company-
-   * attested). Present whenever an enforcement record exists; absent for status
-   * "none" and never set on a degraded (synthesized) result.
+   * How the consent behind the decision was established. Present whenever a
+   * CONSENT backs it; absent for "none", "necessity", an acknowledged information
+   * line (even once withdrawn), and never set on a degraded (synthesized) result.
    */
   assurance?: Assurance;
+  /** The same proof tier as `assurance` ("full" | "manual" | "verbal"); present exactly when it is. */
+  tier?: Tier;
   /**
    * The DECLARED non-consent lawful basis behind a `status: "necessity"` allow.
    * Present ONLY when status is "necessity"; absent for every other status, and
@@ -156,13 +220,16 @@ export interface BatchDecision {
   purpose: string;
   decision: Decision;
   status: Status;
-  /** 0x-hex enforcement handle. Present for every status EXCEPT "none". */
+  /** 0x-hex enforcement handle. Present for every status backed by a record; absent for "none" and "necessity". */
   consentRef?: string;
   /**
-   * How the enforcement record was established. Present whenever a record
-   * exists; absent for status "none" and for "necessity".
+   * How the consent behind the decision was established. Present whenever a
+   * CONSENT backs it; absent for "none", "necessity" and an acknowledged
+   * information line (even once withdrawn).
    */
   assurance?: Assurance;
+  /** The same proof tier as `assurance` ("full" | "manual" | "verbal"); present exactly when it is. */
+  tier?: Tier;
   /**
    * The DECLARED non-consent lawful basis behind a `status: "necessity"` allow.
    * Present ONLY when status is "necessity".
@@ -214,7 +281,12 @@ export interface CreateConsentRequestInput {
   consentDocumentId?: string;
   /** A document code; the server resolves the currently-published version. */
   documentCode?: string;
-  /** The consent lifespan if approved (a future date/time, ISO-8601). */
+  /**
+   * The consent's end if approved: a plain date (YYYY-MM-DD, meaning the END of that
+   * calendar day in the tenant's timezone) or an RFC 3339 instant WITH an offset.
+   * Relative phrases ("+1 year") are refused, and so is an end more than 10 years
+   * after the start (an Agreely product ceiling, not a statutory one).
+   */
   validUntil: string;
 }
 
@@ -241,9 +313,21 @@ export interface IssuedRequest {
   document: ConsentDocumentDescriptor;
 }
 
+/**
+ * The EFFECTIVE status of a consent request.
+ *
+ *   "approved"      -> the person confirmed and, when the request carried consent asks,
+ *                      accepted AT LEAST ONE of them.
+ *   "asks_declined" -> the person confirmed only her receipt of the lines given for
+ *                      information and declined EVERY consent ask: no consent was
+ *                      obtained. Never returned as (nor filtered under) "approved".
+ *   "pending" / "refused" / "expired" / "revoked_before_action" as before; a pending
+ *   request past its answer deadline reads "expired".
+ */
 export type ConsentRequestStatus =
   | "pending"
   | "approved"
+  | "asks_declined"
   | "refused"
   | "expired"
   | "revoked_before_action";
@@ -328,10 +412,15 @@ export interface ConsentRequestPage {
 // ---------------------------------------------------------------------------
 
 /**
- * The evidence for a manual consent. `pdfSha256` is ALWAYS sent (the integrity
- * commitment, "0x" + 64 lowercase hex of the source PDF). `pdf` is an OPTIONAL
- * opt-in upload of the document bytes (base64); omit it to keep the file local
- * and commit only to its hash (data minimization).
+ * The evidence for a manual consent (or for the paper of a verbal one). `pdfSha256`
+ * is ALWAYS sent (the integrity commitment, "0x" + 64 lowercase hex of the source
+ * PDF; `Agreely.hashPdf` computes it). `pdf` is an OPTIONAL opt-in upload of the
+ * document bytes (base64); omit it to keep the file local and commit only to its hash
+ * (data minimization).
+ *
+ * Refused with a 422: an uploaded file that is empty or is not a PDF (no "%PDF-"
+ * header), the SHA-256 of zero bytes, and an upload whose bytes do not hash to
+ * `pdfSha256`.
  */
 export interface ManualConsentEvidence {
   /** "0x" + 64 hex SHA-256 of the source PDF. Required. */
@@ -342,15 +431,39 @@ export interface ManualConsentEvidence {
 
 export interface RecordManualConsentInput {
   customerId: string;
-  /** The id of the signed document version the consent attests to. */
+  /**
+   * The published document version the customer signed. A document that asks no
+   * consent at all (a collection notice) is refused with a 422.
+   */
   documentVersionId: string;
   /** When the consent took effect (ISO date, e.g. the signature date). */
   effectiveDate: string;
-  /** The consent lifespan (ISO date). */
+  /**
+   * The consent's end: a plain date (the END of that calendar day in the tenant's
+   * timezone) or an RFC 3339 instant with an offset. Relative phrases are refused, and
+   * so is an end more than 10 years after the start (an Agreely product ceiling).
+   */
   validUntil: string;
-  /** Catalog entry ids and/or {category, purpose} pairs. At least one. */
+  /**
+   * The consent ASKS ticked on the sheet, as catalog entry ids and/or {category,
+   * purpose} pairs. MAY BE EMPTY: every ask answered "no" (the record then holds only
+   * the acknowledged information lines, and `asksDeclined` is true). The lines the
+   * document gives for information are added by the server as acknowledgements; one
+   * sent here is ignored.
+   */
   items: IssueItem[];
   evidence: ManualConsentEvidence;
+}
+
+/**
+ * A line the document gave FOR INFORMATION, recorded as the person's acknowledgement
+ * and never as a consent. /v1/check answers it by its declared basis.
+ */
+export interface AcknowledgedLine {
+  category: string;
+  purpose: string;
+  /** Its own enforcement handle (withdraw or erase it like any cell). */
+  consentRef: string;
 }
 
 /** The 201 body from recording a manual consent. */
@@ -359,12 +472,16 @@ export interface ManualConsentResult {
   consentId: string;
   /** The merkle root committing to the recorded cells. */
   merkleRoot: string;
-  /** One 0x-hex enforcement handle per recorded (category, purpose) cell. */
+  /** One 0x-hex enforcement handle per recorded cell, acknowledged information lines included. */
   consentRefs: string[];
   /** Always "company_attested" for the manual path. */
   assurance: "company_attested";
   /** Whether the attestation is already anchored on-chain (false at record time). */
   anchored: boolean;
+  /** The information lines recorded as acknowledged (never consents). */
+  acknowledged: AcknowledgedLine[];
+  /** True when no consent ask is on the record (every ask answered "no"); only the acknowledgement was recorded. */
+  asksDeclined: boolean;
 }
 
 export interface CreateClaimLinkInput {
@@ -386,12 +503,24 @@ export interface ManualConsentMutationInput {
   reason?: string;
 }
 
-/** The 200 body from revoking a manual consent. */
+/**
+ * What /v1/check does NOW for the withdrawn purpose:
+ *   "denied"     -> this consent backed the gate, and the gate now denies.
+ *   "superseded" -> a later consent for the same purpose had already taken the gate
+ *                   over; the withdrawal is recorded and that later consent is untouched
+ *                   (so the gate may still ALLOW).
+ *   "unchanged"  -> an idempotent repeat (`alreadyRevoked: true`).
+ */
+export type RevocationGate = "denied" | "superseded" | "unchanged";
+
+/** The 200 body from revoking a manual or verbal consent. */
 export interface ManualConsentRevocation {
   consentRef: string;
   revoked: boolean;
   /** True when the consent was already revoked (the call is idempotent). */
   alreadyRevoked: boolean;
+  /** What the gate does now. Read this, not `revoked`, before telling anyone the use stopped. */
+  gate: RevocationGate;
 }
 
 /** The 200 body from erasing a manual consent. */
@@ -400,6 +529,189 @@ export interface ManualConsentErasure {
   erased: boolean;
   /** True when the consent was already erased (the call is idempotent). */
   alreadyErased: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Verbal consent (issue #100): a consent given BY TELEPHONE and documented by the
+// organisation. The WEAKEST of three tiers (full > manual > verbal): there is no
+// document at all, so the proof is the organisation's word. Every result says
+// tier "verbal" / assurance "company_documented", never "signed" or "validated".
+// ---------------------------------------------------------------------------
+
+/**
+ * The person's own answer to one consent ask put on the call, exactly "yes" or "no".
+ * A purpose is never consented by default, and a line the document gives for
+ * information is never answered (sending one is a 422).
+ */
+export interface VerbalAnswer {
+  category: string;
+  purpose: string;
+  answer: "yes" | "no";
+}
+
+/**
+ * In what capacity a representative answered. The last two name who consents for a
+ * MINOR under 14 and are never interchangeable with the adult measures.
+ */
+export type RepresentativeCapacity =
+  | "tutelle"
+  | "mandat_protection_homologue"
+  | "representation_temporaire"
+  | "curatelle"
+  | "other"
+  | "undeclared"
+  | "titulaire_autorite_parentale"
+  | "tuteur_mineur";
+
+/** Who answered the call. */
+export interface VerbalRespondent {
+  consentedBy: "self" | "self_with_assistant" | "representative";
+  /** Required for a representative, and only for one ("undeclared" is an honest answer). */
+  representativeCapacity?: RepresentativeCapacity;
+  /**
+   * For a minor under 14 only, and then required: the titulaire de l'autorité parentale
+   * or the tuteur who answered (at most 128 bytes). Stored encrypted.
+   */
+  name?: string;
+}
+
+export interface RecordVerbalConsentInput {
+  /** The company's own reference for the person (never a citizen DID). */
+  customerId: string;
+  /** The published consent-document version the call was held against (its grid bounds the purposes). */
+  documentVersionId: string;
+  /**
+   * Each consent ask put on the call, answered, each purpose once. At least one "yes"
+   * unless the document has lines to acknowledge (then every "no" still records the
+   * acknowledgement and `asksDeclined` comes back true). Never a line given for information.
+   */
+  answers: VerbalAnswer[];
+  /**
+   * The instant of the call (the consent date): a Date, or RFC 3339 WITH an offset. Not
+   * in the future (5 minutes of skew allowed) and at most 7 days old.
+   */
+  obtainedAt: Instant;
+  /** The staff member who took the call, as the organisation names them (1 to 128 bytes). Stored encrypted. */
+  obtainedBy: string;
+  /** The organisation's version label of the script read aloud (`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`). */
+  scriptVersion: string;
+  respondent: VerbalRespondent;
+  /**
+   * The consent's end: a plain date (the END of that calendar day in the tenant's
+   * timezone), or a Date / RFC 3339 instant with an offset. After the call and in the
+   * future; relative phrases are refused; at most 10 years (an Agreely product ceiling).
+   */
+  validUntil: string | Date;
+  /**
+   * Must be true when any "yes" purpose is declared sensitive AND rests on the `consent`
+   * basis: the organisation attests the consent was given expressly.
+   */
+  sensitiveExpressAttested?: boolean;
+  /**
+   * The person concerned is a minor under 14. The respondent must then be a representative
+   * in the capacity "titulaire_autorite_parentale" or "tuteur_mineur", named in `respondent.name`.
+   */
+  isMinor?: boolean;
+  /**
+   * The organisation expects the signed paper back. An attribute, never a tier: if the
+   * paper never returns, the consent stays recorded at tier "verbal" and does not lapse.
+   */
+  paperExpected?: boolean;
+}
+
+/** The 201 body from recording a verbal consent (or an idempotent replay of it). */
+export interface VerbalConsentResult {
+  consentId: string;
+  /** 0x-hex Merkle root over the per-cell commitments (anchored like any consent). */
+  merkleRoot: string;
+  /** The per-cell 0x-hex consentRefs of the "yes" purposes and the acknowledged lines. */
+  consentRefs: string[];
+  tier: "verbal";
+  /** Always "company_documented"; never overstated. */
+  assurance: "company_documented";
+  /** False at record time; the on-chain anchor lands asynchronously. */
+  anchored: boolean;
+  paperExpected: boolean;
+  /** The information lines, recorded as acknowledged from the script, never as consents. */
+  acknowledged: AcknowledgedLine[];
+  /** True when every ask was answered "no"; only the acknowledgement was recorded. */
+  asksDeclined: boolean;
+}
+
+export interface ConfirmVerbalPaperInput {
+  /**
+   * The instant the paper was signed (the evidence date): a Date, or RFC 3339 WITH an
+   * offset. No earlier than the call and not in the future.
+   */
+  signedAt: Instant;
+  /**
+   * EXACTLY the purposes still consented by telephone, each once, as ticked on the paper.
+   * A "no" is recorded as a withdrawal dated at `signedAt`. A purpose first consented on
+   * paper is a new consent: record it with `manualConsents.record`.
+   */
+  answers: VerbalAnswer[];
+  /** The signed paper. Same rules as a manual consent's evidence (a real, non-empty PDF). */
+  evidence: ManualConsentEvidence;
+}
+
+/** The 201 body from recording the signed paper of a verbal consent (the rise to manual). */
+export interface VerbalPaperResult {
+  verbalConsentId: string;
+  /** The new manual consent, or null when every box came back unticked. */
+  manualConsentId: string | null;
+  /** The manual consent's own 0x-hex Merkle root, or null. */
+  merkleRoot: string | null;
+  tier: "manual" | null;
+  /** Each purpose ticked on the paper: the verbal cell it confirms and the new manual cell the gate now reads. */
+  confirmed: Array<{ category: string; purpose: string; verbalConsentRef: string; consentRef: string }>;
+  /** The purposes unticked on the paper, withdrawn as of `signedAt`. */
+  withdrawn: Array<{ category: string; purpose: string; consentRef: string }>;
+}
+
+/** Where a verbal consent is in its life. */
+export type VerbalConsentState = "awaiting_paper" | "verbal_only" | "paper_received";
+
+/** One purpose of a verbal consent's history. */
+export interface VerbalHistoryPurpose {
+  category: string | null;
+  purpose: string | null;
+  /** "informed" is a line given for information, acknowledged from the script and never answered. */
+  answer: "yes" | "no" | "informed";
+  consentRef: string | null;
+  status: "active" | "revoked" | "expired" | "erased" | null;
+  paper: "confirmed_on_paper" | "withdrawn_on_paper" | null;
+  /** The manual cell that confirmed this one on paper, when there is one. */
+  confirmedBy: { consentRef: string; status: string } | null;
+}
+
+/** The body of GET /v1/verbal-consents/{consentId}: what was said, what the paper said, what is in force. */
+export interface VerbalConsentHistory {
+  consentId: string;
+  /** Kept forever: the verbal consent never becomes another tier (the paper mints a NEW manual consent). */
+  tier: "verbal";
+  assurance: "company_documented";
+  merkleRoot: string;
+  anchored: boolean;
+  /** The instant of the call, the consent date. */
+  obtainedAt: string;
+  /** When Agreely recorded it. The gap to obtainedAt is shown on purpose. */
+  recordedAt: string;
+  obtainedBy: string | null;
+  scriptVersion: string;
+  documentVersionId: string;
+  validUntil: string;
+  paperExpected: boolean;
+  state: VerbalConsentState;
+  purposes: VerbalHistoryPurpose[];
+  paper: {
+    /** The evidence date, distinct from obtainedAt. */
+    signedAt: string;
+    recordedAt: string;
+    pdfSha256: string;
+    manualConsentId: string | null;
+    manualMerkleRoot: string | null;
+    tier: "manual" | null;
+  } | null;
 }
 
 // ---------------------------------------------------------------------------

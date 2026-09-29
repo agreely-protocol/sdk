@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Agreely } from "../../src/index.js";
+import { Agreely, AgreelyConfigError, AgreelyConflictError, AgreelyNotFoundError } from "../../src/index.js";
 import { mockFetch } from "./helpers.js";
 
 const BASE = "http://api.test";
@@ -25,6 +25,8 @@ const recorded = {
   consentRefs: [REF],
   assurance: "company_attested",
   anchored: false,
+  acknowledged: [],
+  asksDeclined: false,
 };
 
 describe("manualConsents.record (Idempotency-Key)", () => {
@@ -81,6 +83,40 @@ describe("manualConsents.record (Idempotency-Key)", () => {
   });
 });
 
+describe("manualConsents.record (asks, information lines, refusals)", () => {
+  it("sends an EMPTY items list (every ask answered no) and surfaces acknowledged + asksDeclined", async () => {
+    const declined = {
+      ...recorded,
+      consentRefs: [REF],
+      acknowledged: [{ category: "Coordonnees", purpose: "Gestion du dossier", consentRef: REF }],
+      asksDeclined: true,
+    };
+    const { agreely, calls } = client([{ status: 201, json: declined }]);
+    const r = await agreely.manualConsents.record({ ...input, items: [] });
+    expect((calls[0]!.body as { items: unknown[] }).items).toEqual([]);
+    expect(r.asksDeclined).toBe(true);
+    expect(r.acknowledged).toEqual([{ category: "Coordonnees", purpose: "Gestion du dossier", consentRef: REF }]);
+  });
+
+  it("refuses a malformed idempotencyKey override before any call", async () => {
+    const { agreely, calls } = client([{ status: 201, json: recorded }]);
+    expect(() => agreely.manualConsents.record(input, { idempotencyKey: "has space" })).toThrow(AgreelyConfigError);
+    expect(() => agreely.manualConsents.record(input, { idempotencyKey: "" })).toThrow(AgreelyConfigError);
+    expect(() => agreely.manualConsents.record(input, { idempotencyKey: "k".repeat(256) })).toThrow(AgreelyConfigError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("maps a 409 conflict (a verbal consent awaits its paper) to AgreelyConflictError with code conflict", async () => {
+    const { agreely } = client([
+      { status: 409, json: { error: { code: "conflict", message: "A verbal consent awaits its paper." } } },
+    ]);
+    const err = await agreely.manualConsents.record(input).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AgreelyConflictError);
+    expect((err as AgreelyConflictError).code).toBe("conflict");
+    expect((err as AgreelyConflictError).status).toBe(409);
+  });
+});
+
 describe("manualConsents.createClaimLink", () => {
   const link = { claimUrl: "https://x/claim/abc", token: "tok_abc", expiresAt: "2026-07-01T00:00:00Z" };
 
@@ -97,21 +133,39 @@ describe("manualConsents.createClaimLink", () => {
     await agreely.manualConsents.createClaimLink({ customerId: "c1", reference: "order-99" });
     expect(calls[0]!.body).toEqual({ customerId: "c1", reference: "order-99" });
   });
+
+  it("an unknown customer is AgreelyNotFoundError; an ended relationship is AgreelyConflictError", async () => {
+    const { agreely } = client([
+      { status: 404, json: { error: { code: "not_found", message: "No customer with that reference." } } },
+      { status: 409, json: { error: { code: "conflict", message: "The relationship has ended." } } },
+    ]);
+    await expect(agreely.manualConsents.createClaimLink({ customerId: "ghost" })).rejects.toBeInstanceOf(AgreelyNotFoundError);
+    const err = await agreely.manualConsents.createClaimLink({ customerId: "c1" }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AgreelyConflictError);
+    expect((err as AgreelyConflictError).code).toBe("conflict");
+  });
 });
 
 describe("manualConsents.revoke / erase", () => {
   it("revokes by consentRef and forwards the reason", async () => {
-    const { agreely, calls } = client([{ json: { consentRef: REF, revoked: true, alreadyRevoked: false } }]);
+    const { agreely, calls } = client([{ json: { consentRef: REF, revoked: true, alreadyRevoked: false, gate: "denied" } }]);
     const r = await agreely.manualConsents.revoke(REF, { reason: "withdrawn" });
     expect(calls[0]!.url).toBe(`${BASE}/v1/manual-consents/${REF}/revoke`);
     expect(calls[0]!.body).toEqual({ reason: "withdrawn" });
-    expect(r).toEqual({ consentRef: REF, revoked: true, alreadyRevoked: false });
+    expect(r).toEqual({ consentRef: REF, revoked: true, alreadyRevoked: false, gate: "denied" });
   });
 
-  it("revoke is idempotent (alreadyRevoked true on a repeat)", async () => {
-    const { agreely } = client([{ json: { consentRef: REF, revoked: true, alreadyRevoked: true } }]);
+  it("revoke is idempotent (alreadyRevoked true and gate unchanged on a repeat)", async () => {
+    const { agreely } = client([{ json: { consentRef: REF, revoked: true, alreadyRevoked: true, gate: "unchanged" } }]);
     const r = await agreely.manualConsents.revoke(REF);
     expect(r.alreadyRevoked).toBe(true);
+    expect(r.gate).toBe("unchanged");
+  });
+
+  it("surfaces gate superseded: a later consent still backs the purpose", async () => {
+    const { agreely } = client([{ json: { consentRef: REF, revoked: true, alreadyRevoked: false, gate: "superseded" } }]);
+    const r = await agreely.manualConsents.revoke(REF);
+    expect(r.gate).toBe("superseded");
   });
 
   it("erases by consentRef", async () => {

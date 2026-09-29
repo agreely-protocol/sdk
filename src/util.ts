@@ -140,3 +140,19 @@ export function assertIdempotencyKey(options: unknown, label: string): string {
   }
   return key;
 }
+
+/**
+ * The Idempotency-Key of a consent-recording call (manual, verbal, paper): the
+ * caller's override when given, else a fresh one. The server binds the key to the
+ * endpoint and to the request body, and refuses anything but 1 to 255 printable
+ * ASCII characters with a 422, so a bad override is refused here, before the call.
+ */
+export function recordIdempotencyKey(override: unknown, label: string): string {
+  if (override === undefined) return `idem_${globalThis.crypto.randomUUID()}`;
+  if (typeof override !== "string" || !/^[\x21-\x7E]{1,255}$/.test(override)) {
+    throw new AgreelyConfigError(
+      `${label}: idempotencyKey must be 1 to 255 printable ASCII characters (no spaces).`,
+    );
+  }
+  return override;
+}

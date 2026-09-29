@@ -16,6 +16,7 @@ import { sleep } from "../util.js";
 /** The terminal (settled) consent-request statuses. */
 const TERMINAL_STATUSES: ReadonlySet<ConsentRequestStatus> = new Set([
   "approved",
+  "asks_declined",
   "refused",
   "expired",
   "revoked_before_action",
@@ -84,7 +85,8 @@ export class ConsentRequests {
 
   /**
    * List the company's requests, newest first (keyset). All filters optional:
-   * `customerId` (the company's own subject ref), `status`, `limit` (page size;
+   * `customerId` (the company's own subject ref), `status` (note: "approved" never
+   * includes "asks_declined", a request whose every consent ask was declined), `limit` (page size;
    * server default 50, max 100), and `cursor` (a requestId from a prior
    * `nextCursor`). Returns metadata only, tenant-scoped by the API key.
    */
@@ -190,7 +192,7 @@ export class ConsentRequests {
 
   /**
    * Poll GET /v1/consent-requests/{id} until it reaches a terminal state
-   * (approved | refused | expired | revoked_before_action), or throw
+   * (approved | asks_declined | refused | expired | revoked_before_action), or throw
    * AgreelyTimeoutError when the budget elapses. Honors Retry-After on a 429.
    *
    * Abortable via an AbortSignal: the abort is honored PROMPTLY (it interrupts the

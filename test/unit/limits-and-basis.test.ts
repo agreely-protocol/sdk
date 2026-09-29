@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Agreely, AgreelyConfigError, BATCH_CAP, RATE_LIMIT_PER_MINUTE } from "../../src/index.js";
 import { mockFetch } from "./helpers.js";
-import type { Basis, Status } from "../../src/types.js";
+import type { Assurance, Basis, Status, Tier } from "../../src/types.js";
 
 // The documented SERVER LIMITS (the 500-item batch cap) and the documented WIRE FIELDS
 // the SDK previously dropped (`basis`, and the necessity / sensitive statuses).
@@ -147,21 +147,70 @@ describe("the documented status vocabulary and the `basis` field survive decode"
     expect(decisions[0]!.consentRef).toBeUndefined();
   });
 
-  // The sensitive fail-closed status (shipped 2026-07-28) must survive decode and must
-  // DENY. It was absent from the SDK vocabulary entirely.
-  it("decodes sensitive_requires_consent and denies", async () => {
+  // A sensitive cell on a non-consent ground now answers by its basis (2026-09-28):
+  // allow / necessity + basis, with no consentRef, no assurance and no tier.
+  it("decodes a sensitive cell's necessity allow with its basis and no proof fields", async () => {
     const { agreely } = client([
       {
         json: {
-          decision: "deny",
-          status: "sensitive_requires_consent",
-          checkedAt: "2026-08-22T17:04:57Z",
+          decision: "allow",
+          status: "necessity",
+          basis: "legal_obligation",
+          checkedAt: "2026-09-29T12:00:00Z",
         },
       },
     ]);
-    const result = await agreely.checkDetailed("c1", "Renseignements medicaux", "Evaluation des reclamations");
-    expect(result.decision).toBe("deny");
-    expect(result.status).toBe("sensitive_requires_consent");
+    const result = await agreely.checkDetailed("c1", "Renseignements medicaux", "Obligation legale");
+    expect(result.decision).toBe("allow");
+    expect(result.status).toBe("necessity");
+    expect(result.basis).toBe("legal_obligation");
+    expect(result.consentRef).toBeUndefined();
+    expect(result.assurance).toBeUndefined();
+    expect(result.tier).toBeUndefined();
+  });
+
+  it("surfaces the proof tier beside the assurance, including a verbal consent", async () => {
+    const { agreely } = client([
+      {
+        json: {
+          decision: "allow",
+          status: "active",
+          consentRef: "0xabc",
+          assurance: "company_documented",
+          tier: "verbal",
+          checkedAt: "2026-09-29T12:00:00Z",
+        },
+      },
+    ]);
+    const result = await agreely.checkDetailed("c1", "Coordonnees", "Infolettre");
+    expect(result.decision).toBe("allow");
+    expect(result.assurance).toBe("company_documented");
+    expect(result.tier).toBe("verbal");
+  });
+
+  it("decodes a withdrawn information line: deny revoked with a consentRef and no assurance or tier", async () => {
+    const { agreely } = client([
+      {
+        json: {
+          decisions: [
+            {
+              customerRef: "c1",
+              category: "Coordonnees",
+              purpose: "Gestion du dossier",
+              decision: "deny",
+              status: "revoked",
+              consentRef: "0xdef",
+              checkedAt: "2026-09-29T12:00:00Z",
+            },
+          ],
+        },
+      },
+    ]);
+    const [d] = await agreely.checkBatch([{ customerRef: "c1", category: "Coordonnees", purpose: "Gestion du dossier" }]);
+    expect(d!.status).toBe("revoked");
+    expect(d!.consentRef).toBe("0xdef");
+    expect(d!.assurance).toBeUndefined();
+    expect(d!.tier).toBeUndefined();
   });
 
   // A compile-time assertion, not a runtime one: every status openapi.yaml declares must
@@ -176,7 +225,8 @@ describe("the documented status vocabulary and the `basis` field survive decode"
       "expired",
       "erased",
       "relationship_ended",
-      "sensitive_requires_consent",
+      "requires_depersonalization",
+      "basis_not_in_regime",
     ];
     const bases: Basis[] = [
       "contract",
@@ -184,8 +234,19 @@ describe("the documented status vocabulary and the `basis` field survive decode"
       "security_fraud",
       "legal_obligation",
       "professional_contact",
+      "attributions",
+      "programme",
+      "entente_collecte",
+      "compatible_use",
+      "manifest_benefit",
+      "law_application",
+      "public_character",
     ];
-    expect(statuses).toHaveLength(8);
-    expect(bases).toHaveLength(5);
+    const assurances: Assurance[] = ["citizen_signed", "company_attested", "company_documented"];
+    const tiers: Tier[] = ["full", "manual", "verbal"];
+    expect(statuses).toHaveLength(9);
+    expect(bases).toHaveLength(12);
+    expect(assurances).toHaveLength(3);
+    expect(tiers).toHaveLength(3);
   });
 });

@@ -36,9 +36,10 @@ if (await agreely.check("cust_8812", "Phone number", "Billing")) {
 ```ts
 const d = await agreely.checkDetailed("cust_8812", "Phone number", "Billing");
 // { decision: "allow" | "deny",
-//   status: Status,            // the eight values below
+//   status: Status,            // the nine values below
 //   consentRef?: "0x…",        // absent for "none" and for "necessity"
-//   assurance?: "citizen_signed" | "company_attested",  // absent for "none"/"necessity"
+//   assurance?: "citizen_signed" | "company_attested" | "company_documented",
+//   tier?: "full" | "manual" | "verbal",  // the same proof, present exactly when assurance is
 //   basis?: Basis,             // ONLY on "necessity"
 //   checkedAt: "2026-…Z" }
 ```
@@ -48,24 +49,34 @@ throw. Errors (auth, validation, rate-limit, outage) throw typed errors.
 
 ### The status vocabulary
 
-Two statuses allow, six deny:
+Two statuses allow, seven deny:
 
 | status | decision | what it means |
 | --- | --- | --- |
 | `active` | allow | a live consent record backs the cell |
-| `necessity` | allow | **no consent record**; the catalog cell declares a non-consent lawful basis. Carries `basis`, no `consentRef`, no `assurance`. Creates nothing. |
+| `necessity` | allow | **no consent record**; the catalog cell declares a non-consent ground the tenant's act carries. Carries `basis`, no `consentRef`, no `assurance`, no `tier`. Creates nothing. |
 | `none` | deny | no record on a consent-basis cell. Also what an **erased** cell reads as. |
 | `revoked` | deny | the consent was withdrawn (art. 14) |
 | `expired` | deny | the consent lifespan elapsed (art. 14 al. 3) |
 | `relationship_ended` | deny | the company attested the purposes are accomplished (art. 23). A relationship-level stop: the per-cell consent stays truthfully active, it was never withdrawn. |
-| `sensitive_requires_consent` | deny | no record, and the company declared the cell sensitive, so it fails closed to express consent (art. 12 al. 1 in fine / art. 13) |
+| `requires_depersonalization` | deny | the cell declares a ground the act carries only for depersonalized information (A-2.1 art. 65.1 al. 2 (4°)), which cannot be met for a named customer. Not "no consent": do not answer it by collecting one. |
+| `basis_not_in_regime` | deny | the cell declares a ground the tenant's act does not carry at all (usually left over from a sector change). The tenant re-declares the cell. |
 | `erased` | deny | listed by `openapi.yaml`, **not currently emitted**. Erasure crypto-shreds the record, so an erased cell reads back as `none`. |
 
+`sensitive_requires_consent` is **gone** (removed in 0.4.0; the API stopped
+emitting it on 2026-09-28). A cell declared sensitive now answers by its basis like
+any other: on `consent` it denies `none` (the consent must be express), on a
+non-consent ground it allows `necessity` with its `basis`.
+
 **A `necessity` allow is not a consent.** It rests on a basis the company
-*declared* on its catalog (`contract`, `necessary_for_service`, `security_fraud`,
-`legal_obligation`, `professional_contact`), there is no signed proof behind it,
-and Agreely does not certify its legal validity. Never present it to a person or
-an auditor as "consented":
+*declared* on its catalog, there is no signed proof behind it, and Agreely does not
+certify its legal validity. The `basis` vocabulary is sector-keyed: a private
+enterprise (P-39.1) gets `contract`, `necessary_for_service`, `security_fraud`,
+`legal_obligation` or `professional_contact`; a public body (A-2.1) gets
+`attributions`, `programme`, `entente_collecte`, `compatible_use`,
+`manifest_benefit`, `law_application` or `public_character`. Read
+`company.sector` from `identity()` before switching on it. Never present a
+necessity allow to a person or an auditor as "consented":
 
 ```ts
 if (d.status === "necessity") {
@@ -75,6 +86,30 @@ if (d.status === "necessity") {
 
 Treat any status you do not recognise as a **deny**: read `d.decision`, which is
 only ever `allow` or `deny`.
+
+### Proof tiers: `assurance` and `tier`
+
+An allow on a consent tells you **how strong the proof is**, and your system
+decides what each tier may unlock:
+
+| `tier` | `assurance` | the consent |
+| --- | --- | --- |
+| `full` | `citizen_signed` | the person signed it with a passkey |
+| `manual` | `company_attested` | the organisation recorded a hand-signed paper |
+| `verbal` | `company_documented` | the person consented by telephone; the organisation documented it, with no document |
+
+```ts
+const d = await agreely.checkDetailed("cust_8812", "Email address", "Newsletter");
+const acceptable = d.decision === "allow" && (d.tier === "full" || d.tier === "manual");
+```
+
+Treat an `assurance` or `tier` you do not recognise as **not acceptable**.
+
+**Information lines are not consents.** A line the document gives *for
+information* is recorded as the person's acknowledgement. `/v1/check` answers it
+exactly like no record (`necessity` with its `basis`, or the usual refusal), with no
+`consentRef` and no `assurance`/`tier`. Once withdrawn it answers deny `revoked`
+**with** a `consentRef` but still no `assurance`/`tier`.
 
 ### Issue a consent request (no UI)
 
@@ -91,6 +126,12 @@ const r = await agreely.consentRequests.create({
 // { requestId: "0x…64hex", status: "pending", deepLink, emailDelivered, items, document }
 ```
 
+`validUntil` (here, on manual and on verbal consents) is either a plain date,
+meaning **the end of that calendar day in the organisation's timezone**, or an RFC
+3339 instant with an offset. Relative phrases (`"+1 year"`) are refused, and so is
+an end more than **10 years** after the start (an Agreely product ceiling, not a
+statutory one: the acts limit a consent to the time its purposes need).
+
 `create` is **never auto-retried** (it emails). The SDK attaches a unique
 `Idempotency-Key` per call; pass your own to make a retry replay the original
 instead of issuing twice:
@@ -106,6 +147,11 @@ your company's attestation. The result carries `assurance: "company_attested"`
 (the live citizen flow yields `"citizen_signed"`). Send only the PDF **hash** by
 default; upload the bytes only if you opt in.
 
+`items` names the consent **asks ticked on the sheet**, and may be empty when
+every ask was answered "no". The lines the document gives for information are
+added by the server as acknowledgements (never consents) and come back in
+`acknowledged`; one you send in `items` is ignored.
+
 ```ts
 const recorded = await agreely.manualConsents.record({
   customerId: "cust_8812",
@@ -113,34 +159,103 @@ const recorded = await agreely.manualConsents.record({
   effectiveDate: "2026-06-01",
   validUntil: "2031-01-01",
   items: ["<catalogEntryId>", { category: "Email address", purpose: "Newsletter" }],
-  evidence: { pdfSha256: "0x…64hex" }, // pdf?: "<base64>" to opt into uploading the bytes
+  evidence: { pdfSha256: Agreely.hashPdf(bytes) }, // pdf?: "<base64>" to opt into uploading the bytes
 });
-// { consentId, merkleRoot, consentRefs: ["0x…"], assurance: "company_attested", anchored: false }
+// { consentId, merkleRoot, consentRefs: ["0x…"], assurance: "company_attested", anchored: false,
+//   acknowledged: [{ category, purpose, consentRef }], asksDeclined: false }
 
 // Hand the subject a link to self-claim the attestation:
 const link = await agreely.manualConsents.createClaimLink({ customerId: "cust_8812" });
 // { claimUrl, token, expiresAt }
 
-await agreely.manualConsents.revoke("0x…", { reason: "withdrawn" });
+const w = await agreely.manualConsents.revoke("0x…", { reason: "withdrawn" });
+// { consentRef, revoked: true, alreadyRevoked, gate: "denied" | "superseded" | "unchanged" }
 await agreely.manualConsents.erase("0x…");
 ```
 
+What gets refused, and how:
+
+- **422** (`AgreelyValidationError`): a document that asks no consent at all (a
+  collection notice); an uploaded file that is empty or not a PDF; the SHA-256 of
+  zero bytes; an upload that does not hash to `pdfSha256`; an end past the 10-year
+  ceiling.
+- **409** (`AgreelyConflictError`, `code: "conflict"`): a purpose already held by an
+  active passkey consent, or a verbal consent for the same customer and document
+  still awaiting its paper. Nothing is recorded.
+- `createClaimLink`: **404** for a customer the company holds no record of
+  (nothing written), **409** once the relationship has ended.
+
+`revoke` returns `gate`, what `/v1/check` does now for that purpose: `denied`
+(this consent backed it), `superseded` (a later consent had already taken over, and
+the gate may still allow), or `unchanged` (an idempotent repeat). Read `gate`, not
+`revoked`, before telling anyone the use stopped.
+
 Like `consentRequests.create`, `record` is **never auto-retried**; it attaches a
-unique `Idempotency-Key` per call.
+unique `Idempotency-Key` per call, and a retry with the same key and the same body
+replays the original 201 and records nothing new. On the manual and verbal
+endpoints the server binds the key to the **endpoint and the request body**: the
+same key with a different body is a new request, and a key spent elsewhere never
+replays another endpoint's answer. An override must be 1 to 255 printable ASCII
+characters; anything else is refused client-side.
 
-The server honours that key on **both** endpoints: a retry with the same key
-replays the original 201 byte-for-byte and records nothing new, so a dropped
-connection can never double-issue or double-attest.
+### Record a verbal consent (by telephone)
 
-The key is the whole contract. The replay is keyed on **(company, key)** alone,
-not on the request body and not on the endpoint. So:
+A consent the person gave **by telephone**, documented by your organisation. It is
+the weakest of the three tiers: there is no document, so the proof is your word.
+Every result says `tier: "verbal"` and `assurance: "company_documented"`, and
+`/v1/check` returns the same tier. Scope `attest_verbal`, a separate grant that is
+never given by default.
 
-- reusing a key with a **different payload** silently replays the *first* payload
-  and writes nothing;
-- a key already spent on `consentRequests.create` will replay **that** response
-  from `manualConsents.record`.
+```ts
+const v = await agreely.verbalConsents.record({
+  customerId: "cust_8812",
+  documentVersionId: "<docVersionId>",
+  // Every ask put on the call, answered explicitly. Never a line given for information.
+  answers: [
+    { category: "Email address", purpose: "Newsletter", answer: "yes" },
+    { category: "Email address", purpose: "Surveys", answer: "no" },
+  ],
+  obtainedAt: new Date(),              // the call: RFC 3339 with an offset, at most 7 days old
+  obtainedBy: "Julie, customer service",
+  scriptVersion: "script-2026.09",
+  respondent: { consentedBy: "self" }, // or a representative, see below
+  validUntil: "2027-09-29",
+  paperExpected: true,
+});
+// { consentId, merkleRoot, consentRefs, tier: "verbal", assurance: "company_documented",
+//   anchored: false, paperExpected: true, acknowledged: [...], asksDeclined: false }
 
-Leave the key unset unless you have a durable, operation-unique id.
+// The signed paper came back (scope `attest`): each "yes" moves into a NEW manual
+// consent and the gate re-points at it; each "no" is a withdrawal dated at signedAt.
+const p = await agreely.verbalConsents.confirmWithPaper(v.consentId, {
+  signedAt: "2026-10-02T09:00:00-04:00",
+  answers: [{ category: "Email address", purpose: "Newsletter", answer: "yes" }],
+  evidence: { pdfSha256: Agreely.hashPdf(bytes) },
+});
+// { verbalConsentId, manualConsentId, merkleRoot, tier: "manual", confirmed: [...], withdrawn: [...] }
+
+// What was said, what the paper said, what is in force (scope attest_verbal or attest):
+const h = await agreely.verbalConsents.get(v.consentId);
+// h.state: "awaiting_paper" | "verbal_only" | "paper_received"
+// h.purposes[].answer: "yes" | "no" | "informed"
+```
+
+- **A minor under 14**: pass `isMinor: true` and a representative in the capacity
+  `titulaire_autorite_parentale` or `tuteur_mineur`, named in `respondent.name`.
+  The adult measures (`tutelle`, `curatelle`, `mandat_protection_homologue`,
+  `representation_temporaire`, `other`, `undeclared`) are for adults only.
+- **Sensitive purposes**: when a "yes" purpose is declared sensitive and rests on
+  consent, pass `sensitiveExpressAttested: true`.
+- **Refused**: 422 for a notice-only document or an answer on a line given for
+  information; 409 (`code: "conflict"`) when a purpose is already covered or held
+  by an active paper or passkey consent, when the relationship has ended, or for a
+  second paper; 429 `AgreelyVerbalDailyCapError` at your organisation's daily limit
+  (never auto-retried).
+- **Withdraw** with `manualConsents.revoke` (a key holding only `attest_verbal`
+  reaches verbal refs only). Once the paper came back, withdraw the confirming
+  manual `consentRef` instead (see `verbalConsents.get`). **Erase** needs `attest`.
+- `record` and `confirmWithPaper` are never auto-retried and carry an
+  `Idempotency-Key` like `manualConsents.record`.
 
 ### End / revert a customer relationship (art. 23)
 
@@ -173,11 +288,14 @@ window, or after any destruction) is a clean 404 with nothing written.
 ```ts
 const page = await agreely.consentRequests.list({
   customerId: "cust_8812",   // filter to one subject ref (optional)
-  status: "pending",         // pending | approved | refused | expired | revoked_before_action (optional)
+  status: "pending",         // pending | approved | asks_declined | refused | expired | revoked_before_action (optional)
   limit: 50,                 // page size, default 50, max 100 (optional)
   cursor,                    // a prior nextCursor (optional)
 });
 // { items, nextCursor }  - metadata only, newest first; nextCursor is null when exhausted.
+// "approved" means the person accepted AT LEAST ONE consent ask. A request whose every
+// ask was declined reads "asks_declined" (no consent obtained) and is never listed
+// under "approved". waitForSettlement treats both as settled.
 
 const one = await agreely.consentRequests.get("0x…");  // the protocol requestId, NOT a uuid
 const catalog = await agreely.catalog.list();          // discovery for issuance
@@ -317,6 +435,8 @@ Every failure is an `AgreelyError` subclass - a **deny is not an error**.
 | `AgreelyNotFoundError`      | 404                                   |
 | `AgreelyBillingInactiveError` | 402 - the company's Agreely subscription lapsed |
 | `AgreelyRateLimitError`     | 429 (`.retryAfter` seconds)           |
+| `AgreelyVerbalDailyCapError` | 429 `verbal_daily_cap` (a rate-limit subclass; never auto-retried) |
+| `AgreelyConflictError`      | 409: `code: "conflict"` (the record's state refuses it, do not retry as is) or `code: "retry"` (retry with the same Idempotency-Key) |
 | `AgreelyUnavailableError`   | 503 / network / timeout               |
 | `AgreelyConfigError`        | bad client config (thrown at init)    |
 
@@ -480,8 +600,15 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
 - The public identifier everywhere is the **protocol `requestId`** (`0x` + 64
   hex), never an internal uuid.
 - Scopes: `check` authorizes `check`; `issue` authorizes the consent-request
-  endpoints; `attest` authorizes manual consents; `relationship` authorizes the
-  relationship end/revert; any scope reads the catalog.
+  endpoints; `attest` authorizes manual consents, the paper of a verbal consent,
+  withdrawal and erasure; `attest_verbal` authorizes recording a verbal consent,
+  reading its history and withdrawing verbal cells; `relationship` authorizes the
+  relationship end/revert; `check` or `issue` reads the catalog.
+- **Receipt verification.** `Agreely.verifyReceipt` recognises three receipt
+  types: `company_attested` (paper; `overall: "verified"` when sound), `citizen`
+  (at most `partial` offline) and `company_documented`, a verbal
+  `VerbalConsentReceipt`: its company signature is verified, but `overall` is at
+  most `partial`, because the organisation's word is all there is.
 
 ## Open and auditable
 

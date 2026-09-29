@@ -7,6 +7,7 @@ import {
   AgreelyRateLimitError,
   AgreelySweepTooFrequentError,
   AgreelyUnavailableError,
+  AgreelyVerbalDailyCapError,
   AgreelyValidationError,
   type AgreelyErrorCode,
 } from "./errors.js";
@@ -71,7 +72,13 @@ export class Transport {
       try {
         return await this.attempt<T>(spec);
       } catch (error) {
-        if (error instanceof AgreelyRateLimitError && rateAttempt < rateRetries) {
+        // A per-rule floor or a daily cap is not the rate window: waiting it out and
+        // re-sending cannot help, so neither is ever auto-retried.
+        const windowed =
+          error instanceof AgreelyRateLimitError &&
+          !(error instanceof AgreelySweepTooFrequentError) &&
+          !(error instanceof AgreelyVerbalDailyCapError);
+        if (windowed && rateAttempt < rateRetries) {
           rateAttempt++;
           const waitMs =
             this.respectRetryAfter && error.retryAfterSeconds !== undefined
@@ -188,7 +195,8 @@ export class Transport {
           status: res.status,
         });
       case 409:
-        // A concurrent retry of a declaration could not be settled: retry with the same key.
+        // `retry`: a concurrent retry could not be settled (retry with the same key).
+        // `conflict`: the request contradicts the record's state (do not retry as is).
         throw new AgreelyConflictError(message, { code: code ?? "retry", status: res.status });
       case 429: {
         const header = res.headers.get("Retry-After");
@@ -200,6 +208,10 @@ export class Transport {
         // The sweep floor is its own condition, not the company rate window.
         if (code === "sweep_too_frequent") {
           throw new AgreelySweepTooFrequentError(message, { ...init, code: "sweep_too_frequent" });
+        }
+        // The per-company daily cap on verbal consents: not the per-minute window either.
+        if (code === "verbal_daily_cap") {
+          throw new AgreelyVerbalDailyCapError(message, { ...init, code: "verbal_daily_cap" });
         }
         throw new AgreelyRateLimitError(message, { ...init, code: "rate_limited" });
       }

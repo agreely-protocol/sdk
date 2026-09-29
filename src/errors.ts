@@ -36,7 +36,10 @@ export type AgreelyErrorCode =
   | "limit_exceeded"
   | "host_system_limit"
   | "empty_declaration"
-  | "body_too_large";
+  | "body_too_large"
+  // Manual and verbal consents.
+  | "conflict"
+  | "verbal_daily_cap";
 
 export interface AgreelyErrorInit {
   code: AgreelyErrorCode;
@@ -109,10 +112,29 @@ export class AgreelyRateLimitError extends AgreelyError {
 export class AgreelySweepTooFrequentError extends AgreelyRateLimitError {}
 
 /**
- * 409 `retry`: a concurrent retry of the same declaration could not be settled.
- * Nothing new was recorded under this attempt. Retry with the SAME Idempotency-Key
- * (and, after a key rotation, the SAME API key): that replays the declaration
- * rather than recording a second one. Not an outage and not a rate limit.
+ * 429 `verbal_daily_cap`: the organisation reached its daily limit of verbal
+ * (telephone) consents. A subclass of AgreelyRateLimitError, so a generic rate-limit
+ * catch still catches it. It is a per-company daily cap, not the per-minute window:
+ * the SDK never auto-retries it, and retrying today will not succeed.
+ */
+export class AgreelyVerbalDailyCapError extends AgreelyRateLimitError {}
+
+/**
+ * 409. Branch on `code`, the two meanings are opposite:
+ *
+ *   - `retry`: a concurrent retry of the same declaration could not be settled.
+ *     Nothing new was recorded under this attempt. Retry with the SAME
+ *     Idempotency-Key (and, after a key rotation, the SAME API key): that replays
+ *     the declaration rather than recording a second one.
+ *   - `conflict`: the request contradicts the record's current state, and retrying
+ *     it unchanged will fail again. Examples: a purpose already held by an active
+ *     stronger consent (or already covered), a customer relationship that has ended,
+ *     a second paper for the same verbal consent, a manual consent for a customer and
+ *     document whose verbal consent still awaits its paper, or withdrawing a verbal
+ *     consentRef whose paper already came back (withdraw the manual one instead).
+ *     Nothing was recorded.
+ *
+ * Not an outage and not a rate limit.
  */
 export class AgreelyConflictError extends AgreelyError {}
 

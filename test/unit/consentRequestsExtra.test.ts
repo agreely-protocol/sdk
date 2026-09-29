@@ -172,6 +172,27 @@ describe("consentRequests.waitForSettlement", () => {
     expect(settled.status).toBe("approved");
   });
 
+  it("settles on asks_declined (every consent ask declined) instead of polling to the timeout", async () => {
+    const { fetch, calls } = mockFetch([
+      { json: rec("0xr", "pending") },
+      { json: rec("0xr", "asks_declined") },
+      { json: rec("0xr", "asks_declined") },
+    ]);
+    const settled = await client(fetch).consentRequests.waitForSettlement("0xr", {
+      intervalMs: 1,
+      timeoutMs: 1000,
+    });
+    expect(settled.status).toBe("asks_declined");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("filters the list on asks_declined", async () => {
+    const { fetch, calls } = mockFetch([{ json: { requests: [rec("0xr", "asks_declined")], nextCursor: null } }]);
+    const page = await client(fetch).consentRequests.list({ status: "asks_declined" });
+    expect(new URL(calls[0]!.url).searchParams.get("status")).toBe("asks_declined");
+    expect(page.items[0]!.status).toBe("asks_declined");
+  });
+
   it("throws AgreelyTimeoutError with the last status when the budget elapses", async () => {
     const { fetch } = mockFetch([() => ({ json: rec("0xr", "pending") })]);
     await expect(
