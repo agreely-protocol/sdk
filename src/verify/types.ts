@@ -20,15 +20,25 @@ export type CheckStatus = "pass" | "fail" | "unavailable" | "skipped" | "unsuppo
  * The aggregate verdict.
  *
  *   - verified     a company-attested receipt, fully sound.
- *   - partial      a citizen receipt offline — honest, not a failure.
+ *   - partial      a citizen receipt offline, or a verbal (company_documented)
+ *                  receipt whose company signature verified: honest, not a failure.
  *   - failed       a decisive check ACTIVELY failed (a tamper / wrong key).
  *   - unavailable  a decisive check could NOT be completed (the DID could not be
  *                  resolved). Verification is inconclusive, NOT a forgery.
  */
 export type OverallStatus = "verified" | "partial" | "failed" | "unavailable";
 
-/** Which kind of receipt was verified. */
-export type ReceiptType = "company_attested" | "citizen";
+/**
+ * Which kind of receipt was verified.
+ *
+ *   - company_attested    a hand-signed paper consent the company attested to.
+ *   - company_documented  a consent given BY TELEPHONE and documented by the
+ *                         organisation (a VerbalConsentReceipt). No document, no
+ *                         citizen signature: at most "partial" overall, never
+ *                         "verified", because the organisation's word is all there is.
+ *   - citizen             a passkey-signed consent.
+ */
+export type ReceiptType = "company_attested" | "company_documented" | "citizen";
 
 /**
  * The full, honest verification report.

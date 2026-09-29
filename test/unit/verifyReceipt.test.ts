@@ -1,3 +1,4 @@
+import { generateKeyPairSync, sign as cryptoSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -369,5 +370,102 @@ describe("default did:web resolution targets the company DID host that actually 
     }).resolveCompanyDid("acme");
 
     expect(fetched).toEqual(["https://consent.example.test/c/acme/did.json"]);
+  });
+});
+
+describe("a VERBAL receipt (VerbalConsentReceipt, company_documented) is never read as paper nor as citizen", () => {
+  const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  function base58(bytes: Uint8Array): string {
+    let n = BigInt("0x" + (Buffer.from(bytes).toString("hex") || "0"));
+    let out = "";
+    while (n > 0n) {
+      out = B58[Number(n % 58n)]! + out;
+      n /= 58n;
+    }
+    for (const b of bytes) {
+      if (b !== 0) break;
+      out = "1" + out;
+    }
+    return out;
+  }
+
+  const issuer = "did:web:app.agreely.ca:c:acme";
+  const vm = `${issuer}#kms-1`;
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const rawPub = new Uint8Array(publicKey.export({ format: "der", type: "spki" }).subarray(-32));
+  const didDoc = {
+    "@context": ["https://www.w3.org/ns/did/v1"],
+    id: issuer,
+    verificationMethod: [
+      { id: vm, type: "Multikey", controller: issuer, publicKeyMultibase: "z" + base58(new Uint8Array([0xed, 0x01, ...rawPub])) },
+    ],
+  } as unknown as DidDocument;
+  const resolver = (did: string): DidDocument | null => (did === issuer ? didDoc : null);
+
+  function signedVerbalReceipt(): Record<string, unknown> {
+    const body: Record<string, unknown> = {
+      "@context": ["https://www.w3.org/ns/credentials/v2", "https://agreely.ca/credentials/consent/v1"],
+      type: ["VerifiableCredential", "ConsentReceipt", "VerbalConsentReceipt"],
+      id: "urn:agreely:receipt:verbal-1",
+      issuer,
+      assuranceLevel: "company_documented",
+      validFrom: "2026-09-29T14:05:00Z",
+      validUntil: "2027-09-30T03:59:59Z",
+      credentialSubject: {
+        consent: {
+          action: "grant",
+          channel: "telephone",
+          items: [{ itemId: "0x01", category: "Coordonnees", purpose: "Infolettre" }],
+          documentVersion: "11111111-2222-3333-4444-555555555555",
+          document: { code: "conditions", name: "Conditions", version: "3", effectiveDate: "2026-09-01" },
+          grantedAt: "2026-09-29T14:05:00Z",
+          declinedItems: [{ itemId: "0x02", category: "Coordonnees", purpose: "Sondages" }],
+        },
+      },
+      evidence: {
+        type: "VerbalConsentDocumentedByOrganisation",
+        scriptVersion: "script-2026.09",
+        documentVersion: "11111111-2222-3333-4444-555555555555",
+      },
+    };
+    const sig = cryptoSign(null, Buffer.from(canonicalize(body), "utf8"), privateKey);
+    return {
+      ...body,
+      proof: [
+        {
+          type: "DataIntegrityProof",
+          cryptosuite: "eddsa-jcs-2022",
+          created: "2026-09-29T14:07:12Z",
+          verificationMethod: vm,
+          proofPurpose: "assertionMethod",
+          proofValue: "z" + base58(new Uint8Array(sig)),
+        },
+      ],
+    };
+  }
+
+  it("a genuine verbal receipt: company signature passes, receiptType company_documented, overall PARTIAL (never verified)", async () => {
+    const result = await Agreely.verifyReceipt(signedVerbalReceipt(), { resolver });
+    expect(result.receiptType).toBe("company_documented");
+    expect(result.companySignature).toBe("pass");
+    expect(result.citizenAssertion).toBe("unsupported");
+    expect(result.cellLabelBinding).toBe("pass");
+    expect(result.overall).toBe("partial");
+    expect(result.notes.join(" ")).toMatch(/does NOT prove the call happened/);
+  });
+
+  it("a tampered verbal receipt fails", async () => {
+    const receipt = signedVerbalReceipt();
+    (receipt.evidence as Record<string, unknown>).scriptVersion = "another-script";
+    const result = await Agreely.verifyReceipt(receipt, { resolver });
+    expect(result.receiptType).toBe("company_documented");
+    expect(result.companySignature).toBe("fail");
+    expect(result.overall).toBe("failed");
+  });
+
+  it("an unresolvable issuer is unavailable, not a forgery", async () => {
+    const result = await Agreely.verifyReceipt(signedVerbalReceipt(), { resolver: () => null });
+    expect(result.companySignature).toBe("unavailable");
+    expect(result.overall).toBe("unavailable");
   });
 });

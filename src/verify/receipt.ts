@@ -101,11 +101,13 @@ export class ReceiptVerifier {
     let companySignature: CheckStatus;
     let citizenAssertion: CheckStatus;
 
-    if (type === "company_attested") {
-      companySignature = await this.verifyCompanySignature(r, notes);
+    if (type === "company_attested" || type === "company_documented") {
+      companySignature = await this.verifyCompanySignature(r, notes, type);
       citizenAssertion = "unsupported";
       notes.push(
-        "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+        type === "company_attested"
+          ? "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable."
+          : "A verbal (company-documented) receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
       );
     } else {
       companySignature = "unsupported";
@@ -141,8 +143,12 @@ export class ReceiptVerifier {
     };
   }
 
-  /** COMPANY-ATTESTED: verify the Ed25519 proof over the canonical body. */
-  private async verifyCompanySignature(r: Record<string, unknown>, notes: string[]): Promise<CheckStatus> {
+  /** COMPANY-ATTESTED or COMPANY-DOCUMENTED (verbal): verify the Ed25519 proof over the canonical body. */
+  private async verifyCompanySignature(
+    r: Record<string, unknown>,
+    notes: string[],
+    type: "company_attested" | "company_documented",
+  ): Promise<CheckStatus> {
     const issuer = asString(r["issuer"]);
     const proofs = asArray(r["proof"]);
     const proof = asObject(proofs[0]);
@@ -178,11 +184,20 @@ export class ReceiptVerifier {
 
     const ok = verifyEd25519(key, canonical, signature);
     if (ok) {
-      const pdfHash = asString(asObject(r["evidence"])["pdfHash"]);
       notes.push(`Company signature verified against issuer DID ${issuer} (key ${vm}).`);
-      notes.push(
-        `This proves the company ATTESTED to a hand-signed PDF (hash ${pdfHash}); it does NOT prove a human signed.`,
-      );
+      if (type === "company_documented") {
+        const scriptVersion = asString(asObject(r["evidence"])["scriptVersion"]);
+        notes.push(
+          `This proves the ORGANISATION documented a consent given by telephone under script version ` +
+            `${scriptVersion}. It does NOT prove the call happened, and there is no signed document: this is the ` +
+            "weakest of the three tiers, so overall is at most PARTIAL.",
+        );
+      } else {
+        const pdfHash = asString(asObject(r["evidence"])["pdfHash"]);
+        notes.push(
+          `This proves the company ATTESTED to a hand-signed PDF (hash ${pdfHash}); it does NOT prove a human signed.`,
+        );
+      }
       return "pass";
     }
     notes.push(
@@ -418,6 +433,10 @@ export class ReceiptVerifier {
 
 function receiptType(r: Record<string, unknown>): ReceiptType {
   const types = asArray(r["type"]).map((t) => (typeof t === "string" ? t : ""));
+  // Verbal first: a verbal receipt must never be read as a paper one, nor fall into
+  // the citizen path (no passkey proof there reads as a false "failed").
+  if (types.includes("VerbalConsentReceipt")) return "company_documented";
+  if (asString(r["assuranceLevel"]) === "company_documented") return "company_documented";
   if (types.includes("CompanyAttestedConsentReceipt")) return "company_attested";
   if (asString(r["assuranceLevel"]) === "company_attested") return "company_attested";
   return "citizen";
@@ -467,7 +486,7 @@ function decodeMultibase(proofValue: string): Uint8Array {
  *   over the OFFER, which travels in the verification bundle, not in the receipt.
  */
 function assessCellLabelBinding(type: ReceiptType, companySignature: CheckStatus, notes: string[]): CheckStatus {
-  if (type !== "company_attested") {
+  if (type === "citizen") {
     notes.push(
       "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the " +
         "category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. " +
@@ -512,6 +531,12 @@ function decideOverall(
     // The decisive check could not COMPLETE (DID unresolved): inconclusive, not a forgery.
     if (company === "unavailable") return "unavailable";
     return "verified";
+  }
+  if (type === "company_documented") {
+    // The organisation's word, authenticated: never more than partial.
+    if (company === "fail" || disclosure === "fail" || anchor === "fail") return "failed";
+    if (company === "unavailable") return "unavailable";
+    return "partial";
   }
   // Citizen: never "verified" offline.
   if (citizen === "fail" || disclosure === "fail" || anchor === "fail") return "failed";
