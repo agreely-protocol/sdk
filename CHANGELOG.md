@@ -3,10 +3,59 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 0.4.0 - 2026-09-29
+
+Matches the production /v1 API at Agreely commit aa255537. **Breaking**: 0.x
+bumps the minor for a breaking change, and `^0.3.0` will not pick this up on its own.
+
+### Breaking
+
+- **`sensitive_requires_consent` is removed from `Status`.** The API stopped
+  emitting it on 2026-09-28: a cell declared sensitive now answers by its declared
+  basis, so on a non-consent ground it allows `necessity` with its `basis`, and on
+  `consent` it denies `none`. Code that switched on it no longer compiles, which is
+  the point: that branch can never fire again.
+- **`approved` changed meaning, and `asks_declined` is new** on
+  `ConsentRequestStatus` (and as a `list({ status })` filter). `approved` now means
+  the person accepted at least one consent ask; a request whose every ask was
+  declined reads `asks_declined` (no consent was obtained) and is never returned
+  under `approved`. `waitForSettlement` treats it as settled; on 0.3.0 it polled
+  such a request until the timeout.
+- **`ReceiptType` gains `company_documented`** (see Fixed). An exhaustive switch
+  on it must handle the new value.
+- **`Status` gains `requires_depersonalization` and `basis_not_in_regime`**, and
+  **`Basis` gains the seven A-2.1 (public body) grounds** (`attributions`,
+  `programme`, `entente_collecte`, `compatible_use`, `manifest_benefit`,
+  `law_application`, `public_character`). Both were already on the wire.
+- **An `idempotencyKey` override on `manualConsents.record` is validated**: 1 to
+  255 printable ASCII characters, else `AgreelyConfigError` before any call (the
+  server refuses anything else with a 422).
 
 ### Added
 
+- **`agreely.verbalConsents`** (issue #100), a consent given by telephone and
+  documented by the organisation, the weakest of three tiers: `record` (scope
+  `attest_verbal`), `confirmWithPaper` (the signed paper, scope `attest`) and
+  `get` (the history, either scope). Types: `RecordVerbalConsentInput`,
+  `VerbalAnswer`, `VerbalRespondent`, `RepresentativeCapacity` (with
+  `titulaire_autorite_parentale` and `tuteur_mineur` for a minor under 14),
+  `VerbalConsentResult`, `ConfirmVerbalPaperInput`, `VerbalPaperResult`,
+  `VerbalConsentHistory` (`answer` may be `"informed"`), `VerbalConsentState`.
+  Answers must be exactly `"yes"` or `"no"`, a consentId must be a uuid, and
+  `obtainedAt` / `signedAt` must carry an offset: all refused client-side.
+- **`tier`** (`full` | `manual` | `verbal`) on `CheckResult` and `BatchDecision`,
+  and **`company_documented`** on `Assurance`, which was a closed union that missed
+  it. A new `Tier` type. Treat an unknown assurance or tier as not acceptable.
+- **`acknowledged[]` and `asksDeclined`** on `ManualConsentResult`, and an
+  `AcknowledgedLine` type. `items` may now be empty (every ask answered "no"); the
+  server adds the information lines and ignores one sent in `items`.
+- **`gate`** (`denied` | `superseded` | `unchanged`) on `ManualConsentRevocation`,
+  with a `RevocationGate` type. `superseded` means a later consent still backs the
+  purpose.
+- **`AgreelyVerbalDailyCapError`** (429 `verbal_daily_cap`, a subclass of
+  `AgreelyRateLimitError`), never auto-retried. The `conflict` and
+  `verbal_daily_cap` codes on `AgreelyErrorCode`.
+- The `attest_verbal` scope on `Scope`.
 - **The `retention`, `inventory` and `registry` scopes** on `Scope`. A customer
   writing TypeScript could not name a valid scope for any of them. (`registry` has
   no resource yet.)
@@ -22,6 +71,27 @@ to [Semantic Versioning](https://semver.org/).
   idempotency key). A 413 now maps to `AgreelyValidationError` instead of an outage.
 - `legalBasis` and `sensitive` on `CatalogEntry`, and `company` on `Identity`: both
   were already on the wire.
+
+### Fixed
+
+- **A verbal receipt was verified as a FAILED citizen receipt.** The verifier read
+  anything without the `CompanyAttestedConsentReceipt` type as a citizen receipt,
+  found no passkey proof on a `VerbalConsentReceipt` and reported `overall:
+  "failed"`: a false accusation of tampering on a genuine receipt. It now reports
+  `receiptType: "company_documented"`, verifies the company signature, and returns
+  at most `overall: "partial"`, never `"verified"`: the organisation's word is all
+  a verbal receipt carries.
+- **Stale documentation corrected**: the Idempotency-Key on manual and verbal
+  consents IS bound to the endpoint and the request body (0.3.0 said it was not);
+  `validUntil` as a plain date means the end of that calendar day in the tenant's
+  timezone, relative phrases are refused, and a 10-year ceiling applies; the
+  refusals of `manualConsents.record` (notice-only document, empty or non-PDF
+  upload, hash mismatch, a verbal consent awaiting its paper) and of
+  `createClaimLink` (404 unknown customer, 409 ended relationship) are documented;
+  the P-39.1 citations on `Basis` now match openapi.yaml.
+- **409 is split by code** in the docs of `AgreelyConflictError`: `retry` (retry
+  with the same key) versus `conflict` (the record's state refuses it; do not retry
+  as is).
 
 ## 0.3.0 - 2026-08-22
 
