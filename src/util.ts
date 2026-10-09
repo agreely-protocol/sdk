@@ -156,3 +156,53 @@ export function recordIdempotencyKey(override: unknown, label: string): string {
   }
   return override;
 }
+
+/** The longest customerRef the server accepts (characters). */
+export const CUSTOMER_REF_MAX = 200;
+
+/**
+ * A customerRef for a /v1/customers/{customerRef} path: trimmed, 1 to 200 characters.
+ * Refused client-side otherwise (the server would answer a 404 or a 422 that names
+ * nothing the caller can fix by retrying).
+ */
+export function requireCustomerRef(value: unknown, label: string): string {
+  const ref = typeof value === "string" ? value.trim() : "";
+  if (ref === "" || [...ref].length > CUSTOMER_REF_MAX) {
+    throw new AgreelyConfigError(`${label} requires a customerRef of 1 to ${CUSTOMER_REF_MAX} characters.`);
+  }
+  return ref;
+}
+
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/** A uuid path segment, lowercased. Anything else is a 404 server-side, so it is refused here. */
+export function assertUuid(value: unknown, label: string): string {
+  if (typeof value !== "string" || !UUID.test(value.trim())) {
+    throw new AgreelyConfigError(`${label} must be a uuid.`);
+  }
+  return value.trim().toLowerCase();
+}
+
+/**
+ * The time budget of a call that makes the server render a PDF: the per-call override
+ * when given (a positive number of ms), else the larger of the client's budget and
+ * `floorMs`. The client default (800 ms) is sized for the consent check, and a cut-off
+ * render on a minting route loses an answer the server returns only once.
+ */
+export function renderBudget(override: unknown, clientTimeoutMs: number, floorMs: number, label: string): number {
+  if (override === undefined) return Math.max(clientTimeoutMs, floorMs);
+  if (typeof override !== "number" || !Number.isFinite(override) || override <= 0) {
+    throw new AgreelyConfigError(`${label}: timeout must be a positive number of milliseconds.`);
+  }
+  return override;
+}
+
+const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A calendar date, YYYY-MM-DD, refused client-side otherwise. */
+export function requireDay(value: unknown, label: string): string {
+  if (typeof value !== "string" || !CALENDAR_DAY.test(value)) {
+    throw new AgreelyConfigError(`${label} must be a calendar date, YYYY-MM-DD.`);
+  }
+  return value;
+}

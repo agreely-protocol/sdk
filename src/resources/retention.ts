@@ -2,11 +2,23 @@ import { decideRulesOnOutage, retentionOutageWindow } from "../degrade.js";
 import { AgreelyConfigError, AgreelyUnavailableError, AgreelyValidationError } from "../errors.js";
 import type { Transport } from "../transport.js";
 import type {
+  CustomerRetention,
   DeclarationOptions,
+  DeclareDispositionInput,
+  DeclaredDisposition,
   DeclarePurgeInput,
   DeclareSweepInput,
+  HoldOptions,
+  HoldsSync,
+  ListHoldsInput,
   ListRetentionRulesInput,
+  PlacedHold,
+  PlaceHoldInput,
   PurgeDeclaration,
+  ReleasedHold,
+  ReleaseHoldInput,
+  RetentionHoldFeedItem,
+  RetentionHoldPage,
   RetentionRule,
   RetentionRuleDetail,
   RetentionRuleList,
@@ -14,11 +26,16 @@ import type {
   RetentionSweep,
   RulesForPurge,
   RulesForPurgeOptions,
+  SyncHoldsInput,
 } from "../types.js";
 import {
   DEFAULT_MAX_DEGRADE_WINDOW_MS,
   assertHostToken,
   assertIdempotencyKey,
+  assertUuid,
+  recordIdempotencyKey,
+  requireCustomerRef,
+  requireDay,
   toWireInstant,
 } from "../util.js";
 
@@ -31,17 +48,30 @@ export const PURGE_REFERENCES_MAX = 1000;
 /** A sweep's `sweptAt` must fall within this window before now. */
 export const SWEEP_MAX_AGE_MS = 24 * 3_600_000;
 
-const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** At most this many characters of free text (a provision, a release or disposition reason), mirrored from the server. */
+export const RETENTION_TEXT_MAX = 2000;
+
+/** Default bound on the pages one holds sync reads (500 holds a page). */
+const DEFAULT_MAX_HOLD_PAGES = 1000;
 
 /**
- * The host-retention resource (scope: 'retention'). Agreely DECIDES the rules and
- * RECORDS what the host declares; the host reads the decisions, runs its purges,
- * and DECLARES them. Agreely observes nothing in the host's systems and verifies
- * none of it: every write response says `status: "declared"`, never "verified".
+ * The host-retention resource. Agreely DECIDES the rules and RECORDS what the host
+ * declares; the host reads the decisions, runs its purges, and DECLARES them. Agreely
+ * observes nothing in the host's systems and verifies none of it: every write response
+ * says `recorded` / `declared`, never "verified".
  *
- * Neither declaration is ever auto-retried, and both REQUIRE an Idempotency-Key
+ * Scopes differ per method:
+ *   'retention'  listRules, getRule, rulesForPurge, declarePurge, declareSweep
+ *   'registry'   getCustomerRetention, declareDisposition, placeHold, releaseHold
+ *   'holds'      listHolds, holdPages, syncHolds (the feed a purge job reads; never
+ *                granted by default, so a purge job's key carries 'retention' AND 'holds')
+ *
+ * Neither purge declaration is ever auto-retried, and both REQUIRE an Idempotency-Key
  * passed as the third argument, never in the body (see {@link DeclarationOptions}
  * for the key-rotation trap).
+ *
+ * On the per-customer and hold routes a refusal carries its stable string in `code`
+ * (`relationship_active`, `already_released`, `too_many_holds`, ...), not in `reason`.
  */
 export class Retention {
   constructor(
@@ -245,6 +275,224 @@ export class Retention {
   }
 
   /**
+   * The art. 23 / art. 73 posture of ONE customer (scope 'registry'): the relationship's
+   * lifecycle, the clock DERIVED from the rules the organisation declared (with its
+   * recipe, so you recompute rather than trust), the standing disposition, and the holds.
+   *
+   * `clock.dueAt` is the earliest horizon of a rule NO hold suspends; it is null with
+   * `clock.reason` saying which "nothing" it is: `no_declared_rule` (never a defaulted
+   * period), `relationship_active` (no anchor yet) or `hold_active` (every rule held).
+   * A rule with `held: true` keeps its arithmetic `dueAt`, which is not a date to act on.
+   * Metadata only: no justification or provision text is ever returned. An unknown or
+   * foreign ref is AgreelyNotFoundError. A read; safe to auto-retry on a transient outage.
+   */
+  getCustomerRetention(customerRef: string): Promise<CustomerRetention> {
+    const ref = requireCustomerRef(customerRef, "retention.getCustomerRetention");
+    return this.transport.request<CustomerRetention>({
+      method: "GET",
+      path: `/v1/customers/${encodeURIComponent(ref)}/retention`,
+      idempotentRetry: true,
+    });
+  }
+
+  /**
+   * DECLARE what your system did with the personal information it holds about one
+   * customer once the relationship ENDED (scope 'registry'): `destroyed`, `anonymized` or
+   * `legal_hold`. Append-only: a correction is a new declaration that supersedes the
+   * standing one. Re-sending the declaration that stands replays it (`appended: false`,
+   * HTTP 200) instead of writing a twin.
+   *
+   * The relationship must have ended first (`relationships.end`, its own scope): a 409
+   * `relationship_active` otherwise, never an implicit end. A declaration while a hold
+   * covers the customer is recorded as received with a `hold_active` warning, never
+   * refused. `agreelyIdentity` says what it did to Agreely's own copy of the identity.
+   *
+   * Refused client-side: a disposition outside the three, a `legal_hold` without a
+   * reason, a `retentionUntil` on anything but a `legal_hold` or not YYYY-MM-DD, a reason
+   * or scheduleRef that is not a string. Never auto-retried.
+   */
+  declareDisposition(customerRef: string, input: DeclareDispositionInput): Promise<DeclaredDisposition> {
+    const label = "retention.declareDisposition";
+    const ref = requireCustomerRef(customerRef, label);
+    const disposition: unknown = input.disposition;
+    if (disposition !== "destroyed" && disposition !== "anonymized" && disposition !== "legal_hold") {
+      throw new AgreelyConfigError(`${label}: disposition must be "destroyed", "anonymized" or "legal_hold".`);
+    }
+    const reason = optionalText(input.reason, `${label}: reason`);
+    if (disposition === "legal_hold" && (reason === undefined || reason.trim() === "")) {
+      throw new AgreelyConfigError(
+        `${label}: a "legal_hold" requires a reason naming the law that imposes the retention delay.`,
+      );
+    }
+    const retentionUntil: unknown = input.retentionUntil;
+    if (retentionUntil !== undefined && disposition !== "legal_hold") {
+      throw new AgreelyConfigError(`${label}: retentionUntil applies only to a "legal_hold".`);
+    }
+    const scheduleRef = optionalText(input.scheduleRef, `${label}: scheduleRef`);
+    return this.transport.request<DeclaredDisposition>({
+      method: "POST",
+      path: `/v1/customers/${encodeURIComponent(ref)}/retention/dispositions`,
+      body: {
+        disposition,
+        ...(reason !== undefined ? { reason } : {}),
+        ...(retentionUntil !== undefined ? { retentionUntil: requireDay(retentionUntil, `${label}: retentionUntil`) } : {}),
+        ...(scheduleRef !== undefined ? { scheduleRef } : {}),
+      },
+      idempotentRetry: false,
+    });
+  }
+
+  /**
+   * PLACE a retention hold on one customer (scope 'registry'): the information it covers
+   * must be kept, whatever the rules say, until the hold is released. `rights_request`
+   * (the information is the subject of an access or rectification request) or
+   * `other_law` (with the provision that requires keeping it). A hold placed here is
+   * never linked to a rights request: that link is made only inside Agreely.
+   *
+   * Answers 201, or 200 with `replayed: true` when the same Idempotency-Key and body
+   * replay the first answer. Refusals (stable string in `code`): 422 `unknown_field`,
+   * `too_many_holds`, `invalid_request` with `field`; 429 AgreelyDailyCapError
+   * `hold_budget_exhausted` (the API's daily budget of placed holds).
+   *
+   * Refused client-side: a ground outside the two, a missing provision on `other_law`
+   * or one on `rights_request`, a scope that is neither "all" nor at least one rule or
+   * cell key, a startedOn / reviewOn that is not YYYY-MM-DD. The body carries only the
+   * documented members. Never auto-retried; the Idempotency-Key is auto-generated unless
+   * you pass a durable one.
+   */
+  placeHold(customerRef: string, input: PlaceHoldInput, options: HoldOptions = {}): Promise<PlacedHold> {
+    const label = "retention.placeHold";
+    const ref = requireCustomerRef(customerRef, label);
+    const ground: unknown = input.ground;
+    if (ground !== "rights_request" && ground !== "other_law") {
+      throw new AgreelyConfigError(`${label}: ground must be "rights_request" or "other_law".`);
+    }
+    const provision = optionalText(input.provision, `${label}: provision`);
+    if (ground === "other_law" && (provision === undefined || provision.trim() === "")) {
+      throw new AgreelyConfigError(
+        `${label}: an "other_law" hold requires the provision of the law that requires the information to be kept.`,
+      );
+    }
+    if (ground === "rights_request" && provision !== undefined) {
+      throw new AgreelyConfigError(`${label}: provision applies only to an "other_law" hold.`);
+    }
+    const idempotencyKey = recordIdempotencyKey(options.idempotencyKey, label);
+    return this.transport.request<PlacedHold>({
+      method: "POST",
+      path: `/v1/customers/${encodeURIComponent(ref)}/retention/holds`,
+      body: {
+        ground,
+        ...(provision !== undefined ? { provision } : {}),
+        ...(input.scope !== undefined ? { scope: holdScope(input.scope, label) } : {}),
+        ...(input.startedOn !== undefined ? { startedOn: requireDay(input.startedOn, `${label}: startedOn`) } : {}),
+        ...(input.reviewOn !== undefined ? { reviewOn: requireDay(input.reviewOn, `${label}: reviewOn`) } : {}),
+      },
+      headers: { "Idempotency-Key": idempotencyKey },
+      idempotentRetry: false,
+    });
+  }
+
+  /**
+   * RELEASE one active hold of the organisation, with a reason (scope 'registry'). Any
+   * active hold may be released here, including one the organisation placed in Agreely:
+   * the answer then says `placedBy: "organization"`, the owner is notified, and the
+   * company's keys may release a capped number of those per 24 hours (429
+   * AgreelyDailyCapError `hold_release_cap_reached`).
+   *
+   * When this was the last hold on ALL the customer's information and a destroyed or
+   * anonymized declaration stands, the release removes the name, email, basis note and
+   * notice language from Agreely's registry record, irreversibly: `agreelyIdentity`
+   * answers `erased`.
+   *
+   * Refusals (stable string in `code`): 404 for an unknown, foreign or other customer's
+   * hold; 409 `already_released`. A blank reason or a hold id that is not a uuid is
+   * refused client-side. Never auto-retried.
+   */
+  releaseHold(
+    customerRef: string,
+    holdId: string,
+    input: ReleaseHoldInput,
+    options: HoldOptions = {},
+  ): Promise<ReleasedHold> {
+    const label = "retention.releaseHold";
+    const ref = requireCustomerRef(customerRef, label);
+    const id = assertUuid(holdId, `${label}: holdId`);
+    const reason = optionalText(input.reason, `${label}: reason`);
+    if (reason === undefined || reason.trim() === "") {
+      throw new AgreelyConfigError(`${label} requires a reason: releasing a hold is a motivated act.`);
+    }
+    const idempotencyKey = recordIdempotencyKey(options.idempotencyKey, label);
+    return this.transport.request<ReleasedHold>({
+      method: "POST",
+      path: `/v1/customers/${encodeURIComponent(ref)}/retention/holds/${id}/release`,
+      body: { reason },
+      headers: { "Idempotency-Key": idempotencyKey },
+      idempotentRetry: false,
+    });
+  }
+
+  /**
+   * ONE page of the host feed of retention holds (scope 'holds'): references plus scope,
+   * never the ground. Without `changedSince` it is the SNAPSHOT of every active hold;
+   * with the previous sync's `cursor` it is the DELTA of every hold placed or released
+   * since. Pass `nextPageToken` back as `pageToken` until a page answers `cursor`.
+   * Most jobs want {@link Retention.syncHolds}. A read; safe to auto-retry.
+   */
+  listHolds(input: ListHoldsInput = {}): Promise<RetentionHoldPage> {
+    return this.transport.request<RetentionHoldPage>({
+      method: "GET",
+      path: "/v1/retention/holds",
+      query: { changedSince: input.changedSince, pageToken: input.pageToken },
+      idempotentRetry: true,
+    });
+  }
+
+  /**
+   * Every page of one sync, as an async iterable, following `nextPageToken` for you.
+   * The LAST page carries `cursor`. Bounded by `maxPages` (default 1000).
+   *
+   *   for await (const page of agreely.retention.holdPages({ changedSince })) { ... }
+   */
+  async *holdPages(input: SyncHoldsInput = {}): AsyncGenerator<RetentionHoldPage, void, unknown> {
+    const maxPages = input.maxPages !== undefined && input.maxPages > 0 ? input.maxPages : DEFAULT_MAX_HOLD_PAGES;
+    let pageToken: string | undefined;
+    for (let page = 0; page < maxPages; page++) {
+      const result = await this.listHolds({
+        ...(input.changedSince !== undefined ? { changedSince: input.changedSince } : {}),
+        ...(pageToken !== undefined ? { pageToken } : {}),
+      });
+      yield result;
+      if (result.nextPageToken === null || result.nextPageToken === undefined) return;
+      pageToken = result.nextPageToken;
+    }
+  }
+
+  /**
+   * One complete sync of the holds feed: every page read, collected, with the `cursor`
+   * to persist for the next sync. `mode: "snapshot"` (no `changedSince`) REPLACES your
+   * whole active set; `mode: "delta"` lists every hold placed or released since, each
+   * with its status. Delivery is at least once: upsert by `id`.
+   *
+   * FAIL CLOSED: purge only after this resolves. Any error (401, 403, 402, a 5xx, a
+   * timeout) THROWS, and a purge job treats it as "do not purge this run". Reading
+   * `maxPages` pages without reaching the last one throws AgreelyConfigError rather
+   * than returning a partial feed.
+   */
+  async syncHolds(input: SyncHoldsInput = {}): Promise<HoldsSync> {
+    const holds: RetentionHoldFeedItem[] = [];
+    for await (const page of this.holdPages(input)) {
+      holds.push(...page.holds);
+      if (typeof page.cursor === "string" && page.cursor !== "") {
+        return { mode: input.changedSince !== undefined ? "delta" : "snapshot", holds, cursor: page.cursor };
+      }
+    }
+    throw new AgreelyConfigError(
+      "retention.syncHolds stopped before the last page of the holds feed (no cursor): raise maxPages. " +
+        "Do not purge on a partial feed.",
+    );
+  }
+
+  /**
    * Bring a snapshot up to date. With a snapshot, only the rules changed since its
    * cursor are read, merged over the stored ones, and every rule whose key left
    * `ruleKeys` is dropped. A refused cursor, or a current key the merge cannot
@@ -286,9 +534,33 @@ function requireRuleKey(ruleKey: unknown, label: string): string {
   return key;
 }
 
-function requireDay(value: unknown, label: string): string {
-  if (typeof value !== "string" || !CALENDAR_DAY.test(value)) {
-    throw new AgreelyConfigError(`${label} must be a calendar date, YYYY-MM-DD.`);
+
+/** An optional free-text member: a string of at most RETENTION_TEXT_MAX characters when given. */
+function optionalText(value: unknown, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || [...value].length > RETENTION_TEXT_MAX) {
+    throw new AgreelyConfigError(`${label} must be a string of at most ${RETENTION_TEXT_MAX} characters.`);
   }
   return value;
+}
+
+/** A hold scope for the wire: "all", or at least one rule key or cell id. */
+function holdScope(scope: unknown, label: string): "all" | { rules?: string[]; cells?: string[] } {
+  if (scope === "all") return "all";
+  if (scope === null || typeof scope !== "object" || Array.isArray(scope)) {
+    throw new AgreelyConfigError(`${label}: scope must be "all" or { rules?: string[], cells?: string[] }.`);
+  }
+  const { rules, cells } = scope as { rules?: unknown; cells?: unknown };
+  const lists: { rules?: string[]; cells?: string[] } = {};
+  for (const [key, value] of [["rules", rules], ["cells", cells]] as const) {
+    if (value === undefined) continue;
+    if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) {
+      throw new AgreelyConfigError(`${label}: scope.${key} must be a list of keys.`);
+    }
+    lists[key] = value as string[];
+  }
+  if ((lists.rules?.length ?? 0) === 0 && (lists.cells?.length ?? 0) === 0) {
+    throw new AgreelyConfigError(`${label}: scope must list at least one rule or cell, or be "all".`);
+  }
+  return lists;
 }

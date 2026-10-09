@@ -1,19 +1,28 @@
-// The wire types of the Agreely /v1 API, mirrored 1:1 from the committed
-// openapi.yaml. These shapes are load-bearing (anti-drift, like the Phase-2
-// crypto vectors): the contract tests assert real responses against them.
+// The wire types of the Agreely /v1 API, mirrored 1:1 from what the API serves.
+// These shapes are load-bearing (anti-drift, like the shared crypto vectors): the
+// contract tests assert real responses against them.
 
 /** A consent decision. ALLOW is the only true. */
 export type Decision = "allow" | "deny";
 
 /**
- * A /v1 API-key scope: 'check' (the synchronous check), 'issue' (consent-request
- * issuance + reads), 'attest' (manual / offline consent recording, the paper of a
- * verbal consent, withdrawal and erasure), 'attest_verbal' (recording a consent given
- * by telephone; never granted by default, and it withdraws VERBAL consents only),
- * 'relationship' (ending a customer relationship, art. 23), 'registry' (the
- * customer registry; no SDK resource wraps it yet), 'retention' (read the decided
- * retention rules and catalogue cells, declare purges and passes) and 'inventory'
- * (declare a host system's record sets and read their retention statements).
+ * A /v1 API-key scope:
+ *   'check'         the synchronous check, the catalog, the consent documents
+ *   'issue'         consent-request issuance and reads, the catalog, the consent documents
+ *   'attest'        manual / offline consent recording, consent sheets, claim links, the
+ *                   paper of a verbal consent, company-on-behalf revoke and erasure
+ *   'attest_verbal' recording a consent given by telephone; never granted by default,
+ *                   and it revokes VERBAL consents only
+ *   'relationship'  ending and reverting a customer relationship (art. 23)
+ *   'registry'      the customer registry identity, the per-customer retention clock,
+ *                   dispositions, and placing and releasing retention holds
+ *   'retention'     read the decided retention rules and catalogue cells, declare
+ *                   purges and passes
+ *   'inventory'     declare a host system's record sets and read their statements
+ *   'withdraw'      record a person's withdrawal of ANY consent ask on her behalf, a
+ *                   passkey-signed one included; never granted by default, capped daily
+ *   'holds'         read the host feed of retention holds (references and scope, never
+ *                   the ground); never granted by default
  *
  * FORWARD COMPATIBILITY: the server may add scopes, and `identity()` returns them
  * as it receives them, so a value outside this union can reach you at runtime.
@@ -26,7 +35,9 @@ export type Scope =
   | "relationship"
   | "registry"
   | "retention"
-  | "inventory";
+  | "inventory"
+  | "withdraw"
+  | "holds";
 
 /**
  * The least-disclosure identity of the presented key, from GET /v1/whoami: the
@@ -197,6 +208,18 @@ export interface CheckResult {
    */
   basis?: Basis;
   /**
+   * The END of the consent behind the decision (an RFC 3339 UTC instant): the instant
+   * the `expired` status is computed against. Present on every answer backed by a
+   * consent record; ABSENT (not null) when there is no record ("none", "necessity", a
+   * named refusal), on an acknowledged information line, and on a degraded result.
+   */
+  validUntil?: string;
+  /**
+   * When the withdrawal took effect (an RFC 3339 UTC instant). Present ONLY with status
+   * "revoked" (an acknowledged information line withdrawn included); absent otherwise.
+   */
+  revokedAt?: string;
+  /**
    * True when this result did NOT come from the server but from the local
    * degrade policy (fail-open / break-glass) during an outage. Never set on a
    * real server decision.
@@ -235,6 +258,10 @@ export interface BatchDecision {
    * Present ONLY when status is "necessity".
    */
   basis?: Basis;
+  /** The end of the consent behind the decision; absent when there is no record. See {@link CheckResult.validUntil}. */
+  validUntil?: string;
+  /** When the withdrawal took effect; present ONLY with status "revoked". */
+  revokedAt?: string;
   /** ISO-8601 timestamp the decision was made at. */
   checkedAt: string;
 }
@@ -453,6 +480,20 @@ export interface RecordManualConsentInput {
    */
   items: IssueItem[];
   evidence: ManualConsentEvidence;
+  /**
+   * The organisation attests the person gave her consent EXPRESSLY. Required true when a
+   * ticked purpose is declared sensitive and rests on the `consent` basis (refused
+   * otherwise with reason `sensitive_express_required`). A strict JSON boolean: absent is
+   * false, never true by default.
+   */
+  sensitiveExpressAttested?: boolean;
+  /**
+   * The organisation attests the signed paper carried THIS version's purposes and
+   * information. Required true when the paper was signed before the chosen version was
+   * published (refused otherwise with reason `version_attestation_required`). A strict
+   * JSON boolean.
+   */
+  versionAttested?: boolean;
 }
 
 /**
@@ -523,16 +564,18 @@ export interface ManualConsentRevocation {
   gate: RevocationGate;
 }
 
-/** The 200 body from erasing a manual consent. */
+/** The 200 body from erasing a manual or verbal consent. */
 export interface ManualConsentErasure {
   consentRef: string;
   erased: boolean;
   /** True when the consent was already erased (the call is idempotent). */
   alreadyErased: boolean;
+  /** What the gate does now for the purpose, as on a revoke ("unchanged" on a repeat). */
+  gate: RevocationGate;
 }
 
 // ---------------------------------------------------------------------------
-// Verbal consent (issue #100): a consent given BY TELEPHONE and documented by the
+// Verbal consent: a consent given BY TELEPHONE and documented by the
 // organisation. The WEAKEST of three tiers (full > manual > verbal): there is no
 // document at all, so the proof is the organisation's word. Every result says
 // tier "verbal" / assurance "company_documented", never "signed" or "validated".
@@ -587,8 +630,9 @@ export interface RecordVerbalConsentInput {
    */
   answers: VerbalAnswer[];
   /**
-   * The instant of the call (the consent date): a Date, or RFC 3339 WITH an offset. Not
-   * in the future (5 minutes of skew allowed) and at most 7 days old.
+   * The instant of the call (the consent date): a Date, or RFC 3339 WITH an offset. At
+   * most 7 days old and NOT in the future by any amount: a host clock running ahead of
+   * Agreely's is refused (reason `obtained_at_in_future`), never clamped.
    */
   obtainedAt: Instant;
   /** The staff member who took the call, as the organisation names them (1 to 128 bytes). Stored encrypted. */
@@ -641,7 +685,8 @@ export interface VerbalConsentResult {
 export interface ConfirmVerbalPaperInput {
   /**
    * The instant the paper was signed (the evidence date): a Date, or RFC 3339 WITH an
-   * offset. No earlier than the call and not in the future.
+   * offset. No earlier than the call and not in the future by any amount (reason
+   * `signed_at_in_future`).
    */
   signedAt: Instant;
   /**
@@ -1115,7 +1160,7 @@ export type RulesForPurgeOptions =
  */
 export interface InventoryFieldInput {
   key: HostToken;
-  /** 1 to 120 characters, not starting with = + - or @. */
+  /** 1 to 200 characters, not starting with = + - or @. */
   label: string;
   labelEn?: string | null;
 }
@@ -1123,15 +1168,21 @@ export interface InventoryFieldInput {
 /** One record set a host system holds. */
 export interface InventoryCategoryInput {
   key: HostToken;
+  /** 1 to 120 characters. */
   label: string;
   labelEn?: string | null;
-  /** 1 to 60 fields. */
+  /** 1 to 60 fields, at most 60,000 bytes as JSON. */
   fields: InventoryFieldInput[];
 }
 
 /**
  * A host system's COMPLETE inventory. Every set this system declared before and
- * that is not in `categories` is WITHDRAWN. 1 to 50 sets.
+ * that is not in `categories` is WITHDRAWN. 1 to 200 sets.
+ *
+ * NEW SET KEYS ARE RATIONED: at most 1,000 keys the company never declared before may
+ * be introduced in any rolling 30 days (422 `new_set_limit`). A key declared before is
+ * always accepted, so re-sending the same list always passes; generating keys per call
+ * is what the limit refuses.
  */
 export interface ReplaceInventoryInput {
   hostSystem: HostToken;
@@ -1199,6 +1250,468 @@ export interface ResolvedRetentionStatement extends RetentionStatement {
   /** False once a later statement superseded it; it still resolves, that is the point of freezing. */
   current: boolean;
   supersededAt: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Consent documents (scopes 'check' / 'issue'; the PDF also 'attest' /
+// 'attest_verbal'). Read-only: authoring and publishing stay in Agreely.
+// ---------------------------------------------------------------------------
+
+/** A document language. French is the default everywhere a locale is optional. */
+export type DocumentLocale = "fr" | "en";
+
+/** One bilingual text exactly as the organisation published it. Never falls back across languages. */
+export interface LocalizedText {
+  fr: string | null;
+  en: string | null;
+}
+
+/** One catalog cell a document version groups. `sensitive` is the version's own frozen snapshot. */
+export interface ConsentDocumentItem {
+  /** The catalog entry id (what `IssueItem` and a hold's `scope.cells` take). */
+  id: string;
+  category: string;
+  categoryEn: string | null;
+  purpose: string;
+  purposeEn: string | null;
+  sensitive: boolean;
+}
+
+/** One PUBLISHED consent document, as GET /v1/consent-documents lists it. */
+export interface ConsentDocumentSummary {
+  /** The STABLE per-company code shared by every version: pin this, not the version id. */
+  code: string;
+  /**
+   * The id of the version published TODAY: exactly what `manualConsents.record`,
+   * `verbalConsents.record` and `manualConsents.createConsentSheet` take. It goes stale
+   * the next time the organisation publishes, so resolve it through `code`.
+   */
+  documentVersionId: string;
+  version: string;
+  name: string;
+  nameEn: string | null;
+  /** YYYY-MM-DD. */
+  effectiveDate: string;
+  /** RFC 3339 UTC, or null. */
+  publishedAt: string | null;
+  items: ConsentDocumentItem[];
+}
+
+/** One published document with its full published disclosure (GET /v1/consent-documents/{code}). */
+export interface ConsentDocumentDetail extends ConsentDocumentSummary {
+  disclosure: {
+    purpose: LocalizedText;
+    means: LocalizedText;
+    categories: LocalizedText;
+    retention: LocalizedText;
+    withdrawal: LocalizedText;
+    recipients: LocalizedText;
+    crossBorder: LocalizedText;
+    rights: LocalizedText;
+  };
+  responsable: { name: string; contact: string };
+  /** `declared` is the organisation's own declaration; Agreely records it, it does not assess it. */
+  automatedDecision: { declared: boolean; note: LocalizedText };
+  profiling: { declared: boolean; note: LocalizedText };
+  integrity: { ipfsCid: string | null; anchorStatus: string };
+}
+
+/** Options for `consentDocuments.getInformationPdf`. */
+export interface InformationDocumentOptions {
+  /** "fr" (default) or "en". English is refused (422 `english_text_missing`) when a section has no English text. */
+  locale?: DocumentLocale;
+  /**
+   * This call's time budget in ms. Defaults to the client's `timeout` or 15000, whichever
+   * is larger: the server renders the PDF, which an 800 ms budget sized for the consent
+   * check would cut off.
+   */
+  timeout?: number;
+}
+
+/** The information document of one version, as bytes to print and hand to the person. */
+export interface InformationDocument {
+  /** The PDF bytes, as received. Not frozen (the letterhead follows the organisation's logo): store your own copy. */
+  pdf: Uint8Array;
+  /** The filename the server suggested (Content-Disposition), or null. Identity-free. */
+  filename: string | null;
+  contentType: string;
+}
+
+// ---------------------------------------------------------------------------
+// Consent sheets (scope 'attest'): the signature sheet of one published version
+// for one customer, minted with its claim.
+// ---------------------------------------------------------------------------
+
+export interface CreateConsentSheetInput {
+  /** A PUBLISHED version of one of your documents that carries at least one consent ask. */
+  documentVersionId: string;
+  /** "fr" (default) or "en". */
+  locale?: DocumentLocale;
+}
+
+export interface ConsentSheetOptions {
+  /**
+   * The Idempotency-Key, auto-generated per call when omitted. It is a LATCH, not a
+   * replay: a retry with the same key and body is a 409 `already_minted` (the reference
+   * and claim are returned once and never kept), and mints nothing. Send a new key to
+   * print a new sheet, which retires the previous sheet's reference.
+   */
+  idempotencyKey?: string;
+  /** This call's time budget in ms; defaults to the client's `timeout` or 15000, whichever is larger. */
+  timeout?: number;
+}
+
+/**
+ * The 201 body of POST /v1/customers/{customerRef}/consent-sheets. Returned ONCE: the
+ * printed reference and the claim token are stored nowhere and no later call recovers
+ * them (the response is `no-store`).
+ *
+ * TWO RULES THE HOST MUST KEEP:
+ *   - NEVER deliver `claim.claimUrl` in the same message, envelope or piece of paper as
+ *     the sheet. The printed reference is the second factor of the claim link; both
+ *     together make it decorative.
+ *   - NEVER send the hash of this BLANK sheet as `evidence.pdfSha256`. The evidence of a
+ *     manual consent is the SIGNED paper, scanned once it comes back.
+ */
+export interface ConsentSheet {
+  signatureSheet: {
+    documentVersionId: string;
+    locale: DocumentLocale;
+    contentType: "application/pdf";
+    filename: string;
+    /** The PDF, base64: `Buffer.from(sheet.signatureSheet.pdf, "base64")`. */
+    pdf: string;
+  };
+  /** The reference printed on the sheet (e.g. "ABCD-EFGH"), the claim's second factor. */
+  printedReference: string;
+  /** A NEW claim link. It retires any claim still live for this customer. */
+  claim: ClaimLink;
+}
+
+// ---------------------------------------------------------------------------
+// Withdrawal recorded on the person's behalf (scope 'withdraw').
+// ---------------------------------------------------------------------------
+
+/** How the person asked for the withdrawal. */
+export type WithdrawalChannel = "phone" | "email" | "mail" | "in_person" | "other";
+
+export interface RecordWithdrawalInput {
+  channel: WithdrawalChannel;
+  /**
+   * YOUR opaque identifier of the staff member who received the request: 1 to 64
+   * letters, digits, dots, underscores, colons or hyphens, starting with a letter or a
+   * digit. Never an email address.
+   */
+  operator: string;
+  /**
+   * When the person asked, as declared: a Date or RFC 3339 WITH an offset. Not before
+   * the consent and not in the future by any amount. It is recorded in the attestation
+   * and never moves the withdrawal's own instant, which is now.
+   */
+  requestedAt?: Instant;
+  /** At most 1000 characters, no control characters. Encrypted, shredded on erasure, never on chain. */
+  reason?: string;
+}
+
+/**
+ * The 200 body of a recorded withdrawal. ALWAYS `recordedOnBehalf: true` and
+ * `assurance: "company_attested"`: Agreely records that the organisation says it
+ * received and actioned the request; it never presents it as the person's own signed
+ * revocation, whatever the consent's tier.
+ */
+export interface ConsentWithdrawal {
+  consentRef: string;
+  withdrawn: true;
+  /** True on a repeat: the consent was already withdrawn. */
+  alreadyWithdrawn: boolean;
+  recordedOnBehalf: true;
+  assurance: "company_attested";
+  /** What /v1/check does NOW for the purpose. Read this before telling anyone the use stopped. */
+  gate: RevocationGate;
+  /**
+   * The other running consents of the same purpose the withdrawal was carried to at the
+   * same instant (a renewal and the paper it renewed, a verbal consent and its paper).
+   */
+  alsoWithdrawn: string[];
+}
+
+// ---------------------------------------------------------------------------
+// The customer registry (scope 'registry'). One customerRef at a time, by
+// construction: there is no list endpoint and there never will be.
+// ---------------------------------------------------------------------------
+
+/** The relationship lifecycle: "ending" while a person's close-account request is in flight. */
+export type RelationshipLifecycle = "active" | "ending" | "ended";
+
+/**
+ * A registry ground: the tenant's own act's non-consent bases ({@link Basis}, plus the
+ * public-body `depersonalized_research`). `consent` is refused: a client held on
+ * consent belongs to the consent flow. A ground of the other act is refused by name.
+ */
+export type RegistryBasis = Basis | "depersonalized_research";
+
+/**
+ * A MERGE, never a replace: an ABSENT member is left as it stands, `null` or `""`
+ * CLEARS it, a value writes it. Members set to `undefined` are not sent.
+ */
+export interface UpsertCustomerInput {
+  /** At most 200 characters. Stored encrypted; never read back. */
+  displayName?: string | null;
+  /** A valid address of at most 320 characters. Stored encrypted; never read back. */
+  email?: string | null;
+  /** At most 2000 characters. Stored encrypted; never read back. */
+  basisNote?: string | null;
+  legalBasis?: RegistryBasis | null;
+  noticeLocale?: DocumentLocale | null;
+}
+
+/**
+ * What Agreely holds for one customerRef, as METADATA. Every personal field is a
+ * boolean: the name, address and note are never returned.
+ */
+export interface CustomerRecord {
+  customerRef: string;
+  /** Whether an identity row is held at all (false for a ref known only from its consent history). */
+  registered: boolean;
+  /** The first entry route. */
+  source: "manual" | "import" | "api" | "ceremony" | null;
+  hasDisplayName: boolean;
+  hasEmail: boolean;
+  hasBasisNote: boolean;
+  legalBasis: RegistryBasis | null;
+  noticeLocale: DocumentLocale | null;
+  /** As stored (a PostgreSQL timestamp, not necessarily RFC 3339), or null when not registered. */
+  createdAt: string | null;
+  updatedAt: string | null;
+  relationship: { status: RelationshipLifecycle; endedAt: string | null };
+}
+
+/** The result of `customers.upsert`: the record, and whether this call created it (201) or merged (200). */
+export interface UpsertCustomerResult extends CustomerRecord {
+  created: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Per-customer retention (scope 'registry') and the host feed of holds (scope
+// 'holds'). Agreely records what the host DECLARES; it verifies none of it.
+// ---------------------------------------------------------------------------
+
+/** The two grounds of a retention hold. */
+export type HoldGround = "rights_request" | "other_law";
+
+/** What a hold covers: everything, or the listed rule keys and catalog cell ids. */
+export type HoldScope = "all" | { rules: string[]; cells: string[] };
+
+/**
+ * A retention hold, as metadata. `ground`, `hasProvision`, `reviewOn` and
+ * `hasReleaseReason` are present ONLY on a hold your systems placed through the API
+ * (`placedBy: "api"`); a hold the organisation placed says nothing about why.
+ */
+export interface RetentionHold {
+  id: string;
+  status: "active" | "released";
+  scope: HoldScope;
+  placedBy: "api" | "organization";
+  /** YYYY-MM-DD, declared. */
+  startedOn: string;
+  /** RFC 3339 UTC. */
+  placedAt: string;
+  releasedAt: string | null;
+  ground?: HoldGround;
+  hasProvision?: boolean;
+  /** YYYY-MM-DD, a reminder only: nothing ever releases a hold on it. */
+  reviewOn?: string | null;
+  hasReleaseReason?: boolean;
+}
+
+interface PlaceHoldBase {
+  /**
+   * "all" (the default), or the keys of GET /v1/retention/rules (`rules`) and the ids of
+   * GET /v1/catalog/cells (`cells`), at least one. Archived rules and cells are accepted.
+   */
+  scope?: "all" | { rules?: string[]; cells?: string[] };
+  /** YYYY-MM-DD, today or earlier on the organisation's calendar. Defaults to today. */
+  startedOn?: string;
+  /** YYYY-MM-DD, on or after startedOn, at most ten years ahead. A reminder only. */
+  reviewOn?: string;
+}
+
+/**
+ * A hold to place. `other_law` REQUIRES the provision of the law that requires the
+ * information to be kept (at most 2000 characters, recorded as written, never
+ * verified); `rights_request` (the information is the subject of an access or
+ * rectification request) refuses one. Both constraints are compile-time.
+ */
+export type PlaceHoldInput =
+  | (PlaceHoldBase & { ground: "rights_request"; provision?: never })
+  | (PlaceHoldBase & { ground: "other_law"; provision: string });
+
+/** Optional replay key for placing or releasing a hold (the Idempotency-Key header). */
+export interface HoldOptions {
+  /** Auto-generated per call when omitted. Pass a DURABLE one to make a retry replay the first answer. */
+  idempotencyKey?: string;
+}
+
+/** The body of a placed hold: 201, or 200 with `replayed: true` on an idempotent replay. */
+export interface PlacedHold extends RetentionHold {
+  customerRef: string;
+  recorded: true;
+  replayed: boolean;
+}
+
+/**
+ * What a release, or a disposition, did to AGREELY'S OWN copy of the customer's
+ * identity (name, email, basis note, notice language):
+ *   "erased"        removed now, irreversibly
+ *   "none_held"     nothing was held to remove
+ *   "retained_hold" kept, because a hold on all the information still stands
+ *   "retained"      kept (a legal hold declaration)
+ */
+export type AgreelyIdentityOutcome = "erased" | "none_held" | "retained_hold" | "retained";
+
+export interface ReleaseHoldInput {
+  /** REQUIRED, at most 2000 characters. Encrypted, never echoed. */
+  reason: string;
+}
+
+/** The 200 body of a released hold. */
+export interface ReleasedHold extends RetentionHold {
+  customerRef: string;
+  recorded: true;
+  /** Null when no destroyed or anonymized declaration stands for this customer. */
+  agreelyIdentity: AgreelyIdentityOutcome | null;
+}
+
+/** The art. 23 / art. 73 outcome a host declares. There is no "nothing applied" value: that is no entry. */
+export type DispositionKind = "destroyed" | "anonymized" | "legal_hold";
+
+interface DispositionBase {
+  /** OPTIONAL: the conservation rule this was made under (for a public body, its approved schedule). Recorded, never verified. */
+  scheduleRef?: string;
+}
+
+/**
+ * A disposition to declare. `legal_hold` REQUIRES a `reason` naming the law that imposes
+ * the delay, and only it takes `retentionUntil` (YYYY-MM-DD). The relationship must have
+ * ENDED first (a 409 `relationship_active` otherwise): a disposition never implies an end.
+ */
+export type DeclareDispositionInput =
+  | (DispositionBase & { disposition: "destroyed" | "anonymized"; reason?: string; retentionUntil?: never })
+  | (DispositionBase & { disposition: "legal_hold"; reason: string; retentionUntil?: string });
+
+/** One declared disposition, as metadata (the justification is a boolean, never text). */
+export interface RetentionDispositionRecord {
+  id: string;
+  disposition: DispositionKind;
+  retentionUntil: string | null;
+  hasReason: boolean;
+  /** The end of the relationship this declaration was made against, frozen. */
+  endedAtSnapshot: string;
+  scheduleRef: string | null;
+  /** The ground the client was held on at the time, frozen (the code only). */
+  basis: string | null;
+  hasBasisNote: boolean;
+  declaredBy: string;
+  declaredAt: string;
+  /** Null on a row declared before the field existed. */
+  agreelyIdentity: AgreelyIdentityOutcome | null;
+}
+
+/** A divergence recorded as received, never a refusal. */
+export interface DispositionWarning {
+  code: "hold_active";
+  message: string;
+  holdIds: string[];
+}
+
+/** The body of a declared disposition: 201 appended, or 200 with `appended: false` when the standing one was replayed. */
+export interface DeclaredDisposition extends RetentionDispositionRecord {
+  customerRef: string;
+  recorded: true;
+  /** Agreely recorded a declaration. Never "verified". */
+  status: "declared";
+  appended: boolean;
+  warnings: DispositionWarning[];
+}
+
+/** One rule of the derived art. 23 / art. 73 clock. */
+export interface RetentionClockRule {
+  /** The rule key (as in GET /v1/retention/rules). */
+  ruleId: string;
+  label: string;
+  labelEn: string | null;
+  periodMonths: number;
+  action: RetentionAction;
+  /** YYYY-MM-DD arithmetic, or null while the relationship is active. A date to act on only when `held` is false. */
+  dueAt: string | null;
+  /** True when an active hold suspends this rule. */
+  held: boolean;
+}
+
+/** The body of GET /v1/customers/{customerRef}/retention. */
+export interface CustomerRetention {
+  customerRef: string;
+  relationship: { status: RelationshipLifecycle; endedAt: string | null };
+  clock: {
+    trigger: "purpose_achieved";
+    /** The arithmetic in words, so a host recomputes rather than trusts. */
+    recipe: string;
+    /** The earliest horizon of a rule no hold suspends (YYYY-MM-DD), or null with `reason`. Never a defaulted period. */
+    dueAt: string | null;
+    reason: "no_declared_rule" | "relationship_active" | "hold_active" | null;
+    rules: RetentionClockRule[];
+  };
+  /** The standing declaration, or null. */
+  disposition: RetentionDispositionRecord | null;
+  /** Every active hold and the most recent released ones. */
+  holds: RetentionHold[];
+  /** True when older released holds were left out. */
+  releasedTruncated: boolean;
+}
+
+/** One row of the host feed: references plus scope, never the ground or the origin. */
+export interface RetentionHoldFeedItem {
+  id: string;
+  customerRef: string;
+  status: "active" | "released";
+  scope: HoldScope;
+  changedAt: string;
+}
+
+export interface ListHoldsInput {
+  /** The `cursor` of a previous sync's LAST page: read the delta since. Omit for the snapshot of every active hold. */
+  changedSince?: string;
+  /** The `nextPageToken` of the previous page, unchanged. */
+  pageToken?: string;
+}
+
+/**
+ * One page of GET /v1/retention/holds (at most 500 holds). Every page but the last
+ * carries `nextPageToken`; ONLY the last carries `cursor`, the next sync's
+ * `changedSince`.
+ */
+export interface RetentionHoldPage {
+  holds: RetentionHoldFeedItem[];
+  nextPageToken: string | null;
+  cursor: string | null;
+}
+
+export interface SyncHoldsInput {
+  /** The previous sync's `cursor`. Omit for a snapshot. */
+  changedSince?: string;
+  /** Hard bound on pages read (default 1000). Reaching it without a last page throws. */
+  maxPages?: number;
+}
+
+/**
+ * Every page of one sync, collected. `snapshot` REPLACES your whole active set (every
+ * active hold); `delta` is every hold placed or released since, each with its status.
+ * Delivery is at least once: upsert by `id`. Persist `cursor` for the next sync.
+ */
+export interface HoldsSync {
+  mode: "snapshot" | "delta";
+  holds: RetentionHoldFeedItem[];
+  cursor: string;
 }
 
 // ---------------------------------------------------------------------------

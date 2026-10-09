@@ -1,11 +1,19 @@
-// @agreely/sdk — the thin, typed TypeScript/Node client for the Agreely /v1
-// consent API. The CLI (P3-M3) imports from here.
+// @agreely/sdk: the thin, typed TypeScript/Node client for the Agreely /v1
+// consent API.
 
 export { Agreely, BATCH_CAP, RATE_LIMIT_PER_MINUTE } from "./client.js";
 export { BreakGlass } from "./breakGlass.js";
 export { ReceiptVerifier } from "./verify/receipt.js";
-export { PURGE_RECORDS_MAX, PURGE_REFERENCES_MAX, SWEEP_MAX_AGE_MS } from "./resources/retention.js";
+export {
+  PURGE_RECORDS_MAX,
+  PURGE_REFERENCES_MAX,
+  SWEEP_MAX_AGE_MS,
+  RETENTION_TEXT_MAX,
+} from "./resources/retention.js";
 export { INVENTORY_MAX_SETS, INVENTORY_MAX_FIELDS } from "./resources/inventory.js";
+export { DOCUMENT_TIMEOUT_MS } from "./resources/consentDocuments.js";
+export { WITHDRAWAL_CHANNELS, WITHDRAWAL_REASON_MAX } from "./resources/withdrawals.js";
+export { CUSTOMER_REF_MAX } from "./util.js";
 
 export {
   AgreelyError,
@@ -15,6 +23,7 @@ export {
   AgreelyBillingInactiveError,
   AgreelyRateLimitError,
   AgreelySweepTooFrequentError,
+  AgreelyDailyCapError,
   AgreelyVerbalDailyCapError,
   AgreelyConflictError,
   AgreelyUnavailableError,
@@ -22,7 +31,8 @@ export {
   AgreelyAbortError,
   AgreelyConfigError,
 } from "./errors.js";
-export type { AgreelyErrorCode } from "./errors.js";
+export type { AgreelyErrorCode, AgreelyErrorReason } from "./errors.js";
+export type { ConsentRecordOptions } from "./resources/manualConsents.js";
 
 export type {
   AgreelyOptions,
@@ -67,6 +77,45 @@ export type {
   VerbalHistoryPurpose,
   VerbalConsentHistory,
   ManualConsentErasure,
+  DocumentLocale,
+  LocalizedText,
+  ConsentDocumentItem,
+  ConsentDocumentSummary,
+  ConsentDocumentDetail,
+  InformationDocumentOptions,
+  InformationDocument,
+  CreateConsentSheetInput,
+  ConsentSheetOptions,
+  ConsentSheet,
+  WithdrawalChannel,
+  RecordWithdrawalInput,
+  ConsentWithdrawal,
+  RelationshipLifecycle,
+  RegistryBasis,
+  UpsertCustomerInput,
+  CustomerRecord,
+  UpsertCustomerResult,
+  HoldGround,
+  HoldScope,
+  RetentionHold,
+  PlaceHoldInput,
+  HoldOptions,
+  PlacedHold,
+  AgreelyIdentityOutcome,
+  ReleaseHoldInput,
+  ReleasedHold,
+  DispositionKind,
+  DeclareDispositionInput,
+  RetentionDispositionRecord,
+  DispositionWarning,
+  DeclaredDisposition,
+  RetentionClockRule,
+  CustomerRetention,
+  RetentionHoldFeedItem,
+  ListHoldsInput,
+  RetentionHoldPage,
+  SyncHoldsInput,
+  HoldsSync,
   EndRelationshipInput,
   RelationshipEnded,
   RevertRelationshipInput,

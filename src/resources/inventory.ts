@@ -10,8 +10,8 @@ import type {
 } from "../types.js";
 import { assertHostToken } from "../util.js";
 
-/** At most this many record sets per host system, mirrored from the server. */
-export const INVENTORY_MAX_SETS = 50;
+/** At most this many record sets per host-system declaration, mirrored from the server. */
+export const INVENTORY_MAX_SETS = 200;
 
 /** At most this many fields per record set, mirrored from the server. */
 export const INVENTORY_MAX_FIELDS = 60;
@@ -43,8 +43,9 @@ export class Inventory {
    *
    * An empty list is refused (it would read as "withdraw everything", which a
    * serialisation bug must never do in one call). Also refused client-side: more
-   * than 50 sets or 60 fields per set, a set without fields, and a malformed
-   * hostSystem. The body carries only the documented members (key, label,
+   * than 200 sets or 60 fields per set, a set without fields, and a malformed
+   * hostSystem. A list introducing more new set keys than the company may add in 30
+   * days is a 422 `new_set_limit` (a key declared before is always accepted). The body carries only the documented members (key, label,
    * labelEn, fields), so nothing else on your objects leaves the process. Never
    * auto-retried.
    */

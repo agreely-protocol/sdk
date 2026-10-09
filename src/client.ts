@@ -4,12 +4,15 @@ import { BreakGlass } from "./breakGlass.js";
 import { DegradePolicy } from "./degrade.js";
 import { AgreelyBillingInactiveError, AgreelyConfigError, AgreelyUnavailableError } from "./errors.js";
 import { Catalog } from "./resources/catalog.js";
+import { ConsentDocuments } from "./resources/consentDocuments.js";
 import { ConsentRequests } from "./resources/consentRequests.js";
+import { Customers } from "./resources/customers.js";
 import { Inventory } from "./resources/inventory.js";
 import { ManualConsents } from "./resources/manualConsents.js";
 import { Relationships } from "./resources/relationships.js";
 import { Retention } from "./resources/retention.js";
 import { VerbalConsents } from "./resources/verbalConsents.js";
+import { Withdrawals } from "./resources/withdrawals.js";
 import { Transport } from "./transport.js";
 import type { AgreelyOptions, CheckOptions, CheckResult, Identity, BatchCheckItem, BatchDecision, CheckFieldsResult } from "./types.js";
 import { DEFAULT_MAX_DEGRADE_WINDOW_MS, parseDuration } from "./util.js";
@@ -44,19 +47,29 @@ export const RATE_LIMIT_PER_MINUTE = 120;
  * The Agreely client: a thin, near-stateless gate over the /v1 API. It holds an
  * api key, a base URL, a fetch client, a timeout, and the degrade policy — NO
  * database, NO ref tables, and NO allow-cache (caching an allow while a revoke
- * lands mid-window is a stale-allow correctness failure, spec §16). Every
+ * lands mid-window is a stale-allow correctness failure). Every
  * check() is a fresh authoritative call.
  */
 export class Agreely {
   readonly consentRequests: ConsentRequests;
-  /** The manual / offline (company-attested) consent resource (scope: 'attest'). */
+  /** The published consent documents and their information PDF (scopes: 'check' / 'issue', the PDF also 'attest' / 'attest_verbal'). */
+  readonly consentDocuments: ConsentDocuments;
+  /** The manual / offline (company-attested) consent resource and consent sheets (scope: 'attest'). */
   readonly manualConsents: ManualConsents;
   /** The verbal (telephone, documented by the organisation) consent resource (scopes: 'attest_verbal' / 'attest'). */
   readonly verbalConsents: VerbalConsents;
+  /** Withdrawals recorded on the person's behalf, of any consent ask (scope: 'withdraw', never granted by default). */
+  readonly withdrawals: Withdrawals;
+  /** The customer registry identity, as metadata (scope: 'registry'). */
+  readonly customers: Customers;
   /** The customer-relationship lifecycle resource (scope: 'relationship'). */
   readonly relationships: Relationships;
   readonly catalog: Catalog;
-  /** The host-retention resource (scope: 'retention'): decided rules, declared purges and passes. */
+  /**
+   * Host retention: decided rules, declared purges and passes (scope 'retention'), the
+   * per-customer clock, dispositions and holds (scope 'registry'), and the holds feed
+   * (scope 'holds').
+   */
   readonly retention: Retention;
   /** The host inventory resource (scope: 'inventory', reads also 'retention' / 'check'). */
   readonly inventory: Inventory;
@@ -74,11 +87,12 @@ export class Agreely {
     }
 
     this.baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+    const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
 
     this.transport = new Transport({
       baseUrl: this.baseUrl,
       apiKey: options.apiKey,
-      timeoutMs: options.timeout ?? DEFAULT_TIMEOUT_MS,
+      timeoutMs,
       ...(options.fetch !== undefined ? { fetch: options.fetch } : {}),
       ...(options.maxRetries !== undefined ? { maxRetries: options.maxRetries } : {}),
       ...(options.respectRetryAfter !== undefined
@@ -98,8 +112,11 @@ export class Agreely {
     this.degrade = new DegradePolicy(options.degradeOnOutage, this.breakGlass, maxDegradeWindowMs);
 
     this.consentRequests = new ConsentRequests(this.transport);
-    this.manualConsents = new ManualConsents(this.transport);
+    this.consentDocuments = new ConsentDocuments(this.transport, timeoutMs);
+    this.manualConsents = new ManualConsents(this.transport, timeoutMs);
     this.verbalConsents = new VerbalConsents(this.transport);
+    this.withdrawals = new Withdrawals(this.transport);
+    this.customers = new Customers(this.transport);
     this.relationships = new Relationships(this.transport);
     this.catalog = new Catalog(this.transport);
     this.retention = new Retention(this.transport, maxDegradeWindowMs);
@@ -149,6 +166,11 @@ export class Agreely {
    * privacy page. Least-disclosure: no company id, no DID, no key metadata. Any
    * valid key reaches it.
    * A read; safe to auto-retry on a transient outage.
+   *
+   * As a liveness probe: call it about once a minute from ONE scheduler, not per
+   * request (every call counts against the company's 120 a minute). On a 401 or a 402
+   * purge whatever you cached from Agreely and fail closed. It never replaces a check:
+   * never cache /v1/check, and never decide consent from a cached catalog.
    */
   identity(): Promise<Identity> {
     return this.transport.request<Identity>({

@@ -3,6 +3,11 @@ import {
   Agreely,
   AgreelyAuthError,
   AgreelyBillingInactiveError,
+  AgreelyConflictError,
+  AgreelyDailyCapError,
+  AgreelyRateLimitError,
+  AgreelyVerbalDailyCapError,
+  type AgreelyErrorReason,
   AgreelyNotFoundError,
   AgreelyUnavailableError,
   AgreelyValidationError,
@@ -92,5 +97,51 @@ describe("typed errors", () => {
   it("a timeout (abort) becomes AgreelyUnavailableError", async () => {
     const { agreely } = client([{ throw: abortError() }, { throw: abortError() }]);
     await expect(agreely.checkDetailed("c", "cat", "pur")).rejects.toBeInstanceOf(AgreelyUnavailableError);
+  });
+});
+
+describe("the stable reason and field", () => {
+  it("carries error.reason and error.field on every status that sends them", async () => {
+    const { agreely } = client([
+      {
+        status: 409,
+        json: { error: { code: "conflict", message: "Reworded at will.", field: "effectiveDate", reason: "predates_withdrawal" } },
+      },
+    ]);
+    const err = await agreely.manualConsents.revoke("0x" + "a".repeat(64)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AgreelyConflictError);
+    expect(err).toMatchObject({ reason: "predates_withdrawal", field: "effectiveDate", status: 409 });
+  });
+
+  it("passes an unknown future reason through untouched (the type is open-ended)", async () => {
+    const { agreely } = client([
+      { status: 422, json: { error: { code: "invalid_request", message: "new", reason: "some_future_reason" } } },
+    ]);
+    const err = await agreely.catalog.list().catch((e: unknown) => e);
+    const reason: AgreelyErrorReason | undefined = (err as AgreelyValidationError).reason;
+    expect(reason).toBe("some_future_reason");
+  });
+
+  it("leaves reason undefined when the envelope carries none, or a non-string", async () => {
+    const { agreely } = client([
+      { status: 404, json: { error: { code: "not_found", message: "gone" } } },
+      { status: 422, json: { error: { code: "invalid_request", message: "bad", reason: 7, field: ["x"] } } },
+    ]);
+    await expect(agreely.catalog.list()).rejects.toMatchObject({ reason: undefined });
+    await expect(agreely.catalog.list()).rejects.toMatchObject({ reason: undefined, field: undefined });
+  });
+
+  it("types every daily cap apart from the per-minute window", async () => {
+    const { agreely } = client([
+      { status: 429, json: { error: { code: "verbal_daily_cap", message: "cap", reason: "daily_cap" } } },
+      { status: 429, headers: { "Retry-After": "5" }, json: { error: { code: "rate_limited", message: "slow" } } },
+    ]);
+    const verbal = await agreely.catalog.list().catch((e: unknown) => e);
+    expect(verbal).toBeInstanceOf(AgreelyVerbalDailyCapError);
+    expect(verbal).toBeInstanceOf(AgreelyDailyCapError);
+    expect(verbal).toMatchObject({ code: "verbal_daily_cap", reason: "daily_cap" });
+    const window = await agreely.catalog.list().catch((e: unknown) => e);
+    expect(window).toBeInstanceOf(AgreelyRateLimitError);
+    expect(window).not.toBeInstanceOf(AgreelyDailyCapError);
   });
 });

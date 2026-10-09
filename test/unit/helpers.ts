@@ -10,9 +10,13 @@ export interface MockCall {
 export interface MockResponseSpec {
   status?: number;
   json?: unknown;
+  /** A raw binary body (a PDF) instead of `json`. */
+  bytes?: Uint8Array;
   headers?: Record<string, string>;
   /** Throw a network/abort error instead of responding. */
   throw?: Error;
+  /** Answer only after this many ms, aborting like a real fetch when the signal fires first. */
+  delayMs?: number;
 }
 
 /**
@@ -39,8 +43,15 @@ export function mockFetch(script: Array<MockResponseSpec | ((call: MockCall) => 
     const spec = typeof entry === "function" ? entry(call) : entry;
     if (!spec) throw new Error("mockFetch: no scripted response");
     if (spec.throw) throw spec.throw;
+    if (spec.delayMs !== undefined) await delay(spec.delayMs, init?.signal ?? undefined);
 
     const status = spec.status ?? 200;
+    if (spec.bytes !== undefined) {
+      return new Response(spec.bytes, {
+        status,
+        headers: { "Content-Type": "application/pdf", ...spec.headers },
+      });
+    }
     const bodyText = spec.json === undefined ? "" : JSON.stringify(spec.json);
     return new Response(bodyText, {
       status,
@@ -62,6 +73,21 @@ function normalizeHeaders(h: RequestInit["headers"]): Record<string, string> {
     Object.assign(out, h);
   }
   return out;
+}
+
+/** Wait `ms`, rejecting with an AbortError the moment the signal fires (as fetch does). */
+function delay(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(abortError());
+      },
+      { once: true },
+    );
+  });
 }
 
 export function abortError(): Error {

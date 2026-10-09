@@ -4,6 +4,7 @@ import {
   AgreelyConfigError,
   AgreelyNotFoundError,
   AgreelyValidationError,
+  INVENTORY_MAX_SETS,
   type ReplaceInventoryInput,
 } from "../../src/index.js";
 import { mockFetch } from "./helpers.js";
@@ -55,11 +56,12 @@ describe("inventory.replaceCategories", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("refuses over 50 sets, a set without fields, and a pod name as hostSystem", () => {
+  it("refuses over 200 sets, a set without fields, and a pod name as hostSystem", () => {
     const { agreely, calls } = client([{ json: {} }]);
     const set = declaration.categories[0]!;
+    expect(INVENTORY_MAX_SETS).toBe(200);
     expect(() =>
-      agreely.inventory.replaceCategories({ hostSystem: "crm", categories: Array.from({ length: 51 }, () => set) }),
+      agreely.inventory.replaceCategories({ hostSystem: "crm", categories: Array.from({ length: 201 }, () => set) }),
     ).toThrow(AgreelyConfigError);
     expect(() =>
       agreely.inventory.replaceCategories({ hostSystem: "crm", categories: [{ ...set, fields: [] }] }),

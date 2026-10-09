@@ -15,7 +15,7 @@ import type { ConsentRecordOptions } from "./manualConsents.js";
 const CONSENT_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /**
- * The verbal consent resource (issue #100): a consent the person gave BY TELEPHONE,
+ * The verbal consent resource: a consent the person gave BY TELEPHONE,
  * documented by the organisation. The WEAKEST of three tiers (full > manual >
  * verbal): there is no document, so the proof is the organisation's word. Every
  * result names it tier "verbal" / assurance "company_documented", and /v1/check
@@ -24,8 +24,9 @@ const CONSENT_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}
  * Scopes: `record` needs 'attest_verbal' (a separate grant, never given by default);
  * `confirmWithPaper` needs 'attest' (the paper mints a company-attested consent);
  * `get` accepts either. Withdraw with `manualConsents.revoke` (either scope; a
- * verbal-only key reaches verbal refs only) and erase with `manualConsents.erase`
- * ('attest' only).
+ * verbal-only key reaches verbal refs only) or, when the person asked for it, with
+ * `withdrawals.record` (scope 'withdraw'); erase with `manualConsents.erase` ('attest'
+ * only).
  */
 export class VerbalConsents {
   constructor(private readonly transport: Transport) {}
@@ -38,10 +39,21 @@ export class VerbalConsents {
    * Idempotency-Key is auto-generated per call (overridable) so a retry with the same
    * key and body replays the original 201.
    *
-   * Refusals: 422 for a notice-only document, an answer on an information line, a bad
-   * obtainedAt or validUntil; 409 (AgreelyConflictError, code "conflict") when a purpose
-   * is already covered or held by an active paper or passkey consent, or the customer
-   * relationship has ended; 429 AgreelyVerbalDailyCapError at the per-company daily cap.
+   * RENEWAL BY TELEPHONE. A paper consent ending within 30 days may be renewed by a
+   * verbal one with the same call: its `validUntil` may not be earlier than the paper's.
+   * Confirm it on paper later with `confirmWithPaper`. A withdrawal through any reference
+   * of the chain withdraws the running consent too.
+   *
+   * Refusals (compare `error.reason`): 422 for a notice-only document (`notice_only`), an
+   * answer on an information line (`informed_line_answered`), a bad obtainedAt or
+   * validUntil, an obtainedAt in the future by ANY amount (`obtained_at_in_future`: a host
+   * clock running ahead is refused, never clamped); 409 (AgreelyConflictError, code
+   * "conflict") when a purpose is held by a stronger consent outside the renewal window
+   * (`stronger_consent_active`) or already covered (`all_covered`), a renewal ends before
+   * the consent it renews (`renewal_ends_before_current`) or predates its signature
+   * (`renewal_predates_current`), the call predates a withdrawal (`predates_withdrawal`),
+   * or the relationship has ended (`relationship_ended`); 429 AgreelyVerbalDailyCapError
+   * (reason `daily_cap`) at the per-company daily cap.
    */
   record(input: RecordVerbalConsentInput, options: ConsentRecordOptions = {}): Promise<VerbalConsentResult> {
     const label = "verbalConsents.record";
@@ -80,7 +92,9 @@ export class VerbalConsents {
    * the call, with the signature as its evidence date) and the gate re-points at it.
    * A "no" is recorded as a withdrawal dated at `signedAt`. `answers` must cover
    * exactly the purposes still consented by telephone. One paper per verbal consent: a
-   * second one is a 409. Scope 'attest'. NEVER auto-retried; idempotent like `record`.
+   * second one is a 409 `already_confirmed`. A `signedAt` in the future by any amount is
+   * a 422 `signed_at_in_future`. Scope 'attest'. NEVER auto-retried; idempotent like
+   * `record`.
    */
   confirmWithPaper(
     consentId: string,

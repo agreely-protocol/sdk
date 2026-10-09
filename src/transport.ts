@@ -2,6 +2,7 @@ import {
   AgreelyAuthError,
   AgreelyBillingInactiveError,
   AgreelyConflictError,
+  AgreelyDailyCapError,
   AgreelyError,
   AgreelyNotFoundError,
   AgreelyRateLimitError,
@@ -10,6 +11,7 @@ import {
   AgreelyVerbalDailyCapError,
   AgreelyValidationError,
   type AgreelyErrorCode,
+  type AgreelyErrorReason,
 } from "./errors.js";
 import { jitterBackoff, sleep } from "./util.js";
 
@@ -26,7 +28,32 @@ export interface RequestSpec {
    * Idempotency-Key, not re-issue.
    */
   idempotentRetry?: boolean;
+  /**
+   * This call's total time budget in ms, overriding the client's `timeout`. Used by the
+   * routes that render a PDF, which a budget sized for the consent check would cut off.
+   */
+  timeoutMs?: number;
 }
+
+/** A JSON response with its HTTP status, for the routes whose status carries meaning (201 vs 200). */
+export interface JsonExchange<T> {
+  status: number;
+  body: T;
+}
+
+/** A binary response (a PDF), with the headers that describe it. */
+export interface BytesExchange {
+  bytes: Uint8Array;
+  contentType: string | null;
+  contentDisposition: string | null;
+}
+
+/** The 429 codes that are a per-company DAILY cap, never the per-minute window. */
+const DAILY_CAP_CODES: ReadonlySet<string> = new Set([
+  "withdrawal_daily_cap",
+  "hold_budget_exhausted",
+  "hold_release_cap_reached",
+]);
 
 type FetchLike = typeof fetch;
 
@@ -66,18 +93,43 @@ export class Transport {
    * budget). A mutating call never auto-retries a 429.
    */
   async request<T>(spec: RequestSpec): Promise<T> {
+    return (await this.send(spec, (res) => this.parseJson<T>(res))).body;
+  }
+
+  /** As {@link request}, keeping the HTTP status (a PUT that answers 201 created or 200 merged). */
+  requestWithStatus<T>(spec: RequestSpec): Promise<JsonExchange<T>> {
+    return this.send(spec, (res) => this.parseJson<T>(res));
+  }
+
+  /**
+   * A binary response (a PDF). The bytes are returned as received; an error still
+   * arrives as the JSON envelope and maps to the same typed errors as every call.
+   */
+  requestBytes(spec: RequestSpec): Promise<BytesExchange> {
+    return this.send({ ...spec, accept: "application/pdf, application/json" }, async (res) => ({
+      bytes: new Uint8Array(await res.arrayBuffer()),
+      contentType: res.headers.get("Content-Type"),
+      contentDisposition: res.headers.get("Content-Disposition"),
+    }));
+  }
+
+  /** The 429 retry loop around one budgeted send, shared by every response kind. */
+  private async send<R>(
+    spec: RequestSpec & { accept?: string },
+    parse: (res: Response) => Promise<R>,
+  ): Promise<R> {
     const rateRetries = spec.idempotentRetry ? this.maxRetries : 0;
     let rateAttempt = 0;
     for (;;) {
       try {
-        return await this.attempt<T>(spec);
+        return await this.attempt(spec, parse);
       } catch (error) {
         // A per-rule floor or a daily cap is not the rate window: waiting it out and
         // re-sending cannot help, so neither is ever auto-retried.
         const windowed =
           error instanceof AgreelyRateLimitError &&
           !(error instanceof AgreelySweepTooFrequentError) &&
-          !(error instanceof AgreelyVerbalDailyCapError);
+          !(error instanceof AgreelyDailyCapError);
         if (windowed && rateAttempt < rateRetries) {
           rateAttempt++;
           const waitMs =
@@ -93,12 +145,15 @@ export class Transport {
   }
 
   /** One budgeted send with transient-outage retries inside a single time budget. */
-  private async attempt<T>(spec: RequestSpec): Promise<T> {
+  private async attempt<R>(
+    spec: RequestSpec & { accept?: string },
+    parse: (res: Response) => Promise<R>,
+  ): Promise<R> {
     const fetchImpl = await this.resolveFetch();
     const url = this.buildUrl(spec.path, spec.query);
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.apiKey}`,
-      Accept: "application/json",
+      Accept: spec.accept ?? "application/json",
       ...spec.headers,
     };
     let bodyText: string | undefined;
@@ -107,7 +162,7 @@ export class Transport {
       bodyText = JSON.stringify(spec.body);
     }
 
-    const deadline = Date.now() + this.timeoutMs;
+    const deadline = Date.now() + (spec.timeoutMs ?? this.timeoutMs);
     const maxAttempts = spec.idempotentRetry ? 2 : 1;
     let lastError: AgreelyError | undefined;
 
@@ -125,8 +180,11 @@ export class Transport {
       if (bodyText !== undefined) init.body = bodyText;
       try {
         const res = await fetchImpl(url, init);
+        // The timer stays armed while the body is read: a body that stalls is the same
+        // outage as a response that never came.
+        const result = res.ok ? await parse(res) : await this.fail(res);
         clearTimeout(timer);
-        return await this.handle<T>(res);
+        return result;
       } catch (raw) {
         clearTimeout(timer);
         lastError = this.normalize(raw);
@@ -159,59 +217,64 @@ export class Transport {
     return url.toString();
   }
 
-  /** Map a fetch Response to parsed JSON, or throw the typed error for its status. */
-  private async handle<T>(res: Response): Promise<T> {
-    if (res.ok) {
-      const text = await res.text();
-      return (text ? JSON.parse(text) : {}) as T;
-    }
+  /** Parse a successful JSON response (an empty body reads as an empty object). */
+  private async parseJson<T>(res: Response): Promise<JsonExchange<T>> {
+    const text = await res.text();
+    return { status: res.status, body: (text ? JSON.parse(text) : {}) as T };
+  }
 
+  /**
+   * Throw the typed error for a failed response. `field` and `reason` travel on every
+   * status when the envelope carries them: a client compares `reason`, never `message`.
+   */
+  private async fail(res: Response): Promise<never> {
     const payload = await this.safeJson(res);
-    const wire = (payload as { error?: { code?: string; message?: string; field?: string } })
+    const wire = (payload as { error?: { code?: unknown; message?: unknown; field?: unknown; reason?: unknown } })
       ?.error;
-    const message = wire?.message ?? `Agreely request failed (HTTP ${res.status}).`;
-    const code = (wire?.code as AgreelyErrorCode | undefined) ?? undefined;
-    const field = wire?.field;
+    const message =
+      typeof wire?.message === "string" ? wire.message : `Agreely request failed (HTTP ${res.status}).`;
+    const code = typeof wire?.code === "string" ? (wire.code as AgreelyErrorCode) : undefined;
+    const detail = {
+      status: res.status,
+      ...(typeof wire?.field === "string" ? { field: wire.field } : {}),
+      ...(typeof wire?.reason === "string" ? { reason: wire.reason as AgreelyErrorReason } : {}),
+    };
 
     switch (res.status) {
       case 401:
       case 403:
-        throw new AgreelyAuthError(message, { code: code ?? "unauthorized", status: res.status });
+        throw new AgreelyAuthError(message, { ...detail, code: code ?? "unauthorized" });
       case 400:
       case 413:
       case 422:
-        throw new AgreelyValidationError(message, {
-          code: code ?? "invalid_request",
-          status: res.status,
-          ...(field !== undefined ? { field } : {}),
-        });
+        throw new AgreelyValidationError(message, { ...detail, code: code ?? "invalid_request" });
       case 404:
-        throw new AgreelyNotFoundError(message, { code: code ?? "not_found", status: res.status });
+        throw new AgreelyNotFoundError(message, { ...detail, code: code ?? "not_found" });
       case 402:
         // The company's Agreely subscription is inactive/lapsed. Fail-closed for
         // gating, but distinct from an outage: not transient, not retryable.
-        throw new AgreelyBillingInactiveError(message, {
-          code: code ?? "billing_inactive",
-          status: res.status,
-        });
+        throw new AgreelyBillingInactiveError(message, { ...detail, code: code ?? "billing_inactive" });
       case 409:
         // `retry`: a concurrent retry could not be settled (retry with the same key).
         // `conflict`: the request contradicts the record's state (do not retry as is).
-        throw new AgreelyConflictError(message, { code: code ?? "retry", status: res.status });
+        throw new AgreelyConflictError(message, { ...detail, code: code ?? "retry" });
       case 429: {
         const header = res.headers.get("Retry-After");
         const retryAfter = header !== null ? Number(header) : undefined;
         const init = {
-          status: res.status,
+          ...detail,
           ...(retryAfter !== undefined && !Number.isNaN(retryAfter) ? { retryAfter } : {}),
         };
         // The sweep floor is its own condition, not the company rate window.
         if (code === "sweep_too_frequent") {
           throw new AgreelySweepTooFrequentError(message, { ...init, code: "sweep_too_frequent" });
         }
-        // The per-company daily cap on verbal consents: not the per-minute window either.
+        // The per-company daily caps: not the per-minute window either.
         if (code === "verbal_daily_cap") {
           throw new AgreelyVerbalDailyCapError(message, { ...init, code: "verbal_daily_cap" });
+        }
+        if (code !== undefined && DAILY_CAP_CODES.has(code)) {
+          throw new AgreelyDailyCapError(message, { ...init, code });
         }
         throw new AgreelyRateLimitError(message, { ...init, code: "rate_limited" });
       }

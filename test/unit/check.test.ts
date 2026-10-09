@@ -84,3 +84,77 @@ describe("no allow-cache", () => {
     expect(calls).toHaveLength(2);
   });
 });
+
+describe("check dates (validUntil, revokedAt)", () => {
+  it("passes validUntil through on a record-backed allow", async () => {
+    const { agreely } = client([
+      {
+        json: {
+          decision: "allow",
+          status: "active",
+          consentRef: "0xabc",
+          assurance: "company_documented",
+          tier: "verbal",
+          validUntil: "2027-10-09T03:59:59Z",
+          checkedAt: "2026-10-09T12:00:00Z",
+        },
+      },
+    ]);
+    const r = await agreely.checkDetailed("c1", "Email", "News");
+    expect(r.validUntil).toBe("2027-10-09T03:59:59Z");
+    expect(r.revokedAt).toBeUndefined();
+  });
+
+  it("passes revokedAt through on a revoked deny", async () => {
+    const { agreely } = client([
+      {
+        json: {
+          decision: "deny",
+          status: "revoked",
+          consentRef: "0xabc",
+          assurance: "company_attested",
+          tier: "manual",
+          validUntil: "2027-10-09T03:59:59Z",
+          revokedAt: "2026-10-08T20:08:52Z",
+          checkedAt: "2026-10-09T12:00:00Z",
+        },
+      },
+    ]);
+    const r = await agreely.checkDetailed("c1", "Email", "News");
+    expect(r.revokedAt).toBe("2026-10-08T20:08:52Z");
+  });
+
+  it("has neither key without a record (necessity)", async () => {
+    const { agreely } = client([
+      { json: { decision: "allow", status: "necessity", basis: "necessary_for_service", checkedAt: "t" } },
+    ]);
+    const r = await agreely.checkDetailed("c1", "Email", "Billing");
+    expect(r).not.toHaveProperty("validUntil");
+    expect(r).not.toHaveProperty("revokedAt");
+  });
+
+  it("carries the dates on batch decisions too", async () => {
+    const { agreely } = client([
+      {
+        json: {
+          decisions: [
+            {
+              customerRef: "c1",
+              category: "Email",
+              purpose: "News",
+              decision: "deny",
+              status: "revoked",
+              consentRef: "0xabc",
+              validUntil: "2027-01-01T04:59:59Z",
+              revokedAt: "2026-10-01T10:00:00Z",
+              checkedAt: "t",
+            },
+          ],
+        },
+      },
+    ]);
+    const [d] = await agreely.checkBatch([{ customerRef: "c1", category: "Email", purpose: "News" }]);
+    expect(d!.validUntil).toBe("2027-01-01T04:59:59Z");
+    expect(d!.revokedAt).toBe("2026-10-01T10:00:00Z");
+  });
+});
