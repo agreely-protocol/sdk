@@ -25,8 +25,8 @@ const record: CustomerRecord = {
   hasBasisNote: false,
   legalBasis: "contract",
   noticeLocale: "fr",
-  createdAt: "2026-10-08 20:13:48.123456+00",
-  updatedAt: "2026-10-08 20:13:48.123456+00",
+  createdAt: "2026-10-08T20:13:48Z",
+  updatedAt: "2026-10-08T20:13:48Z",
   relationship: { status: "active", endedAt: null },
 };
 
@@ -40,8 +40,8 @@ describe("customers.get", () => {
 
   it("an untouched or foreign ref is AgreelyNotFoundError; a blank or over-long one is refused locally", async () => {
     const { agreely, calls } = client([{ status: 404, json: { error: { code: "not_found", message: "No customer." } } }]);
-    expect(() => agreely.customers.get("")).toThrow(AgreelyConfigError);
-    expect(() => agreely.customers.get("x".repeat(201))).toThrow(AgreelyConfigError);
+    await expect(agreely.customers.get("")).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.customers.get("x".repeat(201))).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
     await expect(agreely.customers.get("ghost")).rejects.toBeInstanceOf(AgreelyNotFoundError);
   });

@@ -6,6 +6,7 @@ import type {
   RelationshipReverted,
   RevertRelationshipInput,
 } from "../types.js";
+import { requireCustomerRef } from "../util.js";
 
 /**
  * The customer-relationship lifecycle resource (scope: 'relationship'). Keyed on
@@ -40,11 +41,8 @@ export class Relationships {
    * Treat AgreelyNotFoundError here as "nothing to end", not as a failure, unless you
    * know the ref has consent history.
    */
-  end(input: EndRelationshipInput): Promise<RelationshipEnded> {
-    const customerRef = typeof input.customerRef === "string" ? input.customerRef.trim() : "";
-    if (customerRef === "") {
-      throw new AgreelyConfigError("relationships.end requires a customerRef.");
-    }
+  async end(input: EndRelationshipInput): Promise<RelationshipEnded> {
+    const customerRef = requireCustomerRef(input.customerRef, "relationships.end");
     const reason = typeof input.reason === "string" ? input.reason : "";
     if (reason.trim() === "") {
       throw new AgreelyConfigError(
@@ -71,11 +69,8 @@ export class Relationships {
    * relationship that is NOT undo-eligible maps to AgreelyNotFoundError (404), with
    * nothing written server-side. Never auto-retried (it mutates).
    */
-  revert(input: RevertRelationshipInput): Promise<RelationshipReverted> {
-    const customerRef = typeof input.customerRef === "string" ? input.customerRef.trim() : "";
-    if (customerRef === "") {
-      throw new AgreelyConfigError("relationships.revert requires a customerRef.");
-    }
+  async revert(input: RevertRelationshipInput): Promise<RelationshipReverted> {
+    const customerRef = requireCustomerRef(input.customerRef, "relationships.revert");
     const reason = typeof input.reason === "string" ? input.reason : "";
     if (reason.trim() === "") {
       throw new AgreelyConfigError(

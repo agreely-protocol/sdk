@@ -32,7 +32,6 @@ export {
   AgreelyConfigError,
 } from "./errors.js";
 export type { AgreelyErrorCode, AgreelyErrorReason } from "./errors.js";
-export type { ConsentRecordOptions } from "./resources/manualConsents.js";
 
 export type {
   AgreelyOptions,
@@ -99,7 +98,7 @@ export type {
   HoldScope,
   RetentionHold,
   PlaceHoldInput,
-  HoldOptions,
+  IdempotencyOptions,
   PlacedHold,
   AgreelyIdentityOutcome,
   ReleaseHoldInput,

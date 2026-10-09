@@ -8,7 +8,7 @@ import type {
   DeclaredDisposition,
   DeclarePurgeInput,
   DeclareSweepInput,
-  HoldOptions,
+  IdempotencyOptions,
   HoldsSync,
   ListHoldsInput,
   ListRetentionRulesInput,
@@ -32,6 +32,7 @@ import {
   DEFAULT_MAX_DEGRADE_WINDOW_MS,
   assertHostToken,
   assertIdempotencyKey,
+  assertOptions,
   assertUuid,
   recordIdempotencyKey,
   requireCustomerRef,
@@ -50,6 +51,9 @@ export const SWEEP_MAX_AGE_MS = 24 * 3_600_000;
 
 /** At most this many characters of free text (a provision, a release or disposition reason), mirrored from the server. */
 export const RETENTION_TEXT_MAX = 2000;
+
+/** At most this many characters of a disposition's `scheduleRef`, mirrored from the server. */
+export const SCHEDULE_REF_MAX = 200;
 
 /** Default bound on the pages one holds sync reads (500 holds a page). */
 const DEFAULT_MAX_HOLD_PAGES = 1000;
@@ -86,7 +90,7 @@ export class Retention {
    * {@link Retention.rulesForPurge}, which does the incremental merge and the
    * outage decision for you.
    */
-  listRules(input: ListRetentionRulesInput = {}): Promise<RetentionRuleList> {
+  async listRules(input: ListRetentionRulesInput = {}): Promise<RetentionRuleList> {
     return this.transport.request<RetentionRuleList>({
       method: "GET",
       path: "/v1/retention/rules",
@@ -99,7 +103,7 @@ export class Retention {
    * One rule, plus the instants of the host's last declared purge and pass under
    * it. An unknown, foreign or malformed key is the same AgreelyNotFoundError.
    */
-  getRule(ruleKey: string): Promise<RetentionRuleDetail> {
+  async getRule(ruleKey: string): Promise<RetentionRuleDetail> {
     return this.transport.request<RetentionRuleDetail>({
       method: "GET",
       path: `/v1/retention/rules/${encodeURIComponent(requireRuleKey(ruleKey, "retention.getRule"))}`,
@@ -153,7 +157,7 @@ export class Retention {
    * The body is built from the named fields only, so nothing else you pass,
    * including an idempotency key, can reach it. Never auto-retried.
    */
-  declarePurge(
+  async declarePurge(
     ruleKey: string,
     input: DeclarePurgeInput,
     options: DeclarationOptions,
@@ -248,7 +252,7 @@ export class Retention {
    * from yesterday, a skewed clock) is refused client-side, since the server would
    * refuse it too. Never auto-retried.
    */
-  declareSweep(
+  async declareSweep(
     ruleKey: string,
     input: DeclareSweepInput,
     options: DeclarationOptions,
@@ -286,7 +290,7 @@ export class Retention {
    * Metadata only: no justification or provision text is ever returned. An unknown or
    * foreign ref is AgreelyNotFoundError. A read; safe to auto-retry on a transient outage.
    */
-  getCustomerRetention(customerRef: string): Promise<CustomerRetention> {
+  async getCustomerRetention(customerRef: string): Promise<CustomerRetention> {
     const ref = requireCustomerRef(customerRef, "retention.getCustomerRetention");
     return this.transport.request<CustomerRetention>({
       method: "GET",
@@ -309,9 +313,9 @@ export class Retention {
    *
    * Refused client-side: a disposition outside the three, a `legal_hold` without a
    * reason, a `retentionUntil` on anything but a `legal_hold` or not YYYY-MM-DD, a reason
-   * or scheduleRef that is not a string. Never auto-retried.
+   * over 2000 characters, a scheduleRef over 200. Never auto-retried.
    */
-  declareDisposition(customerRef: string, input: DeclareDispositionInput): Promise<DeclaredDisposition> {
+  async declareDisposition(customerRef: string, input: DeclareDispositionInput): Promise<DeclaredDisposition> {
     const label = "retention.declareDisposition";
     const ref = requireCustomerRef(customerRef, label);
     const disposition: unknown = input.disposition;
@@ -328,7 +332,7 @@ export class Retention {
     if (retentionUntil !== undefined && disposition !== "legal_hold") {
       throw new AgreelyConfigError(`${label}: retentionUntil applies only to a "legal_hold".`);
     }
-    const scheduleRef = optionalText(input.scheduleRef, `${label}: scheduleRef`);
+    const scheduleRef = optionalText(input.scheduleRef, `${label}: scheduleRef`, SCHEDULE_REF_MAX);
     return this.transport.request<DeclaredDisposition>({
       method: "POST",
       path: `/v1/customers/${encodeURIComponent(ref)}/retention/dispositions`,
@@ -360,8 +364,9 @@ export class Retention {
    * documented members. Never auto-retried; the Idempotency-Key is auto-generated unless
    * you pass a durable one.
    */
-  placeHold(customerRef: string, input: PlaceHoldInput, options: HoldOptions = {}): Promise<PlacedHold> {
+  async placeHold(customerRef: string, input: PlaceHoldInput, options: IdempotencyOptions = {}): Promise<PlacedHold> {
     const label = "retention.placeHold";
+    assertOptions(options, ["idempotencyKey"], label);
     const ref = requireCustomerRef(customerRef, label);
     const ground: unknown = input.ground;
     if (ground !== "rights_request" && ground !== "other_law") {
@@ -408,13 +413,14 @@ export class Retention {
    * hold; 409 `already_released`. A blank reason or a hold id that is not a uuid is
    * refused client-side. Never auto-retried.
    */
-  releaseHold(
+  async releaseHold(
     customerRef: string,
     holdId: string,
     input: ReleaseHoldInput,
-    options: HoldOptions = {},
+    options: IdempotencyOptions = {},
   ): Promise<ReleasedHold> {
     const label = "retention.releaseHold";
+    assertOptions(options, ["idempotencyKey"], label);
     const ref = requireCustomerRef(customerRef, label);
     const id = assertUuid(holdId, `${label}: holdId`);
     const reason = optionalText(input.reason, `${label}: reason`);
@@ -437,19 +443,35 @@ export class Retention {
    * with the previous sync's `cursor` it is the DELTA of every hold placed or released
    * since. Pass `nextPageToken` back as `pageToken` until a page answers `cursor`.
    * Most jobs want {@link Retention.syncHolds}. A read; safe to auto-retry.
+   *
+   * FAIL CLOSED: a hold whose `status` is missing or is not exactly "released" is
+   * returned as "active", so a purge job never treats an unexpected value as permission.
    */
-  listHolds(input: ListHoldsInput = {}): Promise<RetentionHoldPage> {
-    return this.transport.request<RetentionHoldPage>({
+  async listHolds(input: ListHoldsInput = {}): Promise<RetentionHoldPage> {
+    const page = await this.transport.request<RetentionHoldPage>({
       method: "GET",
       path: "/v1/retention/holds",
       query: { changedSince: input.changedSince, pageToken: input.pageToken },
       idempotentRetry: true,
     });
+    const holds: unknown = page.holds;
+    return {
+      ...page,
+      holds: Array.isArray(holds)
+        ? holds.map((hold: RetentionHoldFeedItem) => ({
+            ...hold,
+            status: hold.status === "released" ? "released" : "active",
+          }))
+        : [],
+    };
   }
 
   /**
    * Every page of one sync, as an async iterable, following `nextPageToken` for you.
-   * The LAST page carries `cursor`. Bounded by `maxPages` (default 1000).
+   * The LAST page carries `cursor`. Bounded by `maxPages` (default 1000): reaching the
+   * bound before the last page THROWS AgreelyConfigError, so a consumer that collects
+   * the pages and purges only once the loop completes never acts on a partial feed.
+   * Do not purge while iterating.
    *
    *   for await (const page of agreely.retention.holdPages({ changedSince })) { ... }
    */
@@ -465,6 +487,10 @@ export class Retention {
       if (result.nextPageToken === null || result.nextPageToken === undefined) return;
       pageToken = result.nextPageToken;
     }
+    throw new AgreelyConfigError(
+      `retention.holdPages read ${maxPages} pages without reaching the last page of the holds feed: raise ` +
+        "maxPages. Do not purge on a partial feed.",
+    );
   }
 
   /**
@@ -476,19 +502,20 @@ export class Retention {
    * FAIL CLOSED: purge only after this resolves. Any error (401, 403, 402, a 5xx, a
    * timeout) THROWS, and a purge job treats it as "do not purge this run". Reading
    * `maxPages` pages without reaching the last one throws AgreelyConfigError rather
-   * than returning a partial feed.
+   * than returning a partial feed, and so does a last page that carries no cursor. An
+   * empty `changedSince` reads the snapshot, as the server does.
    */
   async syncHolds(input: SyncHoldsInput = {}): Promise<HoldsSync> {
+    const delta = typeof input.changedSince === "string" && input.changedSince !== "";
     const holds: RetentionHoldFeedItem[] = [];
     for await (const page of this.holdPages(input)) {
       holds.push(...page.holds);
       if (typeof page.cursor === "string" && page.cursor !== "") {
-        return { mode: input.changedSince !== undefined ? "delta" : "snapshot", holds, cursor: page.cursor };
+        return { mode: delta ? "delta" : "snapshot", holds, cursor: page.cursor };
       }
     }
     throw new AgreelyConfigError(
-      "retention.syncHolds stopped before the last page of the holds feed (no cursor): raise maxPages. " +
-        "Do not purge on a partial feed.",
+      "retention.syncHolds: the last page of the holds feed carried no cursor. Do not purge on this feed.",
     );
   }
 
@@ -535,11 +562,11 @@ function requireRuleKey(ruleKey: unknown, label: string): string {
 }
 
 
-/** An optional free-text member: a string of at most RETENTION_TEXT_MAX characters when given. */
-function optionalText(value: unknown, label: string): string | undefined {
+/** An optional free-text member: a string of at most `max` characters when given. */
+function optionalText(value: unknown, label: string, max: number = RETENTION_TEXT_MAX): string | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== "string" || [...value].length > RETENTION_TEXT_MAX) {
-    throw new AgreelyConfigError(`${label} must be a string of at most ${RETENTION_TEXT_MAX} characters.`);
+  if (typeof value !== "string" || [...value].length > max) {
+    throw new AgreelyConfigError(`${label} must be a string of at most ${max} characters.`);
   }
   return value;
 }

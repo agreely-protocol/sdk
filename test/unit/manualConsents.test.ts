@@ -100,9 +100,9 @@ describe("manualConsents.record (asks, information lines, refusals)", () => {
 
   it("refuses a malformed idempotencyKey override before any call", async () => {
     const { agreely, calls } = client([{ status: 201, json: recorded }]);
-    expect(() => agreely.manualConsents.record(input, { idempotencyKey: "has space" })).toThrow(AgreelyConfigError);
-    expect(() => agreely.manualConsents.record(input, { idempotencyKey: "" })).toThrow(AgreelyConfigError);
-    expect(() => agreely.manualConsents.record(input, { idempotencyKey: "k".repeat(256) })).toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.record(input, { idempotencyKey: "has space" })).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.record(input, { idempotencyKey: "" })).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.record(input, { idempotencyKey: "k".repeat(256) })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 
@@ -200,10 +200,10 @@ describe("manualConsents.record (attestations)", () => {
     expect(calls[1]!.body).not.toHaveProperty("versionAttested");
   });
 
-  it("refuses a loose value (never read as a yes) before any call", () => {
+  it("refuses a loose value (never read as a yes) before any call", async () => {
     const { agreely, calls } = client([{ status: 201, json: recorded }]);
     const loose = { ...input, versionAttested: "true" as unknown as boolean };
-    expect(() => agreely.manualConsents.record(loose)).toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.record(loose)).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 
@@ -259,13 +259,11 @@ describe("manualConsents.createConsentSheet", () => {
     expect(calls[0]!.headers["Idempotency-Key"]).toBe("sheet-c1-1");
   });
 
-  it("refuses a blank customerRef, a missing version or a bad locale before any call", () => {
+  it("refuses a blank customerRef, a missing version or a bad locale before any call", async () => {
     const { agreely, calls } = client([{ status: 201, json: sheet }]);
-    expect(() => agreely.manualConsents.createConsentSheet(" ", { documentVersionId: VERSION })).toThrow(AgreelyConfigError);
-    expect(() => agreely.manualConsents.createConsentSheet("c1", { documentVersionId: "" })).toThrow(AgreelyConfigError);
-    expect(() =>
-      agreely.manualConsents.createConsentSheet("c1", { documentVersionId: VERSION, locale: "de" as "fr" }),
-    ).toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.createConsentSheet(" ", { documentVersionId: VERSION })).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.createConsentSheet("c1", { documentVersionId: "" })).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.createConsentSheet("c1", { documentVersionId: VERSION, locale: "de" as "fr" }),).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 

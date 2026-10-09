@@ -2,14 +2,14 @@ import { AgreelyConfigError } from "../errors.js";
 import type { Transport } from "../transport.js";
 import type {
   ConfirmVerbalPaperInput,
+  IdempotencyOptions,
   RecordVerbalConsentInput,
   VerbalAnswer,
   VerbalConsentHistory,
   VerbalConsentResult,
   VerbalPaperResult,
 } from "../types.js";
-import { recordIdempotencyKey, toWireInstant } from "../util.js";
-import type { ConsentRecordOptions } from "./manualConsents.js";
+import { assertOptions, recordIdempotencyKey, toWireInstant } from "../util.js";
 
 /** The consentId shape the routes accept. Anything else is a 404 server-side, so it is refused here. */
 const CONSENT_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -55,8 +55,9 @@ export class VerbalConsents {
    * or the relationship has ended (`relationship_ended`); 429 AgreelyVerbalDailyCapError
    * (reason `daily_cap`) at the per-company daily cap.
    */
-  record(input: RecordVerbalConsentInput, options: ConsentRecordOptions = {}): Promise<VerbalConsentResult> {
+  async record(input: RecordVerbalConsentInput, options: IdempotencyOptions = {}): Promise<VerbalConsentResult> {
     const label = "verbalConsents.record";
+    assertOptions(options, ["idempotencyKey"], label);
     const idempotencyKey = recordIdempotencyKey(options.idempotencyKey, label);
     const respondent = input.respondent;
     return this.transport.request<VerbalConsentResult>({
@@ -96,12 +97,13 @@ export class VerbalConsents {
    * a 422 `signed_at_in_future`. Scope 'attest'. NEVER auto-retried; idempotent like
    * `record`.
    */
-  confirmWithPaper(
+  async confirmWithPaper(
     consentId: string,
     input: ConfirmVerbalPaperInput,
-    options: ConsentRecordOptions = {},
+    options: IdempotencyOptions = {},
   ): Promise<VerbalPaperResult> {
     const label = "verbalConsents.confirmWithPaper";
+    assertOptions(options, ["idempotencyKey"], label);
     const idempotencyKey = recordIdempotencyKey(options.idempotencyKey, label);
     return this.transport.request<VerbalPaperResult>({
       method: "POST",
@@ -124,7 +126,7 @@ export class VerbalConsents {
    * said, and what is in force now. `state` is "awaiting_paper", "verbal_only" or
    * "paper_received". A missing, foreign or non-verbal id is an AgreelyNotFoundError.
    */
-  get(consentId: string): Promise<VerbalConsentHistory> {
+  async get(consentId: string): Promise<VerbalConsentHistory> {
     return this.transport.request<VerbalConsentHistory>({
       method: "GET",
       path: `/v1/verbal-consents/${assertConsentId(consentId, "verbalConsents.get")}`,

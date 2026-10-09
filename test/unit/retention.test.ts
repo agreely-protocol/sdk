@@ -150,10 +150,10 @@ describe("retention.declarePurge", () => {
     ["a record id as hostCategory", () => [{ ...purge, hostCategory: "client-000123" }, { idempotencyKey: "k" }]],
   ];
   for (const [name, args] of refusals) {
-    it(`refuses ${name} before any wire call`, () => {
+    it(`refuses ${name} before any wire call`, async () => {
       const { agreely, calls } = client([{ status: 201, json: stored }]);
       const [input, options] = args();
-      expect(() => agreely.retention.declarePurge(RULE, input, options)).toThrow(AgreelyConfigError);
+      await expect(agreely.retention.declarePurge(RULE, input, options)).rejects.toThrow(AgreelyConfigError);
       expect(calls).toHaveLength(0);
     });
   }
@@ -207,12 +207,10 @@ describe("retention.declareSweep", () => {
     expect(calls[0]!.body).toEqual({ sweptAt: now.toISOString(), hostSystem: "billing" });
   });
 
-  it("refuses a sweptAt older than 24 hours before any wire call", () => {
+  it("refuses a sweptAt older than 24 hours before any wire call", async () => {
     const { agreely, calls } = client([{ status: 201, json: sweep }]);
     const yesterday = new Date(Date.now() - 25 * 3_600_000);
-    expect(() =>
-      agreely.retention.declareSweep(RULE, { sweptAt: yesterday, hostSystem: "billing" }, { idempotencyKey: "s" }),
-    ).toThrow(AgreelyConfigError);
+    await expect(agreely.retention.declareSweep(RULE, { sweptAt: yesterday, hostSystem: "billing" }, { idempotencyKey: "s" }),).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 

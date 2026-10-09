@@ -63,20 +63,16 @@ describe("consentRequests.create, Idempotency-Key", () => {
 
   it("throws AgreelyConfigError without a consent document reference (nothing sent)", async () => {
     const { agreely, calls } = client([]);
-    expect(() =>
-      agreely.consentRequests.create({ customerId: "c1", recipientEmail: "u@x.com", validUntil: "2031-01-01" }),
-    ).toThrow(AgreelyConfigError);
+    await expect(agreely.consentRequests.create({ customerId: "c1", recipientEmail: "u@x.com", validUntil: "2031-01-01" }),).rejects.toThrow(AgreelyConfigError);
     expect(calls.length).toBe(0);
   });
 
   it("throws AgreelyConfigError when BOTH consentDocumentId and documentCode are given", async () => {
     const { agreely, calls } = client([]);
-    expect(() =>
-      agreely.consentRequests.create({
+    await expect(agreely.consentRequests.create({
         customerId: "c1", recipientEmail: "u@x.com", validUntil: "2031-01-01",
         consentDocumentId: "6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b", documentCode: "terms",
-      }),
-    ).toThrow(AgreelyConfigError);
+      }),).rejects.toThrow(AgreelyConfigError);
     expect(calls.length).toBe(0);
   });
 
@@ -215,7 +211,7 @@ describe("catalog.forDocument", () => {
         json: { error: { code: "not_found", message: "No published consent document matches that code.", field: "documentCode" } },
       },
     ]);
-    expect(() => agreely.catalog.forDocument("  ")).toThrow(AgreelyConfigError);
+    await expect(agreely.catalog.forDocument("  ")).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
     await expect(agreely.catalog.forDocument("other-tenant")).rejects.toMatchObject({
       name: "AgreelyNotFoundError",

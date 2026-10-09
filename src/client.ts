@@ -140,7 +140,7 @@ export class Agreely {
    * supply DID documents locally), the default did:web resolver fetches a host
    * taken from the receipt (HTTPS-only; it can never yield a false "verified").
    */
-  static verifyReceipt(
+  static async verifyReceipt(
     receipt: unknown,
     opts: VerifyReceiptOptions = {},
   ): Promise<ReceiptVerification> {
@@ -172,7 +172,7 @@ export class Agreely {
    * purge whatever you cached from Agreely and fail closed. It never replaces a check:
    * never cache /v1/check, and never decide consent from a cached catalog.
    */
-  identity(): Promise<Identity> {
+  async identity(): Promise<Identity> {
     return this.transport.request<Identity>({
       method: "GET",
       path: "/v1/whoami",
@@ -288,7 +288,7 @@ export class Agreely {
    * the policy fails closed, or returns a degraded allow (degraded:true) when
    * the explicit exception applies.
    */
-  checkDetailed(
+  async checkDetailed(
     customerId: string,
     category: string,
     purpose: string,

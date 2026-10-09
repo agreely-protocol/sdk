@@ -49,7 +49,7 @@ export class Inventory {
    * labelEn, fields), so nothing else on your objects leaves the process. Never
    * auto-retried.
    */
-  replaceCategories(input: ReplaceInventoryInput): Promise<InventoryDeclaration> {
+  async replaceCategories(input: ReplaceInventoryInput): Promise<InventoryDeclaration> {
     const label = "inventory.replaceCategories";
     const hostSystem = assertHostToken(input.hostSystem, `${label}: hostSystem`);
     const categories: unknown = input.categories;
@@ -112,7 +112,7 @@ export class Inventory {
    * rule since: `current` is false once a later statement superseded it, and the
    * terms are still the ones frozen. An unknown key is AgreelyNotFoundError.
    */
-  getStatement(statementKey: string): Promise<ResolvedRetentionStatement> {
+  async getStatement(statementKey: string): Promise<ResolvedRetentionStatement> {
     const key = typeof statementKey === "string" ? statementKey.trim() : "";
     if (key === "") throw new AgreelyConfigError("inventory.getStatement requires a statementKey.");
     return this.transport.request<ResolvedRetentionStatement>({

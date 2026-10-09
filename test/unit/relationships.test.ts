@@ -33,15 +33,15 @@ describe("relationships.end", () => {
     expect(calls[0]!.url).toBe(`${BASE}/v1/customers/STORE%2F0042/relationship/end`);
   });
 
-  it("fails CLOSED on a blank reason (AgreelyConfigError) before any wire call", () => {
+  it("fails CLOSED on a blank reason (AgreelyConfigError) before any wire call", async () => {
     const { agreely, calls } = client([{ status: 200, json: ended }]);
-    expect(() => agreely.relationships.end({ customerRef: "cust-1", reason: "   " })).toThrow(AgreelyConfigError);
+    await expect(agreely.relationships.end({ customerRef: "cust-1", reason: "   " })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 
-  it("fails CLOSED on a missing customerRef before any wire call", () => {
+  it("fails CLOSED on a missing customerRef before any wire call", async () => {
     const { agreely, calls } = client([{ status: 200, json: ended }]);
-    expect(() => agreely.relationships.end({ customerRef: "  ", reason: "done" })).toThrow(AgreelyConfigError);
+    await expect(agreely.relationships.end({ customerRef: "  ", reason: "done" })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 
@@ -100,15 +100,15 @@ describe("relationships.revert", () => {
     expect(calls[0]!.url).toBe(`${BASE}/v1/customers/STORE%2F0042/relationship/revert`);
   });
 
-  it("fails CLOSED on a blank reason (AgreelyConfigError) before any wire call", () => {
+  it("fails CLOSED on a blank reason (AgreelyConfigError) before any wire call", async () => {
     const { agreely, calls } = client([{ status: 200, json: reverted }]);
-    expect(() => agreely.relationships.revert({ customerRef: "cust-1", reason: "   " })).toThrow(AgreelyConfigError);
+    await expect(agreely.relationships.revert({ customerRef: "cust-1", reason: "   " })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 
-  it("fails CLOSED on a missing customerRef before any wire call", () => {
+  it("fails CLOSED on a missing customerRef before any wire call", async () => {
     const { agreely, calls } = client([{ status: 200, json: reverted }]);
-    expect(() => agreely.relationships.revert({ customerRef: "  ", reason: "mistake" })).toThrow(AgreelyConfigError);
+    await expect(agreely.relationships.revert({ customerRef: "  ", reason: "mistake" })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 

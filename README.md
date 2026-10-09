@@ -578,7 +578,9 @@ await saveCursor(sync.cursor);
 `syncHolds` follows the pages (500 holds each) for you; `holdPages` iterates them
 and `listHolds({ changedSince, pageToken })` reads one. Only the last page carries
 `cursor`. Treat **any** error on the feed (401, 403, 402, a 5xx, a timeout) as
-"do not purge": `syncHolds` throws rather than returning a partial feed.
+"do not purge": `syncHolds` and `holdPages` throw rather than end on a partial feed
+(with `holdPages`, collect the pages and purge only once the loop completes). A hold
+whose `status` is missing or is anything but `"released"` is read as `"active"`.
 
 **One customer (scope `registry`)**:
 
@@ -671,7 +673,11 @@ same list always passes.
 
 ## Errors
 
-Every failure is an `AgreelyError` subclass - a **deny is not an error**.
+Every failure is an `AgreelyError` subclass - a **deny is not an error**. Every
+method that returns a promise **rejects**, it never throws synchronously: invalid
+input rejects with `AgreelyConfigError` before any request. The options object of a
+write is closed: a misspelt `idempotencykey` is refused, never ignored in favour of a
+random key.
 
 | Error                       | When                                  |
 | --------------------------- | ------------------------------------- |
@@ -679,8 +685,8 @@ Every failure is an `AgreelyError` subclass - a **deny is not an error**.
 | `AgreelyValidationError`    | 400 / 422 (`.field` names the input)  |
 | `AgreelyNotFoundError`      | 404                                   |
 | `AgreelyBillingInactiveError` | 402 - the company's Agreely subscription lapsed |
-| `AgreelyRateLimitError`     | 429 (`.retryAfter` seconds)           |
-| `AgreelyDailyCapError`      | 429 on a per-company daily cap: `withdrawal_daily_cap`, `hold_budget_exhausted`, `hold_release_cap_reached` (a rate-limit subclass; never auto-retried) |
+| `AgreelyRateLimitError`     | 429 (`.retryAfter` seconds). `code: "rate_limited"` is the per-minute window, the only 429 ever auto-retried; any other code keeps its own and is never retried |
+| `AgreelyDailyCapError`      | 429 on a per-company daily cap: `withdrawal_daily_cap`, `hold_budget_exhausted`, `hold_release_cap_reached`, or any 429 whose reason is `daily_cap` (a rate-limit subclass; never auto-retried) |
 | `AgreelyVerbalDailyCapError` | 429 `verbal_daily_cap` (a daily-cap subclass; never auto-retried) |
 | `AgreelyConflictError`      | 409: `code: "conflict"` (the record's state refuses it, do not retry as is), `code: "retry"` (retry with the same Idempotency-Key), or a named state (`already_minted`, `identity_held`, `identity_erased`, `relationship_active`, `already_released`) |
 | `AgreelyUnavailableError`   | 503 / network / timeout               |
@@ -743,8 +749,9 @@ try {
 
 Low default timeout (**800ms** total budget). Only idempotent reads and the
 check are retried on a transient outage (network / 503): up to 2 attempts,
-jittered, inside the budget. No write is ever auto-retried (`consentRequests.create`
-emails; the others record). The two calls that render a PDF
+jittered, inside the budget. With `maxRetries`, a read also retries a 429
+`rate_limited` after its `Retry-After`, and no other 429. No write is ever
+auto-retried (`consentRequests.create` emails; the others record). The two calls that render a PDF
 (`consentDocuments.getInformationPdf`, `manualConsents.createConsentSheet`) get at
 least 15 s, overridable per call with `{ timeout }`: a cut-off sheet would lose a
 reference the server returns only once.

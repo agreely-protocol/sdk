@@ -2,7 +2,11 @@
 // integrator can `catch (e) { if (e instanceof AgreelyRateLimitError) ... }`.
 // A consent DENY is NOT an error (it is a 200) and never appears here.
 
-/** The canonical wire error code. */
+/**
+ * The HTTP-level wire error code (`error.code`). OPEN-ENDED like {@link AgreelyErrorReason}:
+ * the server adds codes, so the type accepts any string while still autocompleting the
+ * known ones.
+ */
 export type AgreelyErrorCode =
   | "unauthorized"
   | "forbidden"
@@ -54,7 +58,9 @@ export type AgreelyErrorCode =
   | "hold_budget_exhausted"
   | "hold_release_cap_reached"
   // Host inventory.
-  | "new_set_limit";
+  | "new_set_limit"
+  // Any code this SDK version does not know yet.
+  | (string & Record<never, never>);
 
 /**
  * The STABLE machine reason of a refusal, sent as `error.reason` beside the HTTP-level
@@ -206,7 +212,12 @@ export class AgreelyNotFoundError extends AgreelyError {}
  */
 export class AgreelyBillingInactiveError extends AgreelyError {}
 
-/** 429: the per-company rate window was exceeded. */
+/**
+ * 429. With `code: "rate_limited"` it is the per-company per-minute window, the ONLY 429
+ * the transport auto-retries (on a read, when `maxRetries` is set). Any other code, one
+ * added later included, keeps its own code and is never auto-retried; its subclasses
+ * name the known ones (the sweep floor, the daily caps).
+ */
 export class AgreelyRateLimitError extends AgreelyError {
   /** Seconds until the window resets (from the Retry-After header), when given. */
   readonly retryAfter: number | undefined;
@@ -234,10 +245,11 @@ export class AgreelyRateLimitError extends AgreelyError {
 export class AgreelySweepTooFrequentError extends AgreelyRateLimitError {}
 
 /**
- * 429 on a per-company DAILY cap, not the per-minute window. `code` names which one:
+ * 429 on a per-company DAILY cap, not the per-minute window: a known daily-cap code, or
+ * any 429 whose `reason` is `daily_cap`. `code` names which one:
  *
- *   - `verbal_daily_cap`: verbal (telephone) consents recorded today (also thrown as
- *     the narrower {@link AgreelyVerbalDailyCapError});
+ *   - `verbal_daily_cap`: verbal (telephone) consents recorded today (thrown as the
+ *     narrower {@link AgreelyVerbalDailyCapError});
  *   - `withdrawal_daily_cap`: withdrawals recorded through the API in 24 hours. It
  *     sends no Retry-After: it is a tripwire for a runaway or stolen key, and the
  *     owner is notified. Record further withdrawals from the customer page in Agreely;
@@ -246,7 +258,8 @@ export class AgreelySweepTooFrequentError extends AgreelyRateLimitError {}
  *     API in 24 hours. The organisation releases further ones in Agreely.
  *
  * A subclass of AgreelyRateLimitError, so a generic rate-limit catch still catches it.
- * The SDK never auto-retries it: waiting out a per-minute window cannot help.
+ * The SDK never auto-retries it, even on a read with `maxRetries`: waiting out a
+ * per-minute window cannot help.
  */
 export class AgreelyDailyCapError extends AgreelyRateLimitError {}
 
@@ -259,7 +272,7 @@ export class AgreelyDailyCapError extends AgreelyRateLimitError {}
 export class AgreelyVerbalDailyCapError extends AgreelyDailyCapError {}
 
 /**
- * 409. Branch on `code`, the two meanings are opposite:
+ * 409. Branch on `code` (and on `reason` when it is `conflict`):
  *
  *   - `retry`: a concurrent retry of the same declaration could not be settled.
  *     Nothing new was recorded under this attempt. Retry with the SAME

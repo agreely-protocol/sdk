@@ -48,7 +48,7 @@ export interface BytesExchange {
   contentDisposition: string | null;
 }
 
-/** The 429 codes that are a per-company DAILY cap, never the per-minute window. */
+/** The 429 codes that are a per-company DAILY cap (besides `verbal_daily_cap`), never the per-minute window. */
 const DAILY_CAP_CODES: ReadonlySet<string> = new Set([
   "withdrawal_daily_cap",
   "hold_budget_exhausted",
@@ -124,10 +124,12 @@ export class Transport {
       try {
         return await this.attempt(spec, parse);
       } catch (error) {
-        // A per-rule floor or a daily cap is not the rate window: waiting it out and
-        // re-sending cannot help, so neither is ever auto-retried.
+        // ONLY the per-minute window (`rate_limited`) is ever auto-retried. A per-rule
+        // floor, a daily cap or a 429 code this SDK does not know is not that window:
+        // waiting it out and re-sending cannot be assumed to help.
         const windowed =
           error instanceof AgreelyRateLimitError &&
+          error.code === "rate_limited" &&
           !(error instanceof AgreelySweepTooFrequentError) &&
           !(error instanceof AgreelyDailyCapError);
         if (windowed && rateAttempt < rateRetries) {
@@ -269,19 +271,23 @@ export class Transport {
         if (code === "sweep_too_frequent") {
           throw new AgreelySweepTooFrequentError(message, { ...init, code: "sweep_too_frequent" });
         }
-        // The per-company daily caps: not the per-minute window either.
         if (code === "verbal_daily_cap") {
           throw new AgreelyVerbalDailyCapError(message, { ...init, code: "verbal_daily_cap" });
         }
-        if (code !== undefined && DAILY_CAP_CODES.has(code)) {
-          throw new AgreelyDailyCapError(message, { ...init, code });
+        // A known daily-cap code, or any 429 whose reason is `daily_cap`: a cap, keeping its code.
+        if ((code !== undefined && DAILY_CAP_CODES.has(code)) || detail.reason === "daily_cap") {
+          throw new AgreelyDailyCapError(message, { ...init, code: code ?? "rate_limited" });
         }
-        throw new AgreelyRateLimitError(message, { ...init, code: "rate_limited" });
+        // The per-minute window (`rate_limited`, or a 429 with no code at all, from a proxy)
+        // is the only one the transport retries. Any other code keeps its own, never rewritten
+        // to `rate_limited`, so it is never retried as if it were the window.
+        throw new AgreelyRateLimitError(message, { ...init, code: code ?? "rate_limited" });
       }
       default:
-        // 503 and any other 5xx: unreachable. 503 is retryable for idempotent calls.
+        // 503 and any other 5xx (and an unmapped status such as 405 or 410): unreachable.
+        // 503 is retryable for idempotent calls. `field` and `reason` travel here too.
         throw new AgreelyUnavailableError(message, {
-          status: res.status,
+          ...detail,
           retryable: res.status === 503,
         });
     }

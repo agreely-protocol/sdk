@@ -54,7 +54,7 @@ export class ConsentRequests {
    * auto-retried (it emails): an Idempotency-Key is auto-generated per call
    * (overridable) so a caller-driven retry replays rather than double-issues.
    */
-  create(input: CreateConsentRequestInput, options: CreateOptions = {}): Promise<IssuedRequest> {
+  async create(input: CreateConsentRequestInput, options: CreateOptions = {}): Promise<IssuedRequest> {
     const hasId = typeof input.consentDocumentId === "string" && input.consentDocumentId.trim() !== "";
     const hasCode = typeof input.documentCode === "string" && input.documentCode.trim() !== "";
     if (!hasId && !hasCode) {
@@ -131,7 +131,7 @@ export class ConsentRequests {
   }
 
   /** Fetch one request by its protocol requestId (0x + 64hex). */
-  get(requestId: string): Promise<ConsentRequestRecord> {
+  async get(requestId: string): Promise<ConsentRequestRecord> {
     return this.transport.request<ConsentRequestRecord>({
       method: "GET",
       path: `/v1/consent-requests/${encodeURIComponent(requestId)}`,
@@ -149,7 +149,7 @@ export class ConsentRequests {
    * transition returns cancelled=true. An unknown/foreign id maps to
    * AgreelyNotFoundError (404). Never auto-retried (it mutates).
    */
-  cancel(requestId: string): Promise<CancelledRequest> {
+  async cancel(requestId: string): Promise<CancelledRequest> {
     return this.transport.request<CancelledRequest>({
       method: "POST",
       path: `/v1/consent-requests/${encodeURIComponent(requestId)}/cancel`,

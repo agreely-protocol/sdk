@@ -36,7 +36,7 @@ export class Catalog {
    * refused before the wire call. Never decide consent from it: a listed cell says
    * what was declared, only a check says what a person consented to.
    */
-  forDocument(documentCode: string): Promise<DocumentCatalog> {
+  async forDocument(documentCode: string): Promise<DocumentCatalog> {
     const code = typeof documentCode === "string" ? documentCode.trim() : "";
     if (code === "") throw new AgreelyConfigError("catalog.forDocument requires a document code.");
     return this.transport.request<DocumentCatalog>({
@@ -53,7 +53,7 @@ export class Catalog {
    * `retentionRuleKey` is null is a gap in the register: the host abstains from
    * purging under it and never picks a duration of its own.
    */
-  listCells(): Promise<CatalogCells> {
+  async listCells(): Promise<CatalogCells> {
     return this.transport.request<CatalogCells>({
       method: "GET",
       path: "/v1/catalog/cells",

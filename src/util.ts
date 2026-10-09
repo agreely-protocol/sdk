@@ -161,16 +161,45 @@ export function recordIdempotencyKey(override: unknown, label: string): string {
 export const CUSTOMER_REF_MAX = 200;
 
 /**
- * A customerRef for a /v1/customers/{customerRef} path: trimmed, 1 to 200 characters.
- * Refused client-side otherwise (the server would answer a 404 or a 422 that names
- * nothing the caller can fix by retrying).
+ * The server's own trim (PHP's: space, tab, newline, carriage return, NUL, vertical tab).
+ * JavaScript's `trim()` also strips Unicode spaces the server keeps, which would address
+ * a different customer than the one the caller named.
+ */
+const SERVER_TRIM = /^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g;
+
+/**
+ * A customerRef for a /v1/customers/{customerRef} path: 1 to 200 characters once
+ * trimmed exactly as the server trims it, and never "." or "..", which the URL parser
+ * would resolve as a path step (`placeHold("..")` would post to /v1/retention/holds).
+ * A "/" or a "%" is fine: the path segment is percent-encoded. Refused client-side
+ * otherwise (the server would answer a 404 or a 422 the caller cannot fix by retrying).
  */
 export function requireCustomerRef(value: unknown, label: string): string {
-  const ref = typeof value === "string" ? value.trim() : "";
+  const ref = typeof value === "string" ? value.replace(SERVER_TRIM, "") : "";
   if (ref === "" || [...ref].length > CUSTOMER_REF_MAX) {
     throw new AgreelyConfigError(`${label} requires a customerRef of 1 to ${CUSTOMER_REF_MAX} characters.`);
   }
+  if (ref === "." || ref === "..") {
+    throw new AgreelyConfigError(`${label}: "${ref}" cannot be a customerRef in a URL path.`);
+  }
   return ref;
+}
+
+/**
+ * Refuse an options object carrying anything but the named members. A misspelt
+ * `idempotencykey` would otherwise be ignored and replaced by a random key, so a retry
+ * the caller believed safe would record twice.
+ */
+export function assertOptions(options: unknown, allowed: readonly string[], label: string): void {
+  if (options === undefined) return;
+  if (options === null || typeof options !== "object" || Array.isArray(options)) {
+    throw new AgreelyConfigError(`${label}: options must be an object.`);
+  }
+  for (const key of Object.keys(options)) {
+    if (!allowed.includes(key)) {
+      throw new AgreelyConfigError(`${label}: unknown option "${key}" (accepted: ${allowed.join(", ")}).`);
+    }
+  }
 }
 
 const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;

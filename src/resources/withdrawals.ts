@@ -1,8 +1,7 @@
 import { AgreelyConfigError } from "../errors.js";
 import type { Transport } from "../transport.js";
-import type { ConsentWithdrawal, RecordWithdrawalInput, WithdrawalChannel } from "../types.js";
-import { recordIdempotencyKey, requireCustomerRef, toWireInstant } from "../util.js";
-import type { ConsentRecordOptions } from "./manualConsents.js";
+import type { ConsentWithdrawal, IdempotencyOptions, RecordWithdrawalInput, WithdrawalChannel } from "../types.js";
+import { assertOptions, recordIdempotencyKey, requireCustomerRef, toWireInstant } from "../util.js";
 
 /** The channels a person may have used to ask, as the server knows them. */
 export const WITHDRAWAL_CHANNELS: readonly WithdrawalChannel[] = ["phone", "email", "mail", "in_person", "other"];
@@ -57,15 +56,17 @@ export class Withdrawals {
    * `requested_at_in_future`, `requested_at_before_grant`; 429 `daily_cap`.
    *
    * NEVER auto-retried. An Idempotency-Key is auto-generated per call (overridable): a
-   * retry with the same key and body replays the first answer and writes nothing.
+   * retry with the same key and body replays the first answer (a 200) and writes nothing.
+   * Invalid input rejects the returned promise; nothing is thrown synchronously.
    */
-  record(
+  async record(
     customerRef: string,
     consentRef: string,
     input: RecordWithdrawalInput,
-    options: ConsentRecordOptions = {},
+    options: IdempotencyOptions = {},
   ): Promise<ConsentWithdrawal> {
     const label = "withdrawals.record";
+    assertOptions(options, ["idempotencyKey"], label);
     const ref = requireCustomerRef(customerRef, label);
     const consent = typeof consentRef === "string" ? consentRef.trim() : "";
     if (!CONSENT_REF.test(consent)) {

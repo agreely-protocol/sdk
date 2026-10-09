@@ -44,7 +44,7 @@ describe("retention.getCustomerRetention", () => {
   it("reads the derived clock, the standing disposition and the holds", async () => {
     const body: CustomerRetention = {
       customerRef: "c1",
-      relationship: { status: "ended", endedAt: "2026-09-01 12:00:00+00" },
+      relationship: { status: "ended", endedAt: "2026-09-01T12:00:00Z" },
       clock: {
         trigger: "purpose_achieved",
         recipe: "dueAt = the tenant-local calendar date of endedAt, plus periodMonths calendar months",
@@ -77,12 +77,12 @@ describe("retention.declareDisposition", () => {
     disposition: "destroyed",
     retentionUntil: null,
     hasReason: false,
-    endedAtSnapshot: "2026-09-01 12:00:00+00",
+    endedAtSnapshot: "2026-09-01T12:00:00Z",
     scheduleRef: null,
     basis: null,
     hasBasisNote: false,
     declaredBy: "api:billing",
-    declaredAt: "2026-10-08 18:00:00+00",
+    declaredAt: "2026-10-08T18:00:00Z",
     agreelyIdentity: "retained_hold",
     warnings: [{ code: "hold_active", message: "An active hold covers this customer.", holdIds: [HOLD] }],
   };
@@ -106,7 +106,7 @@ describe("retention.declareDisposition", () => {
     expect(r.agreelyIdentity).toBe("retained_hold");
   });
 
-  it("refuses an impossible declaration before any call", () => {
+  it("refuses an impossible declaration before any call", async () => {
     const { agreely, calls } = client([{ status: 201, json: declared }]);
     const bad = [
       { disposition: "deleted" },
@@ -116,7 +116,7 @@ describe("retention.declareDisposition", () => {
       { disposition: "legal_hold", reason: "law", retentionUntil: "31/12/2030" },
     ];
     for (const input of bad) {
-      expect(() => agreely.retention.declareDisposition("c1", input as never)).toThrow(AgreelyConfigError);
+      await expect(agreely.retention.declareDisposition("c1", input as never)).rejects.toThrow(AgreelyConfigError);
     }
     expect(calls).toHaveLength(0);
   });
@@ -167,7 +167,7 @@ describe("retention.placeHold / releaseHold", () => {
     expect(calls[0]!.headers["Idempotency-Key"]).toMatch(/^idem_/);
   });
 
-  it("refuses an impossible hold before any call", () => {
+  it("refuses an impossible hold before any call", async () => {
     const { agreely, calls } = client([{ status: 201, json: placed }]);
     const bad = [
       { ground: "lawsuit" },
@@ -180,7 +180,7 @@ describe("retention.placeHold / releaseHold", () => {
       { ground: "other_law", provision: "x".repeat(2001) },
     ];
     for (const input of bad) {
-      expect(() => agreely.retention.placeHold("c1", input as never)).toThrow(AgreelyConfigError);
+      await expect(agreely.retention.placeHold("c1", input as never)).rejects.toThrow(AgreelyConfigError);
     }
     expect(calls).toHaveLength(0);
   });
@@ -214,10 +214,10 @@ describe("retention.placeHold / releaseHold", () => {
     expect(r.agreelyIdentity).toBe("erased");
   });
 
-  it("refuses a blank reason or a malformed hold id before any call", () => {
+  it("refuses a blank reason or a malformed hold id before any call", async () => {
     const { agreely, calls } = client([{ json: {} }]);
-    expect(() => agreely.retention.releaseHold("c1", HOLD, { reason: " " })).toThrow(AgreelyConfigError);
-    expect(() => agreely.retention.releaseHold("c1", "not-a-uuid", { reason: "r" })).toThrow(AgreelyConfigError);
+    await expect(agreely.retention.releaseHold("c1", HOLD, { reason: " " })).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.retention.releaseHold("c1", "not-a-uuid", { reason: "r" })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 

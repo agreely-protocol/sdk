@@ -50,23 +50,19 @@ describe("inventory.replaceCategories", () => {
     expect(r.withdrawn).toBe(1);
   });
 
-  it("refuses an empty list before any wire call, never reading it as withdraw-everything", () => {
+  it("refuses an empty list before any wire call, never reading it as withdraw-everything", async () => {
     const { agreely, calls } = client([{ json: {} }]);
-    expect(() => agreely.inventory.replaceCategories({ hostSystem: "crm", categories: [] })).toThrow(AgreelyConfigError);
+    await expect(agreely.inventory.replaceCategories({ hostSystem: "crm", categories: [] })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 
-  it("refuses over 200 sets, a set without fields, and a pod name as hostSystem", () => {
+  it("refuses over 200 sets, a set without fields, and a pod name as hostSystem", async () => {
     const { agreely, calls } = client([{ json: {} }]);
     const set = declaration.categories[0]!;
     expect(INVENTORY_MAX_SETS).toBe(200);
-    expect(() =>
-      agreely.inventory.replaceCategories({ hostSystem: "crm", categories: Array.from({ length: 201 }, () => set) }),
-    ).toThrow(AgreelyConfigError);
-    expect(() =>
-      agreely.inventory.replaceCategories({ hostSystem: "crm", categories: [{ ...set, fields: [] }] }),
-    ).toThrow(AgreelyConfigError);
-    expect(() => agreely.inventory.replaceCategories({ ...declaration, hostSystem: "crm-5d8f9c7b6a" })).toThrow(
+    await expect(agreely.inventory.replaceCategories({ hostSystem: "crm", categories: Array.from({ length: 201 }, () => set) }),).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.inventory.replaceCategories({ hostSystem: "crm", categories: [{ ...set, fields: [] }] }),).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.inventory.replaceCategories({ ...declaration, hostSystem: "crm-5d8f9c7b6a" })).rejects.toThrow(
       AgreelyConfigError,
     );
     expect(calls).toHaveLength(0);

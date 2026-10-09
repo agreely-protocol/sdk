@@ -93,18 +93,18 @@ describe("verbalConsents.record", () => {
     const { agreely, calls } = client([{ status: 201, json: recorded }]);
     await agreely.verbalConsents.record({ ...input, obtainedAt: new Date("2026-09-29T14:05:00Z") });
     expect((calls[0]!.body as { obtainedAt: string }).obtainedAt).toBe("2026-09-29T14:05:00.000Z");
-    expect(() => agreely.verbalConsents.record({ ...input, obtainedAt: "2026-09-29T10:05:00" })).toThrow(AgreelyConfigError);
-    expect(() => agreely.verbalConsents.record({ ...input, obtainedAt: "yesterday" })).toThrow(AgreelyConfigError);
+    await expect(agreely.verbalConsents.record({ ...input, obtainedAt: "2026-09-29T10:05:00" })).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.verbalConsents.record({ ...input, obtainedAt: "yesterday" })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(1);
   });
 
-  it("refuses an answer that is not exactly yes or no, and an empty answer list", () => {
+  it("refuses an answer that is not exactly yes or no, and an empty answer list", async () => {
     const { agreely, calls } = client([{ status: 201, json: recorded }]);
     const boolAnswer = [{ category: "A", purpose: "B", answer: true }] as unknown as RecordVerbalConsentInput["answers"];
-    expect(() => agreely.verbalConsents.record({ ...input, answers: boolAnswer })).toThrow(AgreelyConfigError);
+    await expect(agreely.verbalConsents.record({ ...input, answers: boolAnswer })).rejects.toThrow(AgreelyConfigError);
     const informed = [{ category: "A", purpose: "B", answer: "informed" }] as unknown as RecordVerbalConsentInput["answers"];
-    expect(() => agreely.verbalConsents.record({ ...input, answers: informed })).toThrow(AgreelyConfigError);
-    expect(() => agreely.verbalConsents.record({ ...input, answers: [] })).toThrow(AgreelyConfigError);
+    await expect(agreely.verbalConsents.record({ ...input, answers: informed })).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.verbalConsents.record({ ...input, answers: [] })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 
@@ -116,7 +116,7 @@ describe("verbalConsents.record", () => {
     expect(calls[0]!.headers["Idempotency-Key"]).toMatch(/^idem_/);
     expect(calls[0]!.headers["Idempotency-Key"]).not.toBe(calls[1]!.headers["Idempotency-Key"]);
     expect(calls[2]!.headers["Idempotency-Key"]).toBe("call-2026-09-29-0001");
-    expect(() => agreely.verbalConsents.record(input, { idempotencyKey: "é" })).toThrow(AgreelyConfigError);
+    await expect(agreely.verbalConsents.record(input, { idempotencyKey: "é" })).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(3);
   });
 
@@ -224,15 +224,13 @@ describe("verbalConsents.confirmWithPaper", () => {
     expect(r.withdrawn).toHaveLength(1);
   });
 
-  it("refuses a consentId that is not a uuid before any call", () => {
+  it("refuses a consentId that is not a uuid before any call", async () => {
     const { agreely, calls } = client([{ status: 201, json: paper }]);
-    expect(() =>
-      agreely.verbalConsents.confirmWithPaper("../manual-consents", {
+    await expect(agreely.verbalConsents.confirmWithPaper("../manual-consents", {
         signedAt: "2026-10-02T09:00:00-04:00",
         answers: [{ category: "A", purpose: "B", answer: "yes" }],
         evidence: { pdfSha256: SHA },
-      }),
-    ).toThrow(AgreelyConfigError);
+      }),).rejects.toThrow(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 

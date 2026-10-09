@@ -75,7 +75,7 @@ describe("withdrawals.record", () => {
     expect(calls.map((c) => (c.body as { channel: string }).channel)).toEqual([...WITHDRAWAL_CHANNELS]);
   });
 
-  it("refuses, before any call, what the server would refuse", () => {
+  it("refuses, before any call, what the server would refuse", async () => {
     const { agreely, calls } = client([{ json: withdrawn }]);
     const bad: Array<[string, string, Record<string, unknown>]> = [
       [" ", REF, input],
@@ -87,7 +87,7 @@ describe("withdrawals.record", () => {
       ["c1", REF, { ...input, reason: "x".repeat(1001) }],
     ];
     for (const [customer, consent, body] of bad) {
-      expect(() => agreely.withdrawals.record(customer, consent, body as never)).toThrow(AgreelyConfigError);
+      await expect(agreely.withdrawals.record(customer, consent, body as never)).rejects.toThrow(AgreelyConfigError);
     }
     expect(calls).toHaveLength(0);
   });

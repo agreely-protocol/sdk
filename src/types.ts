@@ -1267,6 +1267,23 @@ export interface ResolvedRetentionStatement extends RetentionStatement {
 // 'attest_verbal'). Read-only: authoring and publishing stay in Agreely.
 // ---------------------------------------------------------------------------
 
+/**
+ * The Idempotency-Key of a write that accepts one: auto-generated per call when omitted,
+ * else 1 to 255 printable ASCII characters (refused client-side otherwise). The options
+ * object is CLOSED: a member other than `idempotencyKey` (a misspelt `idempotencykey`)
+ * is refused rather than ignored, because ignoring it would silently send a random key.
+ *
+ * The server binds the key to the endpoint and to the request body. A retry with the
+ * same key AND the same body replays the FIRST answer and records nothing new: the 201
+ * of a manual or verbal consent, of a paper and of a placed hold (with `replayed:
+ * true`), the 200 of a withdrawal and of a hold release. The same key with a different
+ * body is a NEW request. Pass a key derived from something durable (your own request
+ * id) when you intend to retry; a key regenerated after a crash is a second request.
+ */
+export interface IdempotencyOptions {
+  idempotencyKey?: string;
+}
+
 /** A document language. French is the default everywhere a locale is optional. */
 export type DocumentLocale = "fr" | "en";
 
@@ -1490,9 +1507,10 @@ export interface CustomerRecord {
   hasBasisNote: boolean;
   legalBasis: RegistryBasis | null;
   noticeLocale: DocumentLocale | null;
-  /** As stored (a PostgreSQL timestamp, not necessarily RFC 3339), or null when not registered. */
+  /** RFC 3339 UTC, or null when no identity row is held. */
   createdAt: string | null;
   updatedAt: string | null;
+  /** `endedAt` is RFC 3339 UTC, or null while the relationship has not ended. */
   relationship: { status: RelationshipLifecycle; endedAt: string | null };
 }
 
@@ -1556,11 +1574,6 @@ export type PlaceHoldInput =
   | (PlaceHoldBase & { ground: "rights_request"; provision?: never })
   | (PlaceHoldBase & { ground: "other_law"; provision: string });
 
-/** Optional replay key for placing or releasing a hold (the Idempotency-Key header). */
-export interface HoldOptions {
-  /** Auto-generated per call when omitted. Pass a DURABLE one to make a retry replay the first answer. */
-  idempotencyKey?: string;
-}
 
 /** The body of a placed hold: 201, or 200 with `replayed: true` on an idempotent replay. */
 export interface PlacedHold extends RetentionHold {
@@ -1615,13 +1628,14 @@ export interface RetentionDispositionRecord {
   disposition: DispositionKind;
   retentionUntil: string | null;
   hasReason: boolean;
-  /** The end of the relationship this declaration was made against, frozen. */
+  /** The end of the relationship this declaration was made against, frozen (RFC 3339 UTC). */
   endedAtSnapshot: string;
   scheduleRef: string | null;
   /** The ground the client was held on at the time, frozen (the code only). */
   basis: string | null;
   hasBasisNote: boolean;
   declaredBy: string;
+  /** RFC 3339 UTC. */
   declaredAt: string;
   /** Null on a row declared before the field existed. */
   agreelyIdentity: AgreelyIdentityOutcome | null;
@@ -1841,9 +1855,10 @@ export interface AgreelyOptions {
    */
   fetch?: typeof fetch;
   /**
-   * Opt-in: how many EXTRA attempts to make on a 429 for IDEMPOTENT calls
-   * (GET / check). Default 0 (surface AgreelyRateLimitError immediately, as
-   * before). A mutating call is never auto-retried on a 429.
+   * Opt-in: how many EXTRA attempts to make on a 429 `rate_limited` (the per-minute
+   * window) for IDEMPOTENT calls (GET / check). Default 0 (surface
+   * AgreelyRateLimitError immediately). No other 429 is ever retried (a daily cap, the
+   * sweep floor, a code this SDK does not know), and a mutating call never is.
    */
   maxRetries?: number;
   /**

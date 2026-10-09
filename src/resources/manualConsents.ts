@@ -1,12 +1,13 @@
 import { AgreelyConfigError } from "../errors.js";
 import type { Transport } from "../transport.js";
-import { recordIdempotencyKey, renderBudget, requireCustomerRef } from "../util.js";
+import { assertOptions, recordIdempotencyKey, renderBudget, requireCustomerRef } from "../util.js";
 import type {
   ClaimLink,
   ConsentSheet,
   ConsentSheetOptions,
   CreateClaimLinkInput,
   CreateConsentSheetInput,
+  IdempotencyOptions,
   ManualConsentErasure,
   ManualConsentMutationInput,
   ManualConsentResult,
@@ -15,21 +16,6 @@ import type {
 } from "../types.js";
 import { DOCUMENT_TIMEOUT_MS, assertLocale } from "./consentDocuments.js";
 
-interface RecordOptions {
-  /**
-   * Override the auto-generated Idempotency-Key sent with the request: 1 to 255
-   * printable ASCII characters, refused client-side otherwise.
-   *
-   * A retry with the same key AND the same body replays the original 201 and
-   * records nothing new. The server binds the key to this endpoint and to the
-   * request body: the same key with a different body is a NEW request (it records),
-   * and a key spent on another endpoint never replays that endpoint's answer here.
-   * Concurrent requests carrying the same key are processed one at a time.
-   */
-  idempotencyKey?: string;
-}
-
-export type { RecordOptions as ConsentRecordOptions };
 
 /**
  * The manual / offline consent resource (scope: 'attest'). The company records a
@@ -45,7 +31,7 @@ export type { RecordOptions as ConsentRecordOptions };
 export class ManualConsents {
   constructor(
     private readonly transport: Transport,
-    private readonly clientTimeoutMs: number = 800,
+    private readonly clientTimeoutMs: number,
   ) {}
 
   /**
@@ -76,7 +62,8 @@ export class ManualConsents {
    * so a retry with the same key and body REPLAYS the original 201 (same consentId,
    * same consentRefs) and records NOTHING new.
    */
-  record(input: RecordManualConsentInput, options: RecordOptions = {}): Promise<ManualConsentResult> {
+  async record(input: RecordManualConsentInput, options: IdempotencyOptions = {}): Promise<ManualConsentResult> {
+    assertOptions(options, ["idempotencyKey"], "manualConsents.record");
     const idempotencyKey = recordIdempotencyKey(options.idempotencyKey, "manualConsents.record");
     return this.transport.request<ManualConsentResult>({
       method: "POST",
@@ -118,12 +105,13 @@ export class ManualConsents {
    * version asks nothing, so there is nothing to sign); 409 `relationship_ended`. Never
    * auto-retried; its time budget defaults to at least 15 s (the server renders the PDF).
    */
-  createConsentSheet(
+  async createConsentSheet(
     customerRef: string,
     input: CreateConsentSheetInput,
     options: ConsentSheetOptions = {},
   ): Promise<ConsentSheet> {
     const label = "manualConsents.createConsentSheet";
+    assertOptions(options, ["idempotencyKey", "timeout"], label);
     const ref = requireCustomerRef(customerRef, label);
     const documentVersionId = typeof input.documentVersionId === "string" ? input.documentVersionId.trim() : "";
     if (documentVersionId === "") {
@@ -147,7 +135,7 @@ export class ManualConsents {
    * is an AgreelyNotFoundError (nothing written); a relationship that has ended is an
    * AgreelyConflictError (code "conflict").
    */
-  createClaimLink(input: CreateClaimLinkInput): Promise<ClaimLink> {
+  async createClaimLink(input: CreateClaimLinkInput): Promise<ClaimLink> {
     return this.transport.request<ClaimLink>({
       method: "POST",
       path: "/v1/manual-consents/claim-links",
@@ -169,7 +157,7 @@ export class ManualConsents {
    * a consent the person signed with her passkey holds the purpose: this route never
    * ends one, record her withdrawal with `withdrawals.record` instead.
    */
-  revoke(consentRef: string, input: ManualConsentMutationInput = {}): Promise<ManualConsentRevocation> {
+  async revoke(consentRef: string, input: ManualConsentMutationInput = {}): Promise<ManualConsentRevocation> {
     return this.transport.request<ManualConsentRevocation>({
       method: "POST",
       path: `/v1/manual-consents/${encodeURIComponent(consentRef)}/revoke`,
@@ -185,7 +173,7 @@ export class ManualConsents {
    * came back is a 409 `superseded_by_paper`; a purpose held by a passkey consent is a
    * 409 `citizen_consent_at_gate`.
    */
-  erase(consentRef: string, input: ManualConsentMutationInput = {}): Promise<ManualConsentErasure> {
+  async erase(consentRef: string, input: ManualConsentMutationInput = {}): Promise<ManualConsentErasure> {
     return this.transport.request<ManualConsentErasure>({
       method: "POST",
       path: `/v1/manual-consents/${encodeURIComponent(consentRef)}/erase`,

@@ -26,7 +26,7 @@ export class Customers {
    * lifecycle. A ref this company never touched is AgreelyNotFoundError (another
    * tenant's ref reads the same). A read; safe to auto-retry on a transient outage.
    */
-  get(customerRef: string): Promise<CustomerRecord> {
+  async get(customerRef: string): Promise<CustomerRecord> {
     const ref = requireCustomerRef(customerRef, "customers.get");
     return this.transport.request<CustomerRecord>({
       method: "GET",
