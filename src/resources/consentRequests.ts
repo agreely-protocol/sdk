@@ -12,7 +12,7 @@ import type {
   ListConsentRequestsInput,
   WaitForSettlementOptions,
 } from "../types.js";
-import { assertOptions, recordIdempotencyKey, sleep } from "../util.js";
+import { assertInput, assertOptions, recordIdempotencyKey, sleep } from "../util.js";
 
 /** The terminal (settled) consent-request statuses. */
 const TERMINAL_STATUSES: ReadonlySet<ConsentRequestStatus> = new Set([
@@ -48,9 +48,21 @@ export class ConsentRequests {
    * the SAME key across a retry to replay the original 201 (no second request, no
    * second email). The options are closed and the key is validated (1 to 255
    * printable ASCII characters): a misspelt `idempotencykey` is refused rather than
-   * replaced by a random key, which would issue twice and email the person twice.
+   * replaced by a random key, which would issue twice and email the person twice. A
+   * key with a space or a line break is refused before any header is built.
+   *
+   * The input is closed too: a member other than customerId, recipientEmail,
+   * validUntil, consentDocumentId and documentCode is refused, never dropped while the
+   * request goes out without it. The one exception is a legacy `items` list, which the
+   * golden vectors shared with the PHP SDK pin as DROPPED: the items derive from the
+   * document server-side, so it is never sent.
    */
   async create(input: CreateConsentRequestInput, options: IdempotencyOptions = {}): Promise<IssuedRequest> {
+    assertInput(
+      input,
+      ["customerId", "recipientEmail", "validUntil", "consentDocumentId", "documentCode", "items"],
+      "consentRequests.create",
+    );
     assertOptions(options, ["idempotencyKey"], "consentRequests.create");
     const hasId = typeof input.consentDocumentId === "string" && input.consentDocumentId.trim() !== "";
     const hasCode = typeof input.documentCode === "string" && input.documentCode.trim() !== "";

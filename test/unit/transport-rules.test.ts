@@ -258,6 +258,24 @@ describe("the options of a write are closed", () => {
     await expect(agreely.consentRequests.create(input, { idempotencyKey: "job 42" })).rejects.toBeInstanceOf(
       AgreelyConfigError,
     );
+    // A line break would split the header: refused before any header is built.
+    await expect(
+      agreely.consentRequests.create(input, { idempotencyKey: "job-42\r\nX-Injected: 1" }),
+    ).rejects.toBeInstanceOf(AgreelyConfigError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("closes the input of consentRequests.create: a stray member is refused, never dropped", async () => {
+    const { agreely, calls } = client([{ status: 201, json: {} }]);
+    const input = {
+      customerId: "c1",
+      recipientEmail: "p@example.com",
+      documentCode: "terms",
+      validUntil: "2031-01-01",
+      recipientName: "Marie",
+    };
+    await expect(agreely.consentRequests.create(input as never)).rejects.toThrow(/unknown member "recipientName"/);
+    await expect(agreely.consentRequests.create(null as never)).rejects.toBeInstanceOf(AgreelyConfigError);
     expect(calls).toHaveLength(0);
   });
 });

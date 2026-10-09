@@ -192,12 +192,25 @@ export function requireCustomerRef(value: unknown, label: string): string {
  */
 export function assertOptions(options: unknown, allowed: readonly string[], label: string): void {
   if (options === undefined) return;
-  if (options === null || typeof options !== "object" || Array.isArray(options)) {
-    throw new AgreelyConfigError(`${label}: options must be an object.`);
+  assertClosed(options, allowed, label, "option", "options");
+}
+
+/**
+ * Refuse an input object carrying anything but the named members, rather than dropping
+ * a stray one silently: a member the caller believes was sent and was not changes what
+ * the request means.
+ */
+export function assertInput(input: unknown, allowed: readonly string[], label: string): void {
+  assertClosed(input, allowed, label, "member", "input");
+}
+
+function assertClosed(value: unknown, allowed: readonly string[], label: string, noun: string, what: string): void {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new AgreelyConfigError(`${label}: ${what} must be an object.`);
   }
-  for (const key of Object.keys(options)) {
+  for (const key of Object.keys(value)) {
     if (!allowed.includes(key)) {
-      throw new AgreelyConfigError(`${label}: unknown option "${key}" (accepted: ${allowed.join(", ")}).`);
+      throw new AgreelyConfigError(`${label}: unknown ${noun} "${key}" (accepted: ${allowed.join(", ")}).`);
     }
   }
 }

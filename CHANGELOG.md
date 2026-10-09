@@ -23,8 +23,12 @@ breaking changes listed under 0.4.0. `^0.3.0` will not pick this up on its own.
   option they do not know: a misspelt `idempotencykey` used to be ignored and
   replaced by a random key, so a retry the caller believed safe recorded twice (on
   `consentRequests.create`, it issued twice and emailed the person twice).
-  `consentRequests.create` now also validates its key (1 to 255 printable ASCII
-  characters), where the server would silently cut a longer one at 255.
+  `consentRequests.create` now also validates its key with the same rule as every
+  other write (1 to 255 printable ASCII characters, so no space and no line break
+  reaches the Idempotency-Key header), where the server would silently cut a longer
+  one at 255, and its input is closed: a member it does not know is refused instead
+  of silently dropped. (A legacy `items` list is still dropped, as the shared golden
+  vectors pin: the items derive from the document.)
 - **Only `rate_limited` is ever auto-retried.** A 429 with any other code used to be
   rewritten to `rate_limited` and, on a read with `maxRetries`, retried. A known
   daily-cap code, or a `daily_cap` reason, now raises `AgreelyDailyCapError`; any
