@@ -163,6 +163,7 @@ export class Retention {
     options: DeclarationOptions,
   ): Promise<PurgeDeclaration> {
     const label = "retention.declarePurge";
+    assertOptions(options, ["idempotencyKey"], label);
     const key = requireRuleKey(ruleKey, label);
     const idempotencyKey = assertIdempotencyKey(options, label);
 
@@ -258,6 +259,7 @@ export class Retention {
     options: DeclarationOptions,
   ): Promise<RetentionSweep> {
     const label = "retention.declareSweep";
+    assertOptions(options, ["idempotencyKey"], label);
     const key = requireRuleKey(ruleKey, label);
     const idempotencyKey = assertIdempotencyKey(options, label);
     const sweptAt = toWireInstant(input.sweptAt, `${label}: sweptAt`);

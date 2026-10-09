@@ -6,12 +6,13 @@ import type {
   ConsentRequestRecord,
   ConsentRequestStatus,
   CreateConsentRequestInput,
+  IdempotencyOptions,
   IssuedRequest,
   ListAllConsentRequestsInput,
   ListConsentRequestsInput,
   WaitForSettlementOptions,
 } from "../types.js";
-import { sleep } from "../util.js";
+import { assertOptions, recordIdempotencyKey, sleep } from "../util.js";
 
 /** The terminal (settled) consent-request statuses. */
 const TERMINAL_STATUSES: ReadonlySet<ConsentRequestStatus> = new Set([
@@ -24,15 +25,6 @@ const TERMINAL_STATUSES: ReadonlySet<ConsentRequestStatus> = new Set([
 
 /** Default guard so an unbounded list can never spin forever. */
 const DEFAULT_MAX_PAGES = 1000;
-
-interface CreateOptions {
-  /**
-   * Override the auto-generated Idempotency-Key. Reuse the SAME key across a
-   * retry to replay the original 201 byte-for-byte (no double-issue, no
-   * double-email).
-   */
-  idempotencyKey?: string;
-}
 
 /** The wire shape of GET /v1/consent-requests (note: `requests`, not `items`). */
 interface ListWire {
@@ -52,9 +44,14 @@ export class ConsentRequests {
    * s. 8 disclosure). Exactly ONE of `consentDocumentId` / `documentCode` is
    * required; the requested items derive from the document server-side. NEVER
    * auto-retried (it emails): an Idempotency-Key is auto-generated per call
-   * (overridable) so a caller-driven retry replays rather than double-issues.
+   * (overridable) so a caller-driven retry replays rather than double-issues. Reuse
+   * the SAME key across a retry to replay the original 201 (no second request, no
+   * second email). The options are closed and the key is validated (1 to 255
+   * printable ASCII characters): a misspelt `idempotencykey` is refused rather than
+   * replaced by a random key, which would issue twice and email the person twice.
    */
-  async create(input: CreateConsentRequestInput, options: CreateOptions = {}): Promise<IssuedRequest> {
+  async create(input: CreateConsentRequestInput, options: IdempotencyOptions = {}): Promise<IssuedRequest> {
+    assertOptions(options, ["idempotencyKey"], "consentRequests.create");
     const hasId = typeof input.consentDocumentId === "string" && input.consentDocumentId.trim() !== "";
     const hasCode = typeof input.documentCode === "string" && input.documentCode.trim() !== "";
     if (!hasId && !hasCode) {
@@ -67,7 +64,7 @@ export class ConsentRequests {
         "consentRequests.create takes either consentDocumentId or documentCode, not both.",
       );
     }
-    const idempotencyKey = options.idempotencyKey ?? generateIdempotencyKey();
+    const idempotencyKey = recordIdempotencyKey(options.idempotencyKey, "consentRequests.create");
     return this.transport.request<IssuedRequest>({
       method: "POST",
       path: "/v1/consent-requests",
@@ -278,9 +275,4 @@ export class ConsentRequests {
       signal.addEventListener("abort", abort, { once: true });
     });
   }
-}
-
-/** A unique Idempotency-Key per create call. crypto.randomUUID is global on Node 18+. */
-function generateIdempotencyKey(): string {
-  return `idem_${globalThis.crypto.randomUUID()}`;
 }

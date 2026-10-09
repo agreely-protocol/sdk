@@ -1027,6 +1027,7 @@ export interface DeclareSweepInput {
  * Settle every pending declaration with the old key before you revoke it.
  */
 export interface DeclarationOptions {
+  /** Required. The options object is closed: any other member is refused, never ignored. */
   idempotencyKey: string;
 }
 
