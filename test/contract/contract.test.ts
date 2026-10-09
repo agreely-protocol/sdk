@@ -6,6 +6,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   Agreely,
   AgreelyAuthError,
+  AgreelyConflictError,
+  AgreelyRateLimitError,
   AgreelyValidationError,
   type CheckResult,
 } from "../../src/index.js";
@@ -17,7 +19,11 @@ const goldenPath = resolve(here, "../../vectors/vectors.json");
 
 interface Fixture {
   baseUrl: string;
-  keys: { check: string; issue: string; both: string; otherTenantCheck: string };
+  /**
+   * `all` is OPTIONAL: a key carrying every scope (attest, withdraw, registry, holds,
+   * ...). The seed does not mint one; add it to the fixture to run the write routes.
+   */
+  keys: { check: string; issue: string; both: string; otherTenantCheck: string; all?: string };
   subject: string;
   absent: string;
   revocable: { category: string; purpose: string; consentRef: string };
@@ -367,4 +373,214 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       });
     });
   });
+});
+
+// ---------------------------------------------------------------------------
+// The write routes, end to end, with customer refs holding "/" and "%41". They need a
+// key carrying every scope (`keys.all` in the fixture), which the seed does not mint:
+// without it they are SKIPPED, and the suite says so out loud rather than silently.
+// ---------------------------------------------------------------------------
+
+const allKey = fixture?.keys.all;
+if (runLive && allKey === undefined) {
+  console.warn(
+    "[contract] keys.all is missing from the fixture: the write-route suite (withdrawal, consent sheet, " +
+      "holds, holds feed, customer upsert) is SKIPPED. Add a key carrying every scope as keys.all.",
+  );
+}
+const writeSuite = runLive && allKey !== undefined ? describe : describe.skip;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Re-send a call (with its fixed Idempotency-Key) after a per-minute 429, so a long seed rides the window. */
+async function paced<T>(call: () => Promise<T>): Promise<T> {
+  for (;;) {
+    try {
+      return await call();
+    } catch (error) {
+      if (!(error instanceof AgreelyRateLimitError) || error.code !== "rate_limited") throw error;
+      await sleep(((error.retryAfterSeconds ?? 1) + 0.2) * 1000);
+    }
+  }
+}
+
+function isoDay(offsetDays: number): string {
+  return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
+}
+
+writeSuite("contract: the write routes, with refs holding a slash and %41", () => {
+  let a: Agreely;
+  const run = Math.random().toString(36).slice(2, 8);
+  const slashRef = `SDK/${run}/0042`;
+  const percentRef = `sdk-${run}%41`;
+
+  beforeAll(() => {
+    a = new Agreely({ apiKey: allKey!, baseUrl: fixture!.baseUrl, timeout: 15_000 });
+  });
+
+  it("the stack hands an encoded slash to the API (it is not refused by the web server)", async () => {
+    const res = await fetch(`${fixture!.baseUrl}/v1/customers/a%2Fb`);
+    expect(res.headers.get("content-type") ?? "", "an HTML 404 means the web server refused %2F").toContain(
+      "application/json",
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("customers.upsert creates, then merges, and a ref with a slash or %41 reads back exactly as written", async () => {
+    for (const ref of [slashRef, percentRef]) {
+      const created = await a.customers.upsert(ref, { displayName: "Contract Person", legalBasis: "contract" });
+      expect(created.created).toBe(true);
+      expect(created.customerRef).toBe(ref);
+      expect(created.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/);
+
+      const merged = await a.customers.upsert(ref, { displayName: null });
+      expect(merged.created).toBe(false);
+      expect(merged.hasDisplayName).toBe(false);
+      expect(merged.legalBasis).toBe("contract");
+
+      const read = await a.customers.get(ref);
+      expect(read.customerRef).toBe(ref);
+    }
+    // "%41" must not have been decoded into "A" on the way: that would be another customer.
+    await expect(a.customers.get(percentRef.replace("%41", "A"))).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("a consent sheet for a ref with a slash is minted once; its key then answers already_minted", async () => {
+    await a.customers.upsert(slashRef, { legalBasis: "contract" });
+    const key = `contract-sheet-${run}`;
+    const sheet = await a.manualConsents.createConsentSheet(
+      slashRef,
+      { documentVersionId: fixture!.issue.documentId },
+      { idempotencyKey: key },
+    );
+    expect(Buffer.from(sheet.signatureSheet.pdf, "base64").subarray(0, 5).toString()).toBe("%PDF-");
+    expect(sheet.printedReference).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    expect(sheet.claim.claimUrl).toMatch(/^https?:\/\//);
+
+    const replay = await a.manualConsents
+      .createConsentSheet(slashRef, { documentVersionId: fixture!.issue.documentId }, { idempotencyKey: key })
+      .catch((e: unknown) => e);
+    expect(replay).toBeInstanceOf(AgreelyConflictError);
+    expect(replay).toMatchObject({ code: "already_minted", reason: "already_minted" });
+  });
+
+  it("a withdrawal recorded on behalf, for a ref with a slash and %41, denies at once and replays on repeat", async () => {
+    const customerRef = `SDK/${run}/wd%41`;
+    const recorded = await a.manualConsents.record({
+      customerId: customerRef,
+      documentVersionId: fixture!.issue.documentId,
+      effectiveDate: isoDay(-1),
+      validUntil: isoDay(365),
+      items: [fixture!.issue.catalogId],
+      evidence: { pdfSha256: Agreely.hashPdf(new TextEncoder().encode(`%PDF-1.7 contract ${run}`)) },
+      versionAttested: true,
+    });
+    const consentRef = recorded.consentRefs.find((ref) => !recorded.acknowledged.some((l) => l.consentRef === ref));
+    expect(consentRef).toMatch(CONSENT_REF);
+
+    const before = await a.checkDetailed(customerRef, fixture!.issue.category, fixture!.issue.purpose);
+    expect(before.decision).toBe("allow");
+
+    const w = await a.withdrawals.record(customerRef, consentRef!, { channel: "mail", operator: "contract-op" });
+    assertExactKeys(w as unknown as Record<string, unknown>, [
+      "consentRef",
+      "withdrawn",
+      "alreadyWithdrawn",
+      "recordedOnBehalf",
+      "assurance",
+      "gate",
+      "alsoWithdrawn",
+    ]);
+    expect(w).toMatchObject({ withdrawn: true, alreadyWithdrawn: false, recordedOnBehalf: true, assurance: "company_attested", gate: "denied" });
+
+    const after = await a.checkDetailed(customerRef, fixture!.issue.category, fixture!.issue.purpose);
+    expect(after).toMatchObject({ decision: "deny", status: "revoked" });
+    expect(after.revokedAt).toMatch(/Z$/);
+
+    const again = await a.withdrawals.record(customerRef, consentRef!, { channel: "mail", operator: "contract-op" });
+    expect(again).toMatchObject({ alreadyWithdrawn: true, gate: "unchanged" });
+
+    // Another customer's ref never reaches this consent: the same 404 as an unknown one.
+    await expect(
+      a.withdrawals.record(slashRef, consentRef!, { channel: "mail", operator: "contract-op" }),
+    ).rejects.toMatchObject({ status: 404, reason: "unknown_consent" });
+  });
+
+  it("a hold on a ref with %41 is placed, fed, released, and a second release is already_released", async () => {
+    await a.customers.upsert(percentRef, { legalBasis: "contract" });
+    const placed = await a.retention.placeHold(
+      percentRef,
+      { ground: "other_law", provision: "Contract test provision, s. 1" },
+      { idempotencyKey: `contract-hold-${run}` },
+    );
+    expect(placed).toMatchObject({ customerRef: percentRef, status: "active", placedBy: "api", replayed: false });
+
+    const replay = await a.retention.placeHold(
+      percentRef,
+      { ground: "other_law", provision: "Contract test provision, s. 1" },
+      { idempotencyKey: `contract-hold-${run}` },
+    );
+    expect(replay).toMatchObject({ id: placed.id, replayed: true });
+
+    const snapshot = await a.retention.syncHolds();
+    expect(snapshot.mode).toBe("snapshot");
+    expect(snapshot.holds.find((h) => h.id === placed.id)).toMatchObject({ customerRef: percentRef, status: "active" });
+
+    const retention = await a.retention.getCustomerRetention(percentRef);
+    expect(retention.holds.some((h) => h.id === placed.id && h.status === "active")).toBe(true);
+
+    const released = await a.retention.releaseHold(percentRef, placed.id, { reason: "Contract test over" });
+    expect(released).toMatchObject({ id: placed.id, status: "released", customerRef: percentRef });
+
+    await expect(a.retention.releaseHold(percentRef, placed.id, { reason: "again" })).rejects.toMatchObject({
+      status: 409,
+      code: "already_released",
+    });
+
+    const delta = await a.retention.syncHolds({ changedSince: snapshot.cursor });
+    expect(delta.mode).toBe("delta");
+    expect(delta.holds.find((h) => h.id === placed.id)).toMatchObject({ status: "released" });
+  });
+
+  // Paging needs more than 500 holds, placed through the API at 120 requests a minute:
+  // about five minutes. Opt in with AGREELY_LIVE_PAGING=1 (on a fresh fixture: the API
+  // places at most 1,000 holds a day per company).
+  const paging = process.env.AGREELY_LIVE_PAGING === "1";
+  if (!paging) console.warn("[contract] AGREELY_LIVE_PAGING is not set: the holds-feed paging test is SKIPPED.");
+  it.skipIf(!paging)(
+    "the holds feed pages past 500 holds: every page but the last has a token, only the last has the cursor",
+    async () => {
+      const perRef = 46; // the server allows 50 active holds per customer
+      const refs = Array.from({ length: 11 }, (_, i) => `SDK/${run}/page/${i}`);
+      const placedIds = new Set<string>();
+      for (const ref of refs) {
+        await paced(() => a.customers.upsert(ref, { legalBasis: "contract" }));
+        for (let n = 0; n < perRef; n++) {
+          const hold = await paced(() =>
+            a.retention.placeHold(ref, { ground: "rights_request" }, { idempotencyKey: `contract-page-${run}-${ref}-${n}` }),
+          );
+          placedIds.add(hold.id);
+        }
+      }
+      expect(placedIds.size).toBe(refs.length * perRef);
+
+      const pages = [];
+      for await (const page of a.retention.holdPages()) pages.push(page);
+      expect(pages.length).toBeGreaterThanOrEqual(2);
+      for (const page of pages.slice(0, -1)) {
+        expect(page.holds).toHaveLength(500);
+        expect(typeof page.nextPageToken).toBe("string");
+        expect(page.cursor).toBeNull();
+      }
+      const last = pages[pages.length - 1]!;
+      expect(last.nextPageToken).toBeNull();
+      expect(typeof last.cursor).toBe("string");
+
+      const seen = new Set(pages.flatMap((p) => p.holds.map((h) => h.id)));
+      for (const id of placedIds) expect(seen.has(id)).toBe(true);
+      const sync = await a.retention.syncHolds();
+      expect(new Set(sync.holds.map((h) => h.id)).size).toBe(seen.size);
+    },
+    600_000,
+  );
 });
