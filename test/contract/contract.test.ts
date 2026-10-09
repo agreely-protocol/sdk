@@ -92,14 +92,19 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
         assertExactKeys(
           r as unknown as Record<string, unknown>,
           ["decision", "status", "checkedAt"],
-          ["consentRef", "assurance"],
+          ["consentRef", "assurance", "tier", "basis", "validUntil", "revokedAt"],
         );
         expect(r.decision).toBe(vec.expect.decision);
         expect(r.status).toBe(vec.expect.status);
         if (vec.expect.consentRefPresent) {
           expect(r.consentRef).toMatch(CONSENT_REF);
+          // A record-backed answer carries the end of its consent, as an RFC 3339 UTC instant.
+          expect(r.validUntil).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
         } else {
           expect(r.consentRef).toBeUndefined();
+          // No record, no dates: the keys are absent, never null.
+          expect(r).not.toHaveProperty("validUntil");
+          expect(r).not.toHaveProperty("revokedAt");
         }
         // The boolean gate agrees with the decision.
         expect(await agreely.check(customerId, vec.category, vec.purpose)).toBe(
@@ -151,16 +156,19 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
     });
   });
 
-  describe("revoke-then-check: instant deny, no chain wait (§17.9)", () => {
-    it("allows, then denies on the very next call after an out-of-band revoke", async () => {
+  describe("revoke-then-check: instant deny, no chain wait", () => {
+    // The out-of-band revoke runs the seed script inside the API stack, so it needs the
+    // directory of that stack's docker-compose file: AGREELY_APP_DIR. Skipped without it.
+    const appDir = process.env.AGREELY_APP_DIR;
+    it.skipIf(appDir === undefined)("allows, then denies on the very next call after an out-of-band revoke", async () => {
       const { category, purpose, consentRef } = fixture!.revocable;
       expect(await agreely.check(fixture!.subject, category, purpose)).toBe(true);
 
-      // Flip the enforcement record out-of-band (the M5 revoke path), in-container.
+      // Flip the enforcement record out-of-band, in-container.
       execFileSync(
         "docker",
         ["compose", "exec", "-T", "api", "php", "scripts/sdk-contract-seed.php", "revoke", consentRef],
-        { cwd: repoRoot, stdio: "pipe" },
+        { cwd: resolve(repoRoot, appDir ?? "."), stdio: "pipe" },
       );
 
       const after = await agreely.checkDetailed(fixture!.subject, category, purpose);
@@ -180,13 +188,19 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
   });
 
   describe("identity (GET /v1/whoami)", () => {
-    it("returns the key's scopes, and nothing else (least disclosure)", async () => {
+    it("returns the key's scopes and the tenant's public identity, nothing else (least disclosure)", async () => {
       const identity = await agreely.identity();
-      assertExactKeys(identity as unknown as Record<string, unknown>, ["scopes"]);
+      assertExactKeys(identity as unknown as Record<string, unknown>, ["scopes", "company"]);
+      assertExactKeys(identity.company as unknown as Record<string, unknown>, [
+        "name",
+        "sector",
+        "statute",
+        "publicPolicyUrl",
+      ]);
       expect(identity.scopes).toContain("check");
-      // No company id / name / counters leak into the body.
+      // No company id, DID, key metadata or counters leak into the body.
       const raw = JSON.stringify(identity);
-      expect(raw).not.toContain("company");
+      expect(raw).not.toMatch(/"(id|companyId|did|plan|usage)"/);
 
       const issuer = new Agreely({ apiKey: fixture!.keys.issue, baseUrl: fixture!.baseUrl });
       expect((await issuer.identity()).scopes).toContain("issue");
@@ -235,9 +249,49 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       const entries = await both.catalog.list();
       expect(entries.length).toBeGreaterThan(0);
       for (const e of entries) {
-        assertExactKeys(e as unknown as Record<string, unknown>, ["id", "category", "purpose", "description"]);
+        assertExactKeys(e as unknown as Record<string, unknown>, [
+          "id",
+          "category",
+          "purpose",
+          "description",
+          "legalBasis",
+          "sensitive",
+        ]);
       }
       expect(entries.some((e) => e.id === fixture!.issue.catalogId)).toBe(true);
+    });
+  });
+
+  describe("consent documents (a check key reads them)", () => {
+    it("lists the published document, resolves it by code, and serves its information PDF", async () => {
+      const documents = await agreely.consentDocuments.list();
+      const listed = documents.find((d) => d.code === fixture!.issue.documentCode);
+      expect(listed).toBeDefined();
+      expect(listed!.documentVersionId).toBe(fixture!.issue.documentId);
+      assertExactKeys(listed as unknown as Record<string, unknown>, [
+        "code",
+        "documentVersionId",
+        "version",
+        "name",
+        "nameEn",
+        "effectiveDate",
+        "publishedAt",
+        "items",
+      ]);
+
+      const detail = await agreely.consentDocuments.get(fixture!.issue.documentCode);
+      expect(detail.documentVersionId).toBe(fixture!.issue.documentId);
+      expect(detail.disclosure).toHaveProperty("crossBorder");
+
+      const pdf = await agreely.consentDocuments.getInformationPdf(fixture!.issue.documentId);
+      expect(Buffer.from(pdf.pdf.subarray(0, 5)).toString()).toBe("%PDF-");
+      expect(pdf.contentType).toContain("application/pdf");
+    });
+
+    it("answers an unknown version with AgreelyNotFoundError", async () => {
+      await expect(
+        agreely.consentDocuments.getInformationPdf("00000000-0000-4000-8000-000000000000"),
+      ).rejects.toMatchObject({ name: "AgreelyNotFoundError", status: 404 });
     });
   });
 
