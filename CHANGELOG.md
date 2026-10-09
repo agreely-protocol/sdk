@@ -3,10 +3,92 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
-## 0.4.0 - 2026-09-29
+## 0.5.0 - 2026-10-09
 
-Matches the production /v1 API at Agreely commit aa255537. **Breaking**: 0.x
-bumps the minor for a breaking change, and `^0.3.0` will not pick this up on its own.
+Covers the whole /v1 API in production since 2026-10-09. **0.4.0 below was
+prepared but never published to npm**: 0.5.0 is the first npm release that
+carries it, so anyone upgrading from 0.3.0 takes both entries, including the
+breaking changes listed under 0.4.0. `^0.3.0` will not pick this up on its own.
+
+### Added
+
+- **`agreely.consentDocuments`**: `list()`, `get(code)` (the published documents
+  and their full disclosure, resolved by their stable code) and
+  `getInformationPdf(documentVersionId, { locale })`, the information document of
+  one version as PDF bytes to hand to the person. Types `ConsentDocumentSummary`,
+  `ConsentDocumentDetail`, `ConsentDocumentItem`, `LocalizedText`,
+  `InformationDocument`.
+- **`manualConsents.createConsentSheet(customerRef, { documentVersionId, locale })`**
+  (scope `attest`): the signature sheet of one version for one customer, minted with
+  a new claim. The printed reference and the claim are returned once; a replayed key
+  is a 409 `already_minted`. Never send the claim link in the same envelope as the
+  sheet, and never send the blank sheet's hash as `evidence.pdfSha256`.
+- **`agreely.withdrawals.record(customerRef, consentRef, { channel, operator,
+  requestedAt?, reason? })`** (scope `withdraw`): the withdrawal a person asked for,
+  recorded on her behalf, of any consent ask, a passkey-signed one included. Always
+  `recordedOnBehalf: true` and `assurance: "company_attested"`, with `gate` and
+  `alsoWithdrawn`. It works while the company's billing has lapsed.
+- **`agreely.customers`** (scope `registry`): `get(customerRef)` (metadata only) and
+  `upsert(customerRef, fields)`, a merge where an absent member is untouched and
+  `null` clears it; `created` tells a 201 from a 200.
+- **Per-customer retention on `agreely.retention`** (scope `registry`):
+  `getCustomerRetention` (the derived clock with `held` per rule, the standing
+  disposition, the holds), `declareDisposition` (with `agreelyIdentity` and the
+  `hold_active` warning), `placeHold` and `releaseHold`.
+- **The holds feed** (scope `holds`): `retention.listHolds` (one page),
+  `retention.holdPages` (an async iterator) and `retention.syncHolds` (every page,
+  with the cursor to persist; a snapshot without `changedSince`, a delta with it). It
+  throws rather than return a partial feed.
+- **`validUntil` and `revokedAt`** on `CheckResult` and `BatchDecision`: the end of
+  the consent behind a record-backed answer, and when a withdrawal took effect.
+  Both are absent, never null, when there is no record.
+- **`sensitiveExpressAttested` and `versionAttested`** on `manualConsents.record`,
+  sent only when given and only as booleans.
+- **`reason` on every `AgreelyError`**, the stable `error.reason` of a refusal, and
+  `field` on every status (it was set on validation errors only). The known reasons
+  are exported as `AgreelyErrorReason`, a string-literal union that stays
+  open-ended, so a reason added later still compiles.
+- **`AgreelyDailyCapError`**, a subclass of `AgreelyRateLimitError`, for the 429
+  daily caps `withdrawal_daily_cap`, `hold_budget_exhausted` and
+  `hold_release_cap_reached`. `AgreelyVerbalDailyCapError` now extends it. None is
+  ever auto-retried.
+- `gate` on `ManualConsentErasure`. The `withdraw` and `holds` scopes on `Scope`.
+  The error codes `withdrawal_daily_cap`, `already_minted`, `no_consent_ask`,
+  `english_text_missing`, `identity_held`, `identity_erased`,
+  `relationship_active`, `already_released`, `too_many_holds`,
+  `hold_budget_exhausted`, `hold_release_cap_reached` and `new_set_limit` on
+  `AgreelyErrorCode`.
+- Constants `DOCUMENT_TIMEOUT_MS`, `RETENTION_TEXT_MAX`, `WITHDRAWAL_CHANNELS`,
+  `WITHDRAWAL_REASON_MAX`, `CUSTOMER_REF_MAX`.
+- README: every new method, the two consent-sheet rules, and a section on liveness
+  and caching (probe `identity()` about once a minute from one scheduler, purge any
+  cache and fail closed on a 401 or a 402, never cache a check, never decide consent
+  from a cached catalog).
+
+### Changed
+
+- **`INVENTORY_MAX_SETS` is 200**, the server's cap per declaration (it was 50).
+  A declaration of 51 to 200 sets is no longer refused client-side.
+- The two calls that render a PDF get a time budget of at least 15 s
+  (`DOCUMENT_TIMEOUT_MS`), overridable per call, instead of the client's 800 ms
+  default, which would cut off a sheet whose reference the server returns once.
+- The time budget now also covers reading the response body: a body that stalls is
+  treated as an outage instead of hanging.
+
+### Fixed
+
+- **A 429 daily cap other than the verbal one was surfaced as the per-minute window**
+  (`code: "rate_limited"`), and a client with `maxRetries` would have retried it.
+  It now keeps its own code and is never retried.
+- The documented skew on `obtainedAt` and `signedAt`: an instant in the future is
+  refused by any amount (`obtained_at_in_future`, `signed_at_in_future`), not
+  within 5 minutes.
+
+## 0.4.0 - 2026-09-29 (never published to npm)
+
+Prepared in this repository but never published to npm: its changes first ship
+in 0.5.0. **Breaking**: 0.x bumps the minor for a breaking change, and
+`^0.3.0` will not pick this up on its own.
 
 ### Breaking
 
@@ -33,7 +115,7 @@ bumps the minor for a breaking change, and `^0.3.0` will not pick this up on its
 
 ### Added
 
-- **`agreely.verbalConsents`** (issue #100), a consent given by telephone and
+- **`agreely.verbalConsents`**, a consent given by telephone and
   documented by the organisation, the weakest of three tiers: `record` (scope
   `attest_verbal`), `confirmWithPaper` (the signed paper, scope `attest`) and
   `get` (the history, either scope). Types: `RecordVerbalConsentInput`,

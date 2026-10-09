@@ -54,7 +54,10 @@ Notes:
 - The `@agreely` npm org must exist and be owned by the publisher. `@agreely`
   is a **scoped** package; `publishConfig.access` is set to `public`, and
   `--access public` is passed explicitly.
-- `files` ships `dist`, `README.md`, and `LICENSE` only. No `src`, tests, or
-  scratch is published.
-- Keep the version at `0.1.0`. Do not create a git tag here; the human tags at
-  publish time.
+- `files` ships `dist`, `README.md`, `CHANGELOG.md` and `LICENSE` only. No `src`,
+  tests, or scratch is published.
+- Publish the version `package.json` carries; its CHANGELOG entry must exist. Do not
+  create a git tag here; the human tags at publish time.
+- Optional, against a local stack: `AGREELY_LIVE=1 npm run test:contract` with a
+  fixture seeded into `test/contract/fixture.json` (set `AGREELY_APP_DIR` to the API
+  stack's directory to include the out-of-band revoke step).
