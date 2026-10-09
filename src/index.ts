@@ -123,6 +123,7 @@ export type {
   CatalogEntry,
   CatalogCell,
   CatalogCells,
+  DocumentCatalog,
   Regime,
   RetentionTrigger,
   RetentionAction,

@@ -177,3 +177,49 @@ describe("catalog.list", () => {
     expect(await agreely.catalog.list()).toEqual([entry]);
   });
 });
+
+describe("catalog.forDocument", () => {
+  const scoped = {
+    regime: { sector: "public", statute: "A-2.1" },
+    document: { code: "inscription-repas", documentVersionId: "6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b" },
+    catalog: [
+      {
+        id: "uuid-1",
+        category: "Coordonnées",
+        purpose: "Livraison des repas",
+        description: null,
+        legalBasis: "attributions",
+        sensitive: false,
+      },
+    ],
+  };
+
+  it("sends GET /v1/catalog with the documentCode filter, trimmed and encoded, and returns the whole body", async () => {
+    const { agreely, calls } = client([{ json: scoped }]);
+    const r = await agreely.catalog.forDocument(" inscription repas ");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.method).toBe("GET");
+    expect(calls[0]!.body).toBeUndefined();
+    const url = new URL(calls[0]!.url);
+    expect(url.origin + url.pathname).toBe(`${BASE}/v1/catalog`);
+    expect([...url.searchParams.entries()]).toEqual([["documentCode", "inscription repas"]]);
+    expect(calls[0]!.url).toBe(`${BASE}/v1/catalog?documentCode=inscription+repas`);
+    expect(r).toEqual(scoped);
+    expect(r.document.documentVersionId).toBe("6a1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b");
+  });
+
+  it("refuses a blank code before any call, and maps an unknown or foreign code to AgreelyNotFoundError", async () => {
+    const { agreely, calls } = client([
+      {
+        status: 404,
+        json: { error: { code: "not_found", message: "No published consent document matches that code.", field: "documentCode" } },
+      },
+    ]);
+    expect(() => agreely.catalog.forDocument("  ")).toThrow(AgreelyConfigError);
+    expect(calls).toHaveLength(0);
+    await expect(agreely.catalog.forDocument("other-tenant")).rejects.toMatchObject({
+      name: "AgreelyNotFoundError",
+      field: "documentCode",
+    });
+  });
+});

@@ -837,6 +837,16 @@ export interface Regime {
   statute: "P-39.1" | "A-2.1";
 }
 
+/** The body of GET /v1/catalog?documentCode=: one published document's active cells. */
+export interface DocumentCatalog {
+  /** The act governing the tenant: `legalBasis` carries two disjoint value sets. */
+  regime: Regime;
+  /** The document the code resolved to, and the id of the version published today. */
+  document: { code: string; documentVersionId: string };
+  /** The ACTIVE cells the document groups, with the LIVE catalog declaration. */
+  catalog: CatalogEntry[];
+}
+
 /**
  * One catalogue cell as a host system reads it (GET /v1/catalog/cells, scope
  * 'retention'): archived cells included, with the rule that governs each one.

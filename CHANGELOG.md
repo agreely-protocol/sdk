@@ -12,6 +12,10 @@ breaking changes listed under 0.4.0. `^0.3.0` will not pick this up on its own.
 
 ### Added
 
+- **`catalog.forDocument(documentCode)`**: the active cells of one published
+  document (GET /v1/catalog?documentCode=), with the tenant's regime and the
+  `documentVersionId` published today, for an intake screen built from the document
+  the person signs. Type `DocumentCatalog`.
 - **`agreely.consentDocuments`**: `list()`, `get(code)` (the published documents
   and their full disclosure, resolved by their stable code) and
   `getInformationPdf(documentVersionId, { locale })`, the information document of

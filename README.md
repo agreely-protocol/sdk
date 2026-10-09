@@ -466,6 +466,9 @@ const page = await agreely.consentRequests.list({
 
 const one = await agreely.consentRequests.get("0x…");  // the protocol requestId, NOT a uuid
 const catalog = await agreely.catalog.list();          // discovery for issuance
+const form = await agreely.catalog.forDocument("conditions-marketing");
+// { regime, document: { code, documentVersionId }, catalog }: only the active cells that
+// document groups, so an intake screen asks about nothing the document does not cover
 ```
 
 **Dedup before issuing.** `hasPending` answers "is a consent request already
