@@ -10,6 +10,27 @@ prepared but never published to npm**: 0.5.0 is the first npm release that
 carries it, so anyone upgrading from 0.3.0 takes both entries, including the
 breaking changes listed under 0.4.0. `^0.3.0` will not pick this up on its own.
 
+### Breaking
+
+- **A method that returns a promise now rejects, it never throws synchronously.**
+  Invalid input (`AgreelyConfigError`) used to be thrown from the call itself on
+  most methods; it now rejects the returned promise, so a `.catch()` chain sees it.
+  Code that awaits inside a `try` is unaffected.
+- **The options of a write are closed.** `manualConsents.record`,
+  `verbalConsents.record` and `confirmWithPaper`, and the new writes below refuse an
+  option they do not know: a misspelt `idempotencykey` used to be ignored and
+  replaced by a random key, which made a retry the caller believed safe record
+  twice.
+- **Only `rate_limited` is ever auto-retried.** A 429 with any other code used to be
+  rewritten to `rate_limited` and, on a read with `maxRetries`, retried. A known
+  daily-cap code, or a `daily_cap` reason, now raises `AgreelyDailyCapError`; any
+  other code raises `AgreelyRateLimitError` keeping its code. Neither is retried.
+- **`AgreelyErrorCode` is open-ended** like `AgreelyErrorReason`: an exhaustive
+  `switch` on `code` needs a default branch.
+- **`relationships.end` and `revert` validate the customerRef like every customer
+  route**: trimmed exactly as the server trims it (ASCII whitespace only, never a
+  Unicode space), at most 200 characters, and never `.` or `..`.
+
 ### Added
 
 - **`catalog.forDocument(documentCode)`**: the active cells of one published
@@ -41,8 +62,9 @@ breaking changes listed under 0.4.0. `^0.3.0` will not pick this up on its own.
   `hold_active` warning), `placeHold` and `releaseHold`.
 - **The holds feed** (scope `holds`): `retention.listHolds` (one page),
   `retention.holdPages` (an async iterator) and `retention.syncHolds` (every page,
-  with the cursor to persist; a snapshot without `changedSince`, a delta with it). It
-  throws rather than return a partial feed.
+  with the cursor to persist; a snapshot without `changedSince`, a delta with it).
+  Both throw rather than end on a partial feed, and a hold whose status is missing
+  or unknown is read as active.
 - **`validUntil` and `revokedAt`** on `CheckResult` and `BatchDecision`: the end of
   the consent behind a record-backed answer, and when a withdrawal took effect.
   Both are absent, never null, when there is no record.
@@ -52,18 +74,21 @@ breaking changes listed under 0.4.0. `^0.3.0` will not pick this up on its own.
   `field` on every status (it was set on validation errors only). The known reasons
   are exported as `AgreelyErrorReason`, a string-literal union that stays
   open-ended, so a reason added later still compiles.
-- **`AgreelyDailyCapError`**, a subclass of `AgreelyRateLimitError`, for the 429
-  daily caps `withdrawal_daily_cap`, `hold_budget_exhausted` and
-  `hold_release_cap_reached`. `AgreelyVerbalDailyCapError` now extends it. None is
-  ever auto-retried.
+- **Daily caps have their own error class**, `AgreelyDailyCapError` (a subclass of
+  `AgreelyRateLimitError`), for the 429 caps `withdrawal_daily_cap`,
+  `hold_budget_exhausted` and `hold_release_cap_reached` and any 429 whose reason is
+  `daily_cap`. `AgreelyVerbalDailyCapError` now extends it. None is ever
+  auto-retried.
+- **`IdempotencyOptions`**, the one options type of every write that takes an
+  Idempotency-Key, closed to unknown members.
 - `gate` on `ManualConsentErasure`. The `withdraw` and `holds` scopes on `Scope`.
   The error codes `withdrawal_daily_cap`, `already_minted`, `no_consent_ask`,
   `english_text_missing`, `identity_held`, `identity_erased`,
   `relationship_active`, `already_released`, `too_many_holds`,
   `hold_budget_exhausted`, `hold_release_cap_reached` and `new_set_limit` on
   `AgreelyErrorCode`.
-- Constants `DOCUMENT_TIMEOUT_MS`, `RETENTION_TEXT_MAX`, `WITHDRAWAL_CHANNELS`,
-  `WITHDRAWAL_REASON_MAX`, `CUSTOMER_REF_MAX`.
+- Constants `DOCUMENT_TIMEOUT_MS`, `RETENTION_TEXT_MAX`, `SCHEDULE_REF_MAX`,
+  `WITHDRAWAL_CHANNELS`, `WITHDRAWAL_REASON_MAX`, `CUSTOMER_REF_MAX`.
 - README: every new method, the two consent-sheet rules, and a section on liveness
   and caching (probe `identity()` about once a minute from one scheduler, purge any
   cache and fail closed on a 401 or a 402, never cache a check, never decide consent
@@ -81,9 +106,6 @@ breaking changes listed under 0.4.0. `^0.3.0` will not pick this up on its own.
 
 ### Fixed
 
-- **A 429 daily cap other than the verbal one was surfaced as the per-minute window**
-  (`code: "rate_limited"`), and a client with `maxRetries` would have retried it.
-  It now keeps its own code and is never retried.
 - The documented skew on `obtainedAt` and `signedAt`: an instant in the future is
   refused by any amount (`obtained_at_in_future`, `signed_at_in_future`), not
   within 5 minutes.
@@ -116,6 +138,10 @@ in 0.5.0. **Breaking**: 0.x bumps the minor for a breaking change, and
 - **An `idempotencyKey` override on `manualConsents.record` is validated**: 1 to
   255 printable ASCII characters, else `AgreelyConfigError` before any call (the
   server refuses anything else with a 422).
+- **A 409 and a 413 no longer raise `AgreelyUnavailableError`.** In 0.3.0 both fell
+  through to the outage error; a 409 now raises `AgreelyConflictError` and a 413
+  `AgreelyValidationError`. A `catch` that treated them as an outage no longer sees
+  them.
 
 ### Added
 
@@ -153,8 +179,7 @@ in 0.5.0. **Breaking**: 0.x bumps the minor for a breaking change, and
 - **`agreely.inventory`**: `replaceCategories` (a complete list, not an append),
   `listCategories`, `getStatement`.
 - `AgreelySweepTooFrequentError` (the 15-minute sweep floor, a subclass of
-  `AgreelyRateLimitError`) and `AgreelyConflictError` (a 409: retry with the same
-  idempotency key). A 413 now maps to `AgreelyValidationError` instead of an outage.
+  `AgreelyRateLimitError`) and `AgreelyConflictError` (a 409, see Breaking).
 - `legalBasis` and `sensitive` on `CatalogEntry`, and `company` on `Identity`: both
   were already on the wire.
 
