@@ -6,7 +6,7 @@ interface CatalogWire {
 }
 
 /**
- * The catalog resource (scope: 'check' OR 'issue') — read-only discovery of the
+ * The catalog resource (scope: 'check' OR 'issue'), read-only discovery of the
  * company's declared active (category, purpose) entries, for composing issuance.
  */
 export class Catalog {

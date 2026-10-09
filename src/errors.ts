@@ -188,25 +188,25 @@ export class AgreelyError extends Error {
   }
 }
 
-/** 401 unauthorized OR 403 forbidden — the key is missing, invalid, revoked, or lacks the scope. */
+/** 401 unauthorized OR 403 forbidden: the key is missing, invalid, revoked, or lacks the scope. */
 export class AgreelyAuthError extends AgreelyError {}
 
-/** 400 / 422 — malformed or invalid input. `field` names the offending input when known. */
+/** 400 / 422: malformed or invalid input. `field` names the offending input when known. */
 export class AgreelyValidationError extends AgreelyError {}
 
-/** 404 — no such resource. */
+/** 404: no such resource. */
 export class AgreelyNotFoundError extends AgreelyError {}
 
 /**
- * 402 — the company behind the API key has an inactive/lapsed subscription
+ * 402: the company behind the API key has an inactive/lapsed subscription
  * (trial ended unpaid, past_due, or canceled). DISTINCT from an outage: NOT
  * transient and NOT retryable. Treat it as fail-closed for gating (do NOT grant
- * a gated value) but surface it as actionable — the company must pay to restore
+ * a gated value) but surface it as actionable, the company must pay to restore
  * service, it is not "Agreely is down".
  */
 export class AgreelyBillingInactiveError extends AgreelyError {}
 
-/** 429 — the per-company rate window was exceeded. */
+/** 429: the per-company rate window was exceeded. */
 export class AgreelyRateLimitError extends AgreelyError {
   /** Seconds until the window resets (from the Retry-After header), when given. */
   readonly retryAfter: number | undefined;
@@ -283,7 +283,7 @@ export class AgreelyConflictError extends AgreelyError {}
 
 /**
  * The client-side poll budget (e.g. waitForSettlement) elapsed before the
- * resource reached a terminal state. NOT a server outage — the last-seen state
+ * resource reached a terminal state. NOT a server outage, the last-seen state
  * is attached so a caller can decide whether to keep waiting.
  */
 export class AgreelyTimeoutError extends AgreelyError {
@@ -315,7 +315,7 @@ export class AgreelyAbortError extends AgreelyError {
 }
 
 /**
- * 503 / network error / timeout — Agreely was unreachable. This is the ONLY
+ * 503 / network error / timeout: Agreely was unreachable. This is the ONLY
  * error subject to the degrade policy. `retryable` marks the transient cases
  * (503, network, timeout) the transport may retry for idempotent calls.
  */

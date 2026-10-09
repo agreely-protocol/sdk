@@ -5,13 +5,13 @@
 // resolution (or supply the DID document(s) via an injected `resolver` for a truly
 // air-gapped verify). The IPFS disclosure copy and the on-chain anchor are the
 // two OPT-IN extra network calls. When a DID cannot be resolved, the affected
-// check is reported "unavailable" (inconclusive) — never "fail" (a real tamper).
+// check is reported "unavailable" (inconclusive), never "fail" (a real tamper).
 //
 // A company-attested receipt is fully offline-sound: strip the proof, JCS-
 // canonicalize the body (byte-identical to CompanyAttestedConsentReceipt::body),
 // decode the multibase proofValue to a 64-byte Ed25519 signature, resolve the
 // issuer DID to its key, and verify. That proves the COMPANY attested (under a
-// domain-bound key) to a hand-signed PDF with hash H — it does NOT prove a human
+// domain-bound key) to a hand-signed PDF with hash H, it does NOT prove a human
 // signed.
 //
 // A citizen receipt is HONESTLY PARTIAL offline: the company half signed the
@@ -22,7 +22,7 @@
 // root), which this verifier does not read. It reads a BARE receipt, so it reports
 // the company check as "unsupported" rather than a verdict it cannot support.
 // The citizen WebAuthn assertion IS checkable and proves passkey-possession over
-// the committed challenge — not the cell semantics.
+// the committed challenge, not the cell semantics.
 //
 // disclosureCopy (both types) and documentAnchor (opt-in) are the two additional
 // offline-sound / on-chain proofs.
@@ -84,7 +84,7 @@ const REGISTRY_BY_CHAIN: Record<number, string | null> = {
   8453: MAINNET_REGISTRY_ADDRESS, // Base mainnet (default)
   84532: "0x3532a9DfF3C910152543afCa49De7c66113C5312", // Base Sepolia (optional testing)
 };
-// keccak256("IdentityAnchored(bytes32,uint64)") — the document CID is anchored via
+// keccak256("IdentityAnchored(bytes32,uint64)"), the document CID is anchored via
 // anchorIdentity(commitment = keccak256(utf8(cid))).
 const IDENTITY_ANCHORED_TOPIC = keccak256Hex("IdentityAnchored(bytes32,uint64)");
 
@@ -332,7 +332,7 @@ export class ReceiptVerifier {
       return "skipped";
     }
 
-    const commitment = keccak256Hex(cid); // keccak256(utf8(cid)) — the anchored bytes32
+    const commitment = keccak256Hex(cid); // keccak256(utf8(cid)), the anchored bytes32
     const fetchImpl = this.opts.fetch ?? globalThis.fetch;
     try {
       const res = await fetchImpl(rpcUrl, {
@@ -477,7 +477,7 @@ function decodeMultibase(proofValue: string): Uint8Array {
  * Is the human-readable cell label (category/purpose) cryptographically bound?
  *
  * company_attested: the labels sit INSIDE the Ed25519-signed body, so this tracks
- *   companySignature — a mutation to any item's category/purpose/itemId breaks the
+ *   companySignature, a mutation to any item's category/purpose/itemId breaks the
  *   signature (a genuine offline cross-check of the labels).
  * citizen: UNSUPPORTED offline. The receipt deliberately omits the salted
  *   commitment + Merkle root that bind the labels (unlinkability / crypto-

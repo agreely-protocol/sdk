@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 // Dual ESM + CJS build with full .d.ts. `undici` is the only (optional) runtime
-// import and it is loaded lazily, so it is kept external — the SDK never bundles
+// import and it is loaded lazily, so it is kept external, the SDK never bundles
 // it, and Node 18+ users with global fetch never touch it.
 export default defineConfig({
   entry: ["src/index.ts"],

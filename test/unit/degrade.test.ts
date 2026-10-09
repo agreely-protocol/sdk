@@ -90,7 +90,7 @@ describe("fail-open: config allow-list + per-call gate (two gates)", () => {
     expect(onDegrade).not.toHaveBeenCalled();
   });
 
-  it("denies an allow-listed category WITHOUT the per-call opt (gate 2 — the per-call gate)", async () => {
+  it("denies an allow-listed category WITHOUT the per-call opt (gate 2, the per-call gate)", async () => {
     const onDegrade = vi.fn();
     const { agreely } = failOpenClient(outageScript(), onDegrade);
     expect(await agreely.check("cust", "Browsing/usage", "Analytics")).toBe(false);
@@ -215,7 +215,7 @@ describe("break-glass per-decision audit (compliance evidence, QA #1)", () => {
   it("a break-glass allow with NO degradeOnOutage config STILL emits a per-decision audit record", async () => {
     const onBreakGlass = vi.fn();
     const { fetch } = mockFetch(outageScript());
-    // No degradeOnOutage config at all — only onBreakGlass.
+    // No degradeOnOutage config at all, only onBreakGlass.
     const agreely = new Agreely({ apiKey: "k", baseUrl: BASE, fetch, onBreakGlass });
     agreely.breakGlass.engage({ reason: "incident-99", ttl: "30m", scope: ["Browsing/usage"] });
 

@@ -290,7 +290,7 @@ export interface ItemLabels {
 /**
  * An item to request consent for: either a catalog entry id (string) OR a raw
  * {category, purpose} pair. Pairs are resolved server-side to the company's
- * declared active catalog — the SDK sends them raw and NEVER normalizes.
+ * declared active catalog, the SDK sends them raw and NEVER normalizes.
  */
 export type IssueItem = string | { category: string; purpose: string };
 
@@ -298,7 +298,7 @@ export type IssueItem = string | { category: string; purpose: string };
  * Input for issuing a consent request. Every request is issued under a
  * PUBLISHED consent document (the Law 25 s. 8 disclosure): exactly ONE of
  * `consentDocumentId` / `documentCode` is required. The requested (category,
- * purpose) items derive from the document server-side — there is no caller
+ * purpose) items derive from the document server-side, there is no caller
  * items list.
  */
 export interface CreateConsentRequestInput {
@@ -761,7 +761,7 @@ export interface VerbalConsentHistory {
 
 // ---------------------------------------------------------------------------
 // End of a customer relationship (Law 25 art. 23, "les fins sont accomplies").
-// A pure lifecycle OVERLAY keyed on the company's OWN customerRef — never a DID.
+// A pure lifecycle OVERLAY keyed on the company's OWN customerRef, never a DID.
 // ---------------------------------------------------------------------------
 
 /** Input for ending a customer relationship. */
@@ -1740,7 +1740,7 @@ export interface DegradeContext {
 /**
  * Integrator config to opt specific categories into fail-open on an outage.
  * Off by default (the SDK is fail-closed). `onDegrade` is MANDATORY when
- * `mode: "fail-open"` — absent, the constructor throws.
+ * `mode: "fail-open"`: absent, the constructor throws.
  */
 export interface DegradeOnOutageConfig {
   /** The explicit word. Only "fail-open" enables the exception. */
@@ -1756,8 +1756,8 @@ export interface DegradeOnOutageConfig {
 /**
  * An auditable break-glass event.
  *
- *   "engage" / "disengage" / "expire" — lifecycle of the operator lever.
- *   "authorized" — a PER-DECISION record: a single break-glass-authorized allow
+ *   "engage" / "disengage" / "expire": lifecycle of the operator lever.
+ *   "authorized": a PER-DECISION record: a single break-glass-authorized allow
  *     that happened during an outage. Emitted for EVERY such allow, regardless of
  *     whether `degradeOnOutage` is configured, so the evidence trail can show
  *     every access allowed inside a break-glass window (not just engage/expire).

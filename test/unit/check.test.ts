@@ -37,7 +37,7 @@ describe("check() boolean mapping", () => {
     expect(await agreely.check("c1", "Phone", "Billing")).toBe(false);
   });
 
-  it("sends category/purpose RAW — no client-side normalization", async () => {
+  it("sends category/purpose RAW, no client-side normalization", async () => {
     const { agreely, calls } = client([{ json: { decision: "deny", status: "none", checkedAt: "t" } }]);
     await agreely.check("c1", "  Email   ADDRESS ", "Marketing\tOutreach");
     expect(calls[0]!.body).toEqual({

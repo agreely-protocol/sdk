@@ -34,7 +34,7 @@ describe("consentRequests.listAll / collect", () => {
 
   it("honors the maxPages guard", async () => {
     const { fetch, calls } = mockFetch([
-      // Always returns a next cursor — the guard must stop it.
+      // Always returns a next cursor, the guard must stop it.
       () => ({ json: { requests: [rec("0xloop")], nextCursor: "0xnext" } }),
     ]);
     const all = await client(fetch).consentRequests.collect({ maxPages: 3 });
@@ -55,7 +55,7 @@ describe("consentRequests.listAll / collect", () => {
 
   it("coerces an absent wire nextCursor to null so listAll stops (TS<->PHP parity)", async () => {
     const { fetch, calls } = mockFetch([
-      // The wire omits nextCursor entirely — listAll must still terminate.
+      // The wire omits nextCursor entirely, listAll must still terminate.
       { json: { requests: [rec("0xa")] } },
     ]);
     const all = await client(fetch).consentRequests.collect();

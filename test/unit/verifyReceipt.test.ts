@@ -126,7 +126,7 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
     const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
       if (init?.method === "POST") {
-        // eth_getLogs — return one matching log.
+        // eth_getLogs, return one matching log.
         return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [{ blockNumber: "0x1" }] }), {
           headers: { "Content-Type": "application/json" },
         });
@@ -154,7 +154,7 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
       if (init?.method === "POST") {
         anchorRequestBody = String(init.body);
-        // eth_getLogs — return one matching log.
+        // eth_getLogs, return one matching log.
         return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [{ blockNumber: "0x1" }] }), {
           headers: { "Content-Type": "application/json" },
         });
@@ -306,7 +306,7 @@ describe("cellLabelBinding cross-checks the human-readable labels (claims-audit 
     expect(result.overall).toBe("failed");
   });
 
-  it("a citizen receipt NEVER reports cellLabelBinding: pass — a mutated label is honestly 'unsupported' offline, never presented as verified", async () => {
+  it("a citizen receipt NEVER reports cellLabelBinding: pass, a mutated label is honestly 'unsupported' offline, never presented as verified", async () => {
     const genuine = await Agreely.verifyReceipt(structuredClone(citizenCase().receipt), {
       resolver,
       ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
@@ -317,13 +317,13 @@ describe("cellLabelBinding cross-checks the human-readable labels (claims-audit 
 
     const receipt = structuredClone(citizenCase().receipt) as Record<string, unknown>;
     const items = (receipt.credentialSubject as { consent: { items: Array<Record<string, unknown>> } }).consent.items;
-    items[0]!.category = "HACKED"; // offline, no salt/commitment/root to cross-check against — see the note
+    items[0]!.category = "HACKED"; // offline, no salt/commitment/root to cross-check against, see the note
     const mutated = await Agreely.verifyReceipt(receipt, {
       resolver,
       verifyDisclosure: false,
     });
     // Offline the citizen label cannot be cryptographically failed (by design), but it is
-    // never 'pass', and the result is at most 'partial' — a relying party is not misled.
+    // never 'pass', and the result is at most 'partial', a relying party is not misled.
     expect(mutated.cellLabelBinding).toBe("unsupported");
     expect(mutated.cellLabelBinding).not.toBe("pass");
     expect(mutated.overall).not.toBe("verified");

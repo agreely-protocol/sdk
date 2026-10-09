@@ -22,7 +22,7 @@ export function parseDuration(input: string): number {
  * A LOCAL policy key for degrade allow-list / break-glass scope matching ONLY.
  *
  * IMPORTANT: this is NOT the server's CatalogEntry::normalizeKey and is NEVER
- * applied to the category/purpose SENT to the server (those go raw — the hard
+ * applied to the category/purpose SENT to the server (those go raw, the hard
  * rule). This only decides whether a category the integrator pre-declared in
  * config matches the category at a call site, so "Browsing/usage" and
  * " browsing/usage " gate the same way. A purely local, transparent comparison.
@@ -32,7 +32,7 @@ export function localPolicyKey(value: string): string {
 }
 
 /**
- * Default upper bound for an open degrade window — both a break-glass `ttl` and
+ * Default upper bound for an open degrade window, both a break-glass `ttl` and
  * a `degradeOnOutage.maxOutageWindow`. 24h. An accountability product must not
  * let an operator open an effectively-unbounded fail-open window ("9999h"); the
  * cap is overridable per-client via the `maxDegradeWindow` option.

@@ -1,4 +1,4 @@
-// A compact, dependency-free keccak-256 (the Ethereum hash — NOT NIST SHA3-256;
+// A compact, dependency-free keccak-256 (the Ethereum hash, NOT NIST SHA3-256;
 // the difference is the domain-separation padding byte 0x01 vs 0x06). Used ONLY
 // to derive the AgreelyRegistry event topic and the keccak256(utf8(cid)) document
 // commitment for the opt-in on-chain documentAnchor check. Matches the app's

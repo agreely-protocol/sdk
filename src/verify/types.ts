@@ -7,7 +7,7 @@
  *
  *   - pass         the cryptography verified.
  *   - fail         the cryptography actively did NOT verify (a tamper / wrong key).
- *   - unavailable  the check could NOT be completed — the issuer/citizen DID could
+ *   - unavailable  the check could NOT be completed, the issuer/citizen DID could
  *                  not be resolved (network outage, unreachable host, key not
  *                  found). DISTINCT from "fail": a valid receipt during a DID
  *                  outage must never look byte-identical to a forgery.
@@ -57,7 +57,7 @@ export type ReceiptType = "company_attested" | "company_documented" | "citizen";
  *   - documentAnchor    pass/fail of the opt-in on-chain check; "skipped" without
  *                       an rpcUrl (or a CID to look up).
  *   - cellLabelBinding  whether the human-readable cell labels (category/purpose)
- *                       are CRYPTOGRAPHICALLY bound in THIS offline verification —
+ *                       are CRYPTOGRAPHICALLY bound in THIS offline verification,
  *                       the one field to read before trusting a displayed label.
  *                       company_attested: tracks companySignature (the labels sit
  *                       inside the signed body, so a mutation breaks it). citizen:

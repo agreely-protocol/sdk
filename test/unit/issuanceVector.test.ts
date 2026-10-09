@@ -75,7 +75,7 @@ describe("issuanceRequest golden vectors (shared with the PHP SDK)", () => {
       const call = calls[0]!;
       expect(call.method).toBe(c.expect.method);
       expect(new URL(call.url).pathname).toBe(c.expect.path);
-      // EXACT envelope: the body deep-equals the golden body — no items key,
+      // EXACT envelope: the body deep-equals the golden body, no items key,
       // no second document reference, nothing extra.
       expect(call.body).toEqual(c.expect.body);
       expect(call.headers["idempotency-key"] ?? call.headers["Idempotency-Key"]).toBeTruthy();

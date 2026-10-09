@@ -24,7 +24,7 @@ export interface RequestSpec {
   /**
    * Whether this call may be retried on a transient outage (network / 503).
    * TRUE only for idempotent reads and the check (a pure read). NEVER for
-   * consentRequests.create — it emails; a retry there must replay via the
+   * consentRequests.create, it emails; a retry there must replay via the
    * Idempotency-Key, not re-issue.
    */
   idempotentRetry?: boolean;

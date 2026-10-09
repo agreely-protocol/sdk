@@ -14,7 +14,7 @@ interface EngagedState {
 
 /**
  * The break-glass lever (degrade gate 3): an explicit, auto-expiring operator
- * override for an active outage. Independent of the config allow-list — it is
+ * override for an active outage. Independent of the config allow-list, it is
  * the runtime emergency switch when the outage policy wasn't pre-armed. Every
  * engage / disengage / expiry is audited via the onBreakGlass sink.
  */
@@ -53,7 +53,7 @@ export class BreakGlass {
   /**
    * Emit a PER-DECISION audit record for a single break-glass-authorized allow.
    * Called by the degrade policy on every break-glass allow during an outage, so
-   * the evidence trail records every access (not just engage/disengage/expire) —
+   * the evidence trail records every access (not just engage/disengage/expire),
    * regardless of whether `degradeOnOutage`/`onDegrade` is configured.
    */
   recordAuthorized(record: {

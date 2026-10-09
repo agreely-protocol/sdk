@@ -1,4 +1,4 @@
-// A strict, NUMBER-FREE JCS (RFC 8785) canonicalizer — a byte-for-byte port of
+// A strict, NUMBER-FREE JCS (RFC 8785) canonicalizer, a byte-for-byte port of
 // the Agreely app's App\Models\Crypto\Canonicalizer (spec rule 17.1). The output
 // is the deterministic UTF-8 byte string a verifier re-canonicalizes and hashes,
 // so it MUST match the PHP SDK and the server exactly:

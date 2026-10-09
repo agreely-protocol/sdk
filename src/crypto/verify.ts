@@ -100,7 +100,7 @@ export function verifyWebAuthnAssertion(
 }
 
 // ---------------------------------------------------------------------------
-// A minimal CBOR reader — just enough for a COSE_Key map: unsigned ints (major
+// A minimal CBOR reader, just enough for a COSE_Key map: unsigned ints (major
 // 0), negative ints (major 1), byte strings (major 2) and the map header (major
 // 5). Anything else throws.
 // ---------------------------------------------------------------------------

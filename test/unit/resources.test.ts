@@ -10,7 +10,7 @@ function client(script: Parameters<typeof mockFetch>[0]) {
   return { agreely: new Agreely({ apiKey: "k", baseUrl: BASE, fetch }), calls };
 }
 
-describe("consentRequests.create — Idempotency-Key", () => {
+describe("consentRequests.create, Idempotency-Key", () => {
   const input = {
     customerId: "c1",
     recipientEmail: "user@example.com",

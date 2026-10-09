@@ -15,7 +15,7 @@ export class Relationships {
   constructor(private readonly transport: Transport) {}
 
   /**
-   * End a customer relationship (Law 25 art. 23, "les fins sont accomplies") —
+   * End a customer relationship (Law 25 art. 23, "les fins sont accomplies"),
    * the exact company-UI action, exposed for a company's own offboarding flow.
    * The `reason` is REQUIRED (the attestation must carry its justification): a
    * blank one fails CLOSED client-side (AgreelyConfigError) before any wire call,
@@ -61,7 +61,7 @@ export class Relationships {
 
   /**
    * UNDO a mistaken company-attested end (Law 25 art. 11 / art. 28 correction of
-   * an inaccurate record) — NOT a resurrection of dead consent. Allowed ONLY as a
+   * an inaccurate record), NOT a resurrection of dead consent. Allowed ONLY as a
    * narrow server-side carve-out: the end was company-attested, nothing was
    * destroyed, and it is within the correction window. On success the relationship
    * returns to 'active' and the still-active consents apply again.

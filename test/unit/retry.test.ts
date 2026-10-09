@@ -51,7 +51,7 @@ describe("retry policy", () => {
         validUntil: "2030-01-01",
       }),
     ).rejects.toMatchObject({ name: "AgreelyUnavailableError" });
-    expect(calls).toHaveLength(1); // exactly one attempt — no double-issue
+    expect(calls).toHaveLength(1); // exactly one attempt, no double-issue
   });
 
   it("does NOT retry a non-idempotent 400 on list", async () => {

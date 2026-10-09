@@ -45,7 +45,7 @@ export const RATE_LIMIT_PER_MINUTE = 120;
 
 /**
  * The Agreely client: a thin, near-stateless gate over the /v1 API. It holds an
- * api key, a base URL, a fetch client, a timeout, and the degrade policy — NO
+ * api key, a base URL, a fetch client, a timeout, and the degrade policy, NO
  * database, NO ref tables, and NO allow-cache (caching an allow while a revoke
  * lands mid-window is a stale-allow correctness failure). Every
  * check() is a fresh authoritative call.
@@ -134,10 +134,10 @@ export class Agreely {
    * resolution by default, or supply a local `resolver` for an air-gapped verify);
    * the IPFS disclosure copy and on-chain anchor are the opt-in extra calls. When a
    * DID cannot be resolved the check is "unavailable" (inconclusive), never "fail".
-   * Static — no API key needed.
+   * Static, no API key needed.
    *
    * SECURITY: when verifying UNTRUSTED receipts, inject your own `resolver` (or
-   * supply DID documents locally) — the default did:web resolver fetches a host
+   * supply DID documents locally), the default did:web resolver fetches a host
    * taken from the receipt (HTTPS-only; it can never yield a false "verified").
    */
   static verifyReceipt(
@@ -155,7 +155,7 @@ export class Agreely {
     return "0x" + createHash("sha256").update(bytes).digest("hex");
   }
 
-  /** Read a PDF from disk and hash it (Node) — see {@link Agreely.hashPdf}. */
+  /** Read a PDF from disk and hash it (Node), see {@link Agreely.hashPdf}. */
   static async hashPdfFile(path: string): Promise<string> {
     return Agreely.hashPdf(await readFile(path));
   }
@@ -184,9 +184,9 @@ export class Agreely {
    * The boolean-ergonomic consent gate. ALLOW is the only true. A 200 deny ->
    * false. On an outage, the fail-closed default returns false; the explicit,
    * scoped, audited exception (config + per-call opt, or break-glass) may
-   * return true. NEVER throws on an outage — it resolves to a boolean.
+   * return true. NEVER throws on an outage, it resolves to a boolean.
    *
-   * Send RAW category/purpose — the server normalizes. Labels may be French OR
+   * Send RAW category/purpose, the server normalizes. Labels may be French OR
    * English, with or without accents (case- and whitespace-insensitive); English
    * resolves only when the company disclosed an English label for that cell, and
    * an ambiguous/undeclared label fails closed.
@@ -298,7 +298,7 @@ export class Agreely {
   }
 
   /**
-   * Shared resolution. Sends category/purpose RAW (the server normalizes — the
+   * Shared resolution. Sends category/purpose RAW (the server normalizes, the
    * SDK never does). On a 200, returns the server decision and clears any outage
    * window. On an outage, applies the degrade policy: a degraded allow returns a
    * synthesized allow result; a fail-closed outcome rethrows the outage error.
