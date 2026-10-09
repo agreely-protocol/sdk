@@ -13,14 +13,18 @@ breaking changes listed under 0.4.0. `^0.3.0` will not pick this up on its own.
 ### Breaking
 
 - **A method that returns a promise now rejects, it never throws synchronously.**
-  Invalid input (`AgreelyConfigError`) used to be thrown from the call itself on
-  most methods; it now rejects the returned promise, so a `.catch()` chain sees it.
-  Code that awaits inside a `try` is unaffected.
-- **The options of a write are closed.** `manualConsents.record`,
-  `verbalConsents.record` and `confirmWithPaper`, and the new writes below refuse an
+  In 0.3.0, `consentRequests.create`, `manualConsents.record`, `relationships.end`
+  and `relationships.revert` threw invalid input (`AgreelyConfigError`) from the call
+  itself; they now reject the returned promise, like every other method, so a
+  `.catch()` chain sees it. Code that awaits inside a `try` is unaffected.
+- **The options of every write are closed.** `consentRequests.create`,
+  `manualConsents.record`, `verbalConsents.record` and `confirmWithPaper`,
+  `retention.declarePurge` and `declareSweep`, and the new writes below refuse an
   option they do not know: a misspelt `idempotencykey` used to be ignored and
-  replaced by a random key, which made a retry the caller believed safe record
-  twice.
+  replaced by a random key, so a retry the caller believed safe recorded twice (on
+  `consentRequests.create`, it issued twice and emailed the person twice).
+  `consentRequests.create` now also validates its key (1 to 255 printable ASCII
+  characters), where the server would silently cut a longer one at 255.
 - **Only `rate_limited` is ever auto-retried.** A 429 with any other code used to be
   rewritten to `rate_limited` and, on a read with `maxRetries`, retried. A known
   daily-cap code, or a `daily_cap` reason, now raises `AgreelyDailyCapError`; any
