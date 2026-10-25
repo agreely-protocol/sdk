@@ -4,7 +4,7 @@ import type { CustomerRecord, UpsertCustomerInput, UpsertCustomerResult } from "
 import { requireCustomerRef } from "../util.js";
 
 /** The members `upsert` sends, and no others. */
-const UPSERT_MEMBERS = ["displayName", "email", "basisNote", "legalBasis", "noticeLocale"] as const;
+const UPSERT_MEMBERS = ["displayName", "email", "noticeLocale"] as const;
 
 /**
  * The customer registry (scope 'registry'): the identity your own system holds for one
@@ -12,7 +12,7 @@ const UPSERT_MEMBERS = ["displayName", "email", "basisNote", "legalBasis", "noti
  * customerRef (the one /v1/check uses), never a DID.
  *
  * THERE IS NO LIST, AND THE READ IS METADATA. Every route takes one customerRef you
- * already know, and `get` answers WHETHER a name, an address or a note is held, never
+ * already know, and `get` answers WHETHER a name or an address is held, never
  * what it says: Agreely is not a place to read your customers back from.
  *
  * The per-customer retention clock, dispositions and holds live on `agreely.retention`
@@ -43,9 +43,9 @@ export class Customers {
    * wipe a name curated in Agreely. `created` is true when this call created the record
    * (HTTP 201), false when it merged into an existing one (200).
    *
-   * `legalBasis` must be a non-consent ground of YOUR act (a consent-held client belongs
-   * to the consent flow); anything else is a 422 naming it, never dropped silently. No
-   * consent side effect: no email, no request, no enforcement record.
+   * No consent side effect: no email, no request, no enforcement record. The registry
+   * holds no per-customer ground: a `basisNote` or `legalBasis` is not a member, so it is
+   * not sent.
    *
    * A 409 AgreelyConflictError carries its stable string in `code` (no `reason` on this
    * route): `identity_erased` (a standing destruction or anonymization removed the

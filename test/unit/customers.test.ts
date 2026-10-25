@@ -22,8 +22,6 @@ const record: CustomerRecord = {
   source: "api",
   hasDisplayName: true,
   hasEmail: false,
-  hasBasisNote: false,
-  legalBasis: "contract",
   noticeLocale: "fr",
   createdAt: "2026-10-08T20:13:48Z",
   updatedAt: "2026-10-08T20:13:48Z",
@@ -50,16 +48,22 @@ describe("customers.get", () => {
 describe("customers.upsert (a merge, never a replace)", () => {
   it("sends only the members given: absent is untouched, null and empty clear, a value writes", async () => {
     const { agreely, calls } = client([{ status: 200, json: record }]);
-    await agreely.customers.upsert("STORE/0042", { displayName: "Marie", email: null, basisNote: "" });
+    await agreely.customers.upsert("STORE/0042", { displayName: "Marie", email: null, noticeLocale: null });
     expect(calls[0]!.method).toBe("PUT");
     expect(calls[0]!.url).toBe(`${BASE}/v1/customers/STORE%2F0042`);
-    expect(calls[0]!.body).toEqual({ displayName: "Marie", email: null, basisNote: "" });
+    expect(calls[0]!.body).toEqual({ displayName: "Marie", email: null, noticeLocale: null });
   });
 
-  it("drops members set to undefined and anything that is not a registry member", async () => {
+  it("never forwards the retired basisNote or legalBasis, nor members set to undefined or unknown ones", async () => {
     const { agreely, calls } = client([{ status: 200, json: record }]);
-    await agreely.customers.upsert("c1", { legalBasis: "contract", noticeLocale: undefined, company: "x" } as never);
-    expect(calls[0]!.body).toEqual({ legalBasis: "contract" });
+    await agreely.customers.upsert("c1", {
+      displayName: "Ada",
+      legalBasis: "contract",
+      basisNote: "a note",
+      noticeLocale: undefined,
+      company: "x",
+    } as never);
+    expect(calls[0]!.body).toEqual({ displayName: "Ada" });
   });
 
   it("reports created from the status: 201 created, 200 merged", async () => {
@@ -94,15 +98,15 @@ describe("customers.upsert (a merge, never a replace)", () => {
     });
   });
 
-  it("a ground outside the tenant's act is a 422 naming legalBasis, never dropped silently", async () => {
+  it("a 422 from the server is an AgreelyValidationError naming the field it refuses", async () => {
     const { agreely } = client([
       {
         status: 422,
-        json: { error: { code: "invalid_request", message: "Not a ground of P-39.1.", field: "legalBasis" } },
+        json: { error: { code: "invalid_request", message: "email must be a valid address.", field: "email" } },
       },
     ]);
-    await expect(agreely.customers.upsert("c1", { legalBasis: "attributions" })).rejects.toSatisfy(
-      (e: unknown) => e instanceof AgreelyValidationError && e.field === "legalBasis",
+    await expect(agreely.customers.upsert("c1", { email: "not-an-address" })).rejects.toSatisfy(
+      (e: unknown) => e instanceof AgreelyValidationError && e.field === "email",
     );
   });
 

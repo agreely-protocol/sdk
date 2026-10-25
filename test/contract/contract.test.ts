@@ -428,7 +428,7 @@ writeSuite("contract: the write routes, with refs holding a slash and %41", () =
 
   it("customers.upsert creates, then merges, and a ref with a slash or %41 reads back exactly as written", async () => {
     for (const ref of [slashRef, percentRef]) {
-      const created = await a.customers.upsert(ref, { displayName: "Contract Person", legalBasis: "contract" });
+      const created = await a.customers.upsert(ref, { displayName: "Contract Person" });
       expect(created.created).toBe(true);
       expect(created.customerRef).toBe(ref);
       expect(created.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/);
@@ -436,7 +436,9 @@ writeSuite("contract: the write routes, with refs holding a slash and %41", () =
       const merged = await a.customers.upsert(ref, { displayName: null });
       expect(merged.created).toBe(false);
       expect(merged.hasDisplayName).toBe(false);
-      expect(merged.legalBasis).toBe("contract");
+      // The registry holds and returns no per-customer ground.
+      expect(merged).not.toHaveProperty("legalBasis");
+      expect(merged).not.toHaveProperty("hasBasisNote");
 
       const read = await a.customers.get(ref);
       expect(read.customerRef).toBe(ref);
@@ -446,7 +448,7 @@ writeSuite("contract: the write routes, with refs holding a slash and %41", () =
   });
 
   it("a consent sheet for a ref with a slash is minted once; its key then answers already_minted", async () => {
-    await a.customers.upsert(slashRef, { legalBasis: "contract" });
+    await a.customers.upsert(slashRef, { displayName: "Contract Person" });
     const key = `contract-sheet-${run}`;
     const sheet = await a.manualConsents.createConsentSheet(
       slashRef,
@@ -507,7 +509,7 @@ writeSuite("contract: the write routes, with refs holding a slash and %41", () =
   });
 
   it("a hold on a ref with %41 is placed, fed, released, and a second release is already_released", async () => {
-    await a.customers.upsert(percentRef, { legalBasis: "contract" });
+    await a.customers.upsert(percentRef, { displayName: "Contract Person" });
     const placed = await a.retention.placeHold(
       percentRef,
       { ground: "other_law", provision: "Contract test provision, s. 1" },
@@ -554,7 +556,7 @@ writeSuite("contract: the write routes, with refs holding a slash and %41", () =
       const refs = Array.from({ length: 11 }, (_, i) => `SDK/${run}/page/${i}`);
       const placedIds = new Set<string>();
       for (const ref of refs) {
-        await paced(() => a.customers.upsert(ref, { legalBasis: "contract" }));
+        await paced(() => a.customers.upsert(ref, { displayName: "Paging Person" }));
         for (let n = 0; n < perRef; n++) {
           const hold = await paced(() =>
             a.retention.placeHold(ref, { ground: "rights_request" }, { idempotencyKey: `contract-page-${run}-${ref}-${n}` }),

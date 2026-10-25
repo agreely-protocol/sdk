@@ -1487,15 +1487,12 @@ export interface UpsertCustomerInput {
   displayName?: string | null;
   /** A valid address of at most 320 characters. Stored encrypted; never read back. */
   email?: string | null;
-  /** At most 2000 characters. Stored encrypted; never read back. */
-  basisNote?: string | null;
-  legalBasis?: RegistryBasis | null;
   noticeLocale?: DocumentLocale | null;
 }
 
 /**
  * What Agreely holds for one customerRef, as METADATA. Every personal field is a
- * boolean: the name, address and note are never returned.
+ * boolean: the name and address are never returned.
  */
 export interface CustomerRecord {
   customerRef: string;
@@ -1505,8 +1502,6 @@ export interface CustomerRecord {
   source: "manual" | "import" | "api" | "ceremony" | null;
   hasDisplayName: boolean;
   hasEmail: boolean;
-  hasBasisNote: boolean;
-  legalBasis: RegistryBasis | null;
   noticeLocale: DocumentLocale | null;
   /** RFC 3339 UTC, or null when no identity row is held. */
   createdAt: string | null;

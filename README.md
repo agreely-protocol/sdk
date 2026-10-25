@@ -431,11 +431,10 @@ endpoint, by construction.
 const r = await agreely.customers.upsert("cust_8812", {
   displayName: "Marie Tremblay",
   email: null,               // null or "" CLEARS a value
-  legalBasis: "contract",    // a non-consent ground of YOUR act
   noticeLocale: "fr",
 });                          // a member you leave out is left as it stands
-// { customerRef, registered, source, hasDisplayName, hasEmail, hasBasisNote,
-//   legalBasis, noticeLocale, createdAt, updatedAt, relationship, created }
+// { customerRef, registered, source, hasDisplayName, hasEmail, noticeLocale,
+//   createdAt, updatedAt, relationship, created }
 
 const meta = await agreely.customers.get("cust_8812"); // metadata only
 ```
@@ -447,8 +446,7 @@ const meta = await agreely.customers.get("cust_8812"); // metadata only
   place to read your customers back from.
 - **409** carries its stable string in `code` here: `identity_erased` (a standing
   destruction removed the identity; a value would undo that, a clear still works)
-  or `identity_held` (a hold keeps it as is, a clear included). `legalBasis:
-  "consent"`, or a ground of the other act, is a 422 naming `legalBasis`.
+  or `identity_held` (a hold keeps it as is, a clear included).
 
 ### List / lookup / get / catalog
 

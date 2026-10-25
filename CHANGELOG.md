@@ -3,6 +3,18 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Breaking
+
+- **The customer registry no longer takes or returns a per-customer ground.**
+  `customers.upsert` drops `basisNote` and `legalBasis` from its input, and
+  `CustomerRecord` drops `hasBasisNote` and `legalBasis`. TypeScript callers that set or
+  read them stop compiling. At runtime a value still sent is no longer forwarded, and the
+  server ignores it. The purpose belongs to the processing, documented per catalogue
+  cell. The retention disposition keeps its frozen `basis` and `hasBasisNote`, and the
+  catalogue keeps `legalBasis` per cell.
+
 ## 0.5.0 - 2026-10-09
 
 Covers the whole /v1 API in production since 2026-10-09. **0.4.0 below was
