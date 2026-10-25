@@ -29,9 +29,10 @@ to [Semantic Versioning](https://semver.org/).
 - **`consentAnchor`**: with an `rpcUrl`, `verifyReceipt` reads each cell's on-chain
   record from a bundle with `eth_call registry(consentRef)`, tied to the receipt by
   the Merkle root the passkey assertion binds. It reads `pass` once every cell's
-  record was read under that root and is in force, `fail` when the chain records a
-  cell under another root or records its withdrawal (state 2), and `unavailable`
-  otherwise, a cell not yet recorded included. `consentAnchorRecords` gives each
+  record was read under that root and is in force, `withdrawn` when the chain records
+  a cell's withdrawal (state 2) under that root (the consent is authentic, and no
+  longer in force), `fail` when the chain records a cell under another root, and
+  `unavailable` otherwise, a cell not yet recorded included. `consentAnchorRecords` gives each
   cell read under that root: its state, `anchoredAt`, `revokedAt` and
   `anchoredBlock`.
 - **The on-chain checks read the registry by `eth_call` only.** The document anchor
@@ -42,10 +43,15 @@ to [Semantic Versioning](https://semver.org/).
 - The known registry per chain: Base Sepolia (84532)
   `0xAf170eA0F66279104D5CF25d7938bBe7A4173e61`. Base mainnet (8453) has none until
   its registry is deployed: there, pass `registryAddress`, or the anchor checks read
-  `fail` with « no known registry for this chain ». An explicit `registryAddress` is
-  read by `eth_call`.
+  `unavailable` with « no known registry for this chain ». An explicit `registryAddress`
+  is read by `eth_call`.
 - A bundle whose issuer key delegation names another registry or chain than the one
-  read fails both anchor checks as an unknown registry, and no RPC call is made.
+  read reads both anchor checks `unavailable` as an unknown registry, is never
+  `verified`, and no RPC call is made. A genuine receipt anchored on a registry this
+  SDK does not read gets this outcome: it is inconclusive, not a forgery.
+- `overall` reads `withdrawn` only when every other decisive check would have produced
+  `verified` and the consent anchor reads `withdrawn`. A `fail` elsewhere still gives
+  `failed`, an `unavailable` elsewhere still gives `unavailable`.
 - `timeoutMs`, and `rpcDeadlineMs` (default 30000) over the whole on-chain sequence.
 - `identity().company` carries `slug`, the tenant's public identifier (the one its
   public policy URL carries). Additive: existing fields are unchanged.
@@ -88,7 +94,7 @@ to [Semantic Versioning](https://semver.org/).
 
 - With an `rpcUrl` and no `registryAddress`, Base mainnet (the default chain) no
   longer resolves `0x23577fafFa306375028D33a559D0F95Ced9424DB`: the anchor checks
-  read `fail` with « no known registry for this chain » until the mainnet registry
+  read `unavailable` with « no known registry for this chain » until the mainnet registry
   read by `eth_call` is known. Base Sepolia no longer resolves
   `0x3532a9DfF3C910152543afCa49De7c66113C5312`. Neither address is read by any check.
 - The document anchor is no longer an `IdentityAnchored` log query, and
@@ -97,8 +103,8 @@ to [Semantic Versioning](https://semver.org/).
 - `verifyReceipt` takes a verification bundle or a receipt. A bare passkey receipt
   reads `incomplete` (it read `partial`), its `citizenAssertion` `unbound` and its
   `disclosureCopy` `unsupported`: pass the bundle issued with it.
-- `CheckStatus` adds `"unbound"`; `OverallStatus` adds `"incomplete"` and
-  `"malformed"`. `ReceiptVerification` adds `input` (`"bundle" | "receipt"`),
+- `CheckStatus` adds `"unbound"` and `"withdrawn"`; `OverallStatus` adds
+  `"incomplete"`, `"malformed"` and `"withdrawn"`. `ReceiptVerification` adds `input` (`"bundle" | "receipt"`),
   `receiptIntegrity` and `consentAnchor`. An exhaustive `switch` over the statuses
   stops compiling.
 - `malformed` is the overall for a file the verifier cannot read: not an object, a

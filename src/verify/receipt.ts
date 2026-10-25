@@ -136,6 +136,8 @@ type RpcOutcome = { ok: true; result: unknown } | { ok: false; reason: string };
 type ChainSession = {
   deadline: number | null;
   namedRegistry: NamedRegistry | null;
+  // Set when the bundle names a registry this SDK does not read: the anchors are then never verified.
+  registryRefused?: boolean;
   documentRecord?: DocumentAnchorRecord;
   consentRecords?: ConsentAnchorRecord[];
 };
@@ -240,7 +242,7 @@ export class ReceiptVerifier {
 
     let overall: ReceiptVerification["overall"];
     if (companySignature === "fail" || disclosureCopy === "fail" || documentAnchor === "fail") overall = "failed";
-    else if (companySignature === "unavailable") overall = "unavailable";
+    else if (companySignature === "unavailable" || session.registryRefused) overall = "unavailable";
     // A telephone receipt is the organisation's word, authenticated: never more than partial.
     else overall = type === "company_attested" ? "verified" : "partial";
 
@@ -390,9 +392,11 @@ export class ReceiptVerifier {
 
     let overall: ReceiptVerification["overall"];
     const checks = [companySignature, receiptIntegrity, citizenAssertion, disclosureCopy, documentAnchor, consentAnchor];
+    // A bundle that names a registry this SDK does not read is never verified, however sound its signatures.
     if (checks.includes("fail")) overall = "failed";
-    else if (companySignature === "pass" && receiptIntegrity === "pass" && citizenAssertion === "pass") overall = "verified";
-    else overall = "unavailable";
+    else if (companySignature === "pass" && receiptIntegrity === "pass" && citizenAssertion === "pass" && !session.registryRefused) {
+      overall = consentAnchor === "withdrawn" ? "withdrawn" : "verified";
+    } else overall = "unavailable";
 
     return {
       input: "bundle",
@@ -750,8 +754,8 @@ export class ReceiptVerifier {
     const chainId = this.chainId();
     const target = this.registryToRead(session);
     if (!target.ok) {
-      notes.push(`documentAnchor FAILED: ${target.reason}`);
-      return "fail";
+      notes.push(`documentAnchor UNAVAILABLE: ${target.reason} Nothing was read on chain.`);
+      return "unavailable";
     }
 
     const call = await this.rpc(rpcUrl, "eth_call", [{ to: target.address, data: ROOT_OF_SELECTOR + stripHex(keccak256Hex(cid)) }, "latest"], session);
@@ -815,8 +819,8 @@ export class ReceiptVerifier {
     const chainId = this.chainId();
     const target = this.registryToRead(session);
     if (!target.ok) {
-      notes.push(`consentAnchor FAILED: ${target.reason}`);
-      return "fail";
+      notes.push(`consentAnchor UNAVAILABLE: ${target.reason}`);
+      return "unavailable";
     }
 
     const root = stripHex(merkleRoot).toLowerCase();
@@ -857,10 +861,11 @@ export class ReceiptVerifier {
     const blocks = [...new Set(records.map((rec) => rec.anchoredBlock))].join(", ");
     if (withdrawn > 0) {
       notes.push(
-        `consentAnchor FAILED: WITHDRAWN on chainId ${String(chainId)} (${counts}). The chain records the consent under ` +
-          `this bundle's Merkle root, anchored in block ${blocks}, and records its withdrawal: it is no longer in force.`,
+        `consentAnchor WITHDRAWN on chainId ${String(chainId)} (${counts}). The chain records the consent under ` +
+          `this bundle's Merkle root, anchored in block ${blocks}, and records its withdrawal: it is authentic, but ` +
+          "it is no longer in force. This is NOT a forgery.",
       );
-      return "fail";
+      return "withdrawn";
     }
     if (active !== refs.length) {
       notes.push(
@@ -899,10 +904,11 @@ export class ReceiptVerifier {
     }
     const named = session.namedRegistry;
     if (named && (named.registry.toLowerCase() !== address.toLowerCase() || (named.chainId !== "" && named.chainId !== String(chainId)))) {
+      session.registryRefused = true;
       return {
         ok: false,
-        reason: `the bundle names the registry ${named.registry}${named.chainId ? ` on chainId ${named.chainId}` : ""}, which is ` +
-          `not a known registry for chainId ${String(chainId)}. Nothing was read on chain.`,
+        reason: `unknown registry: the bundle names the registry ${named.registry}${named.chainId ? ` on chainId ${named.chainId}` : ""}, ` +
+          `which is not a known registry for chainId ${String(chainId)}. Nothing was read on chain.`,
       };
     }
     return { ok: true, address };

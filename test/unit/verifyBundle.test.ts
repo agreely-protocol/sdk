@@ -166,13 +166,24 @@ describe("a bundle naming a registry the SDK does not read is refused, with no R
   // The vectors were issued on the emit-only Base Sepolia registry, named in their signed issuer delegation.
   const EMIT_ONLY = ["0x3532a9DfF3C910152543afCa49De7c66113C5312", "0x23577fafFa306375028D33a559D0F95Ced9424DB"];
 
-  it.each(EMIT_ONLY)("a bundle naming %s fails both anchor checks as an unknown registry", async (address) => {
+  it.each(EMIT_ONLY)("a bundle naming %s reads both anchor checks unavailable as an unknown registry, never verified", async (address) => {
     const named = structuredClone(artefact("a1v1.bundle")) as { didDocuments: { issuer: { delegation: { body: Record<string, unknown> } } } };
     named.didDocuments.issuer.delegation.body["registry"] = address.toLowerCase();
     const rpc = rpcFetch(() => rootWord(3));
     const result = await verify(named, { ...SEPOLIA, fetch: rpc.fetch });
-    expect(result.consentAnchor).toBe("fail");
-    expect(result.notes.join("\n")).toContain(`the bundle names the registry ${address.toLowerCase()} on chainId 84532, which is not a known registry for chainId 84532`);
+    expect(result.consentAnchor).toBe("unavailable");
+    expect(result.overall).toBe("unavailable");
+    expect(result.notes.join("\n")).toContain(`unknown registry: the bundle names the registry ${address.toLowerCase()} on chainId 84532, which is not a known registry for chainId 84532`);
+    expect(rpc.calls).toHaveLength(0);
+  });
+
+  it("a cidv1 bundle naming the emit-only registry reads its document anchor unavailable, with no RPC", async () => {
+    const named = structuredClone(artefact("cidv1.bundle")) as { didDocuments: { issuer: { delegation: { body: Record<string, unknown> } } } };
+    named.didDocuments.issuer.delegation.body["registry"] = EMIT_ONLY[0]!.toLowerCase();
+    const rpc = rpcFetch(() => rootWord(3));
+    const result = await verify(named, { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.documentAnchor).toBe("unavailable");
+    expect(result.overall).not.toBe("verified");
     expect(rpc.calls).toHaveLength(0);
   });
 
@@ -181,7 +192,8 @@ describe("a bundle naming a registry the SDK does not read is refused, with no R
       const rpc = rpcFetch(() => rootWord(3));
       const result = await verify(artefact(name), { ...SEPOLIA, fetch: rpc.fetch });
       expect([result.companySignature, result.receiptIntegrity, result.citizenAssertion]).toEqual(["pass", "pass", "pass"]);
-      expect(result.consentAnchor).toBe("fail");
+      expect(result.consentAnchor).toBe("unavailable");
+      expect(result.overall).toBe("unavailable");
       expect(result.documentAnchor).not.toBe("pass");
       expect(rpc.calls).toHaveLength(0);
     }
@@ -192,7 +204,8 @@ describe("a bundle naming a registry the SDK does not read is refused, with no R
     named.didDocuments.issuer.delegation.body["chainId"] = "8453";
     const rpc = rpcFetch(() => rootWord(3));
     const result = await verify(named, { ...SEPOLIA, fetch: rpc.fetch });
-    expect(result.consentAnchor).toBe("fail");
+    expect(result.consentAnchor).toBe("unavailable");
+    expect(result.overall).not.toBe("verified");
     expect(rpc.calls).toHaveLength(0);
   });
 });
@@ -220,10 +233,56 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
   it("a withdrawn record (state 2) is never a pass", async () => {
     const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000, 1760000600, 2) : null));
     const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
-    expect(result.consentAnchor).toBe("fail");
+    expect(result.consentAnchor).not.toBe("pass");
+    expect(result.consentAnchor).toBe("withdrawn");
     expect(result.consentAnchorRecords![0]!.state).toBe("withdrawn");
     expect(result.consentAnchorRecords![0]!.revokedAt).toBe(1760000600);
     expect(result.notes.join("\n")).toContain("WITHDRAWN");
+    expect(result.notes.join("\n")).toContain("NOT a forgery");
+  });
+
+  it("an authentic withdrawn consent reads overall withdrawn, only when every other decisive check verified", async () => {
+    const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000, 1760000600, 2) : null));
+    const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.companySignature).toBe("pass");
+    expect(result.citizenAssertion).toBe("pass");
+    expect(result.overall).toBe("withdrawn");
+  });
+
+  it("a withdrawn consent next to a failed document anchor is failed, not withdrawn", async () => {
+    const bundleWithCid = onReadableRegistry(artefact("cidv1.bundle"));
+    const cidRoot = String(bundleWithCid["merkleRoot"]);
+    const rpc = rpcFetch((m, params) => {
+      if (m !== "eth_call") return null;
+      const data = (params[0] as { data: string }).data;
+      return data.startsWith("0x6d6f398e") ? rootWord(0) : anchorWord(cidRoot, 1760000000, 1760000600, 2);
+    });
+    const result = await verify(bundleWithCid, { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.documentAnchor).toBe("fail");
+    expect(result.consentAnchor).toBe("withdrawn");
+    expect(result.overall).toBe("failed");
+  });
+
+  it("a withdrawn consent next to an unavailable document anchor stays withdrawn: an RPC outage never downgrades a verified receipt (R13)", async () => {
+    const bundleWithCid = onReadableRegistry(artefact("cidv1.bundle"));
+    const cidRoot = String(bundleWithCid["merkleRoot"]);
+    const rpc = rpcFetch((m, params) => {
+      if (m !== "eth_call") return null;
+      const data = (params[0] as { data: string }).data;
+      return data.startsWith("0x6d6f398e") ? new Response("down", { status: 503 }) : anchorWord(cidRoot, 1760000000, 1760000600, 2);
+    });
+    const result = await verify(bundleWithCid, { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.documentAnchor).toBe("unavailable");
+    expect(result.consentAnchor).toBe("withdrawn");
+    expect(result.overall).toBe("withdrawn");
+  });
+
+  it("on Base mainnet with no registry known yet, the consent anchor reads unavailable with no RPC call", async () => {
+    const rpc = rpcFetch(() => anchorWord(root(), 1760000000));
+    const result = await verify(bundle(), { rpcUrl: "https://rpc.test", chainId: 8453, fetch: rpc.fetch });
+    expect(result.consentAnchor).toBe("unavailable");
+    expect(result.notes.join("\n")).toContain("no known registry for this chain (chainId 8453)");
+    expect(rpc.calls).toHaveLength(0);
   });
 
   it("a four-word answer is unreadable, never a record", async () => {

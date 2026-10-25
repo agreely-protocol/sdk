@@ -215,7 +215,7 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     expect(result.notes.join("\n")).toContain("a tagged document");
   });
 
-  it("on Base mainnet, with no registry known yet, the anchor check FAILS with no known registry and reads nothing", async () => {
+  it("on Base mainnet, with no registry known yet, the anchor check reads UNAVAILABLE with no known registry and reads nothing", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
     const chain = chainFetch(rootWord(3));
     const result = await Agreely.verifyReceipt(citizenCase.receipt, {
@@ -223,7 +223,7 @@ describe("verifyReceipt honesty matrix edge cases", () => {
       fetch: chain.fetch,
       rpcUrl: "https://rpc.test",
     });
-    expect(result.documentAnchor).toBe("fail");
+    expect(result.documentAnchor).toBe("unavailable");
     expect(result.notes.join("\n")).toContain("no known registry for this chain (chainId 8453)");
     expect(chain.sent).toHaveLength(0);
   });

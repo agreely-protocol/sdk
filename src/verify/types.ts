@@ -17,8 +17,10 @@
  *                  about the receipt.
  *   - skipped      the input needed for this check was absent (or not requested).
  *   - unsupported  the check is not applicable to this input.
+ *   - withdrawn    the consent is authentic and under the receipt's root, but the chain records
+ *                  its withdrawal (state 2) at `revokedAt`. Neither a pass nor a forgery.
  */
-export type CheckStatus = "pass" | "fail" | "unavailable" | "unbound" | "skipped" | "unsupported";
+export type CheckStatus = "pass" | "fail" | "unavailable" | "unbound" | "skipped" | "unsupported" | "withdrawn";
 
 /**
  * The aggregate verdict.
@@ -32,13 +34,16 @@ export type CheckStatus = "pass" | "fail" | "unavailable" | "unbound" | "skipped
  *   - failed       a check ACTIVELY failed (a tamper / wrong key / contradiction).
  *   - unavailable  a decisive check could NOT be completed (the DID could not be
  *                  resolved). Verification is inconclusive, NOT a forgery.
+ *   - withdrawn    the receipt is authentic and its consent was withdrawn on chain. Given only when every other
+ *                  decisive check would have produced `verified`: a `fail` elsewhere still gives `failed`, an
+ *                  `unavailable` elsewhere still gives `unavailable`, and the consentAnchor check reads `withdrawn`.
  *   - malformed    the input is not a receipt or bundle this verifier can read: not
  *                  an object, a bundle of another version, a bundle whose receipt or
  *                  signed offer is missing or not an object, a value the
  *                  canonicalizer refuses, or nesting past 64 levels. No check ran,
  *                  so it says nothing about alteration. Never a pass.
  */
-export type OverallStatus = "verified" | "partial" | "incomplete" | "failed" | "unavailable" | "malformed";
+export type OverallStatus = "verified" | "partial" | "incomplete" | "failed" | "unavailable" | "malformed" | "withdrawn";
 
 /**
  * Which kind of receipt was verified.
@@ -81,11 +86,13 @@ export type ReceiptType = "company_attested" | "company_documented" | "citizen";
  *                       passkey receipt, whose hash is signed by nobody.
  *   - documentAnchor    OPT-IN (rpcUrl): the document CID's on-chain anchor, read with
  *                       rootOf(keccak256(cid)). "pass" only in the consent-document lane;
- *                       "fail" when absent, in another lane, or when no registry is known.
+ *                       "fail" when absent or in another lane; "unavailable" when no registry is
+ *                       known for the chain, or the bundle names another registry (nothing is read).
  *   - consentAnchor     OPT-IN (rpcUrl), bundle only: the consent's on-chain record,
  *                       read with registry(consentRef) and tied by the bound Merkle root.
  *                       "pass" only when every cell's record was read and is in force; a
- *                       withdrawn cell is "fail".
+ *                       withdrawn cell (state 2, under the bundle's root) is "withdrawn", with
+ *                       its `revokedAt` in consentAnchorRecords. A record under another root is "fail".
  *   - cellLabelBinding  whether the human-readable cell labels (category/purpose) are
  *                       CRYPTOGRAPHICALLY bound, the one field to read before trusting
  *                       a displayed label.
