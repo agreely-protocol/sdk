@@ -3,53 +3,111 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
-## Unreleased
-
-### Breaking
-
-- **The customer registry no longer takes or returns a per-customer ground.**
-  `customers.upsert` drops `basisNote` and `legalBasis` from its input, and
-  `CustomerRecord` drops `hasBasisNote` and `legalBasis`. TypeScript callers that set or
-  read them stop compiling. At runtime a value still sent is no longer forwarded, and the
-  server ignores it. The purpose belongs to the processing, documented per catalogue
-  cell. The retention disposition keeps its frozen `basis` and `hasBasisNote`, and the
-  catalogue keeps `legalBasis` per cell.
-- `withdrawals.record`, `manualConsents.revoke` and `manualConsents.erase` refuse an input
-  member they do not name, before any call (`AgreelyConfigError`), where they used to drop
-  it silently. A stray or misspelt key, such as `otherConsent`, now fails loudly.
+## 0.6.0 - Unreleased
 
 ### Added
 
-- `identity().company` carries `slug`, the tenant's public identifier (the one its public
-  policy URL carries). Additive: existing fields are unchanged.
+- **`verifyReceipt` verifies a passkey consent from its verification bundle**
+  (`version "1"`: the receipt, its `signedOffer` and its `merkleRoot`). `verified`
+  means every one of these holds:
+  - the company's signature over the signed offer;
+  - the receipt matched against that offer field by field, its top-level keys,
+    `type`, `@context` and `urn:agreely:receipt:` id included, with the
+    `disclosureHash` recomputed from the offer and `validFrom` equal to `grantedAt`;
+  - the passkey assertion over the challenge recomputed as
+    `keccak256(JCS({issuer, subject, requestId, action, grantedAt, merkleRoot}) || nonce)`;
+  - the citizen key confirmed by the citizen's DID document: its `id` is the
+    subject, it lists the key the assertion verified with under `authentication`
+    (a method of the same DID, the exact COSE bytes), and that key's window
+    `[validFrom, validUntil)` covers `grantedAt`;
+  - `grantedAt` inside the signed offer's window, from `createdAt` to `expiresAt`
+    (whole seconds). Outside it, `receiptIntegrity` reads `fail` and the note names
+    `granted-outside-offer-window` (or `offer-window-unreadable`), and
+    `citizenAssertion` reads `unavailable`: the person's key is not evaluated at
+    that date. Each check gives one note.
+- `isVerificationBundle(value)` tells a verification bundle from a receipt.
+- **`consentAnchor`**: with an `rpcUrl`, `verifyReceipt` reads each cell's on-chain
+  record from a bundle with `eth_call registry(consentRef)`, tied to the receipt by
+  the Merkle root the passkey assertion binds. It reads `pass` once every cell's
+  record was read under that root, `fail` when the chain records a cell under
+  another root, and `unavailable` otherwise, a cell not yet recorded included.
+- Options that bound the on-chain checks: `registryDeployBlock`, `logRangeLimit`
+  (default 10000), `maxLogQueries` (default 10), `timeoutMs`, and `rpcDeadlineMs`
+  (default 30000) over the whole on-chain sequence. The document-anchor log query
+  starts at the registry's deploy block (Base mainnet 48889369, Base Sepolia
+  43698609) and pages within the provider's range limit.
+- `identity().company` carries `slug`, the tenant's public identifier (the one its
+  public policy URL carries). Additive: existing fields are unchanged.
 - `withdrawals.record` returns `stillInForce`: the refs of the other consents of the
-  purpose still in force after the act. `manualConsents.revoke` and `manualConsents.erase`
-  return `stillInForce: true` only when another consent was kept in force, and omit it
-  otherwise. Additive: no existing response field changes.
+  purpose still in force after the act. `manualConsents.revoke` and
+  `manualConsents.erase` return `stillInForce: true` only when another consent was
+  kept in force, and omit it otherwise. Additive: no existing response field changes.
 - `withdrawals.record` takes the scope toward the other consents of its purpose:
-  `otherConsents: "withdraw" | "keep"`, or `alsoWithdraw` (a list of at most 50 consentRefs,
-  `[]` declares nothing). Both together are refused client-side. `manualConsents.revoke` and
-  `manualConsents.erase` take `otherConsents: "keep" | "withdraw"` (`"withdraw"` is treated
-  as no declaration by the route, which still refuses a passkey consent with 409).
-- A withdrawal refused 422 `other_consents_running` throws `AgreelyOtherConsentsRunningError`,
-  an `AgreelyValidationError` whose `otherConsentRefs` lists the other consents in force, so
-  the caller can ask the person and retry. `WITHDRAWAL_SCOPE_MAX` is exported (50).
+  `otherConsents: "withdraw" | "keep"`, or `alsoWithdraw` (a list of at most 50
+  consentRefs, `[]` declares nothing). Both together are refused client-side.
+  `manualConsents.revoke` and `manualConsents.erase` take
+  `otherConsents: "keep" | "withdraw"` (`"withdraw"` is treated as no declaration by
+  the route, which still refuses a passkey consent with 409).
+- A withdrawal refused 422 `other_consents_running` throws
+  `AgreelyOtherConsentsRunningError`, an `AgreelyValidationError` whose
+  `otherConsentRefs` lists the other consents in force, so the caller can ask the
+  person and retry. `WITHDRAWAL_SCOPE_MAX` is exported (50).
 
-### Fixed
+### Changed
 
+- The disclosure-copy check of a passkey bundle compares the IPFS copy with the
+  signed offer's `disclosureHash` and v2 `legalBasis`. A v2 `disclosureHash`
+  recomputes over `{disclosure, legalBasis}` when the receipt declares
+  `disclosureVersion: "2"`, and a v2 receipt without its `legalBasis` reads `fail`.
+- An IPFS gateway answer that is not the document (`404`, `502`), and a chain RPC
+  error, refusal or timeout, read `unavailable`.
+- `verifyReceipt` resolves on every input. A value the canonicalizer refuses in a
+  receipt's content gives `disclosureCopy: "fail"` (and `companySignature: "fail"`
+  when the receipt body holds it), with the reason in the note. A DID document entry
+  that is not an object is skipped.
+- The default DID resolver applies `timeoutMs`.
+- The `resolver` documentation states what a `did:web` issuer proves: a receipt
+  signed by whoever controls that host's DID document. Inject a `resolver` that pins
+  the issuers you expect for any receipt you did not fetch yourself.
+- The withdrawal docs (README and docblocks) state that the other consents of the
+  purpose are withdrawn only when the scope names them; otherwise the call is
+  refused as above.
+
+### Breaking
+
+- `verifyReceipt` takes a verification bundle or a receipt. A bare passkey receipt
+  reads `incomplete` (it read `partial`), its `citizenAssertion` `unbound` and its
+  `disclosureCopy` `unsupported`: pass the bundle issued with it.
+- `CheckStatus` adds `"unbound"`; `OverallStatus` adds `"incomplete"` and
+  `"malformed"`. `ReceiptVerification` adds `input` (`"bundle" | "receipt"`),
+  `receiptIntegrity` and `consentAnchor`. An exhaustive `switch` over the statuses
+  stops compiling.
+- `malformed` is the overall for a file the verifier cannot read: not an object, a
+  bundle of another version, a bundle whose `receipt` or `signedOffer` is not an
+  object, a value the canonicalizer refuses, or nesting past 64 levels. A passkey
+  bundle without its `signedOffer` or `merkleRoot` reads `malformed` (it read
+  `incomplete`).
+- A passkey bundle reads `verified` only once the citizen's DID document confirms
+  the key at `grantedAt` (see Added). A `resolver` that serves citizen documents
+  without `authentication` or `validFrom` makes such a bundle read `failed`. The
+  citizen half is checked for a `did:agreely:citizen:` subject only, whatever the
+  resolver; any other subject reads `unavailable`. A citizen document with no
+  usable COSE key reads `failed` (it read `unavailable`).
+- The disclosure-copy check is opt-in: it runs only with `verifyDisclosure: true`
+  and otherwise reads `skipped`, without contacting the IPFS gateway.
+- **The customer registry no longer takes or returns a per-customer ground.**
+  `customers.upsert` drops `basisNote` and `legalBasis` from its input, and
+  `CustomerRecord` drops `hasBasisNote` and `legalBasis`. TypeScript callers that
+  set or read them stop compiling. At runtime a value still sent is not forwarded,
+  and the server ignores it. The purpose belongs to the processing, documented per
+  catalogue cell. The retention disposition keeps its frozen `basis` and
+  `hasBasisNote`, and the catalogue keeps `legalBasis` per cell.
+- `withdrawals.record`, `manualConsents.revoke` and `manualConsents.erase` refuse an
+  input member they do not name, before any call (`AgreelyConfigError`). A stray or
+  misspelt key, such as `otherConsent`, fails loudly.
 - `withdrawals.record` types `assurance` as `"company_documented"`, the only value the
-  server sends (since 2026-10-20). It was typed `"company_attested"`, so code that compares
-  against `"company_attested"` no longer compiles. Narrowing a literal type, not additive.
-- The withdrawal docs (README and docblocks) said the other consents of the purpose are always
-  withdrawn with it. They are withdrawn only when the scope names them; otherwise the call
-  is refused as above.
-- `verifyReceipt` recomputes a v2 `disclosureHash` over `{disclosure, legalBasis}` when the
-  receipt declares `disclosureVersion: "2"`. Every authentic v2 receipt (a cell on a non-consent
-  basis) used to report `disclosureCopy` as `fail`. A v2 receipt without its `legalBasis` now
-  fails rather than falling back to the v1 formula.
-- `verifyReceipt` returns a verdict where it used to throw on a receipt whose content the
-  canonicalizer refuses, such as a number in a v2 `legalBasis`. `disclosureCopy` reports `fail`,
-  and `companySignature` does too when the receipt body holds such a value. The note names the reason.
+  server sends (since 2026-10-20). Code that compares it with `"company_attested"`
+  stops compiling.
 
 ## 0.5.0 - 2026-10-09
 

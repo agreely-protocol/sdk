@@ -1,0 +1,242 @@
+{
+  "version": "1",
+  "receipt": {
+    "@context": [
+      "https://www.w3.org/ns/credentials/v2",
+      "https://agreely.ca/credentials/consent/v1"
+    ],
+    "credentialSubject": {
+      "consent": {
+        "action": "grant",
+        "declinedItems": [
+          {
+            "automatedDecision": false,
+            "category": "numéro de téléphone",
+            "itemId": "0xbed28c156bf1aced7ee0c42ee97168f69100684e287e39e4ecef6859f5c188cc",
+            "legalBasis": "consent",
+            "purpose": "sondage de satisfaction",
+            "sensitive": false
+          }
+        ],
+        "disclosureHash": "0x8f026745aa816b932bf0d8cc5255acb4fe3dda0d36523d9c9793f06e4077257a",
+        "document": {
+          "code": "infolettre-et-sondages-eve-v2",
+          "effectiveDate": "2026-10-20",
+          "ipfsCid": "QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+          "name": "Infolettre et sondages Ève v2",
+          "nameEn": "Infolettre et sondages Ève v2 (EN)",
+          "version": "1.0"
+        },
+        "grantedAt": "2026-10-21T01:19:55Z",
+        "items": [
+          {
+            "automatedDecision": false,
+            "category": "courriel",
+            "itemId": "0x1790c23c2191e37d7fab4ea54bde9a312d4deb134f86a72688190c9267eef3c0",
+            "legalBasis": "consent",
+            "purpose": "infolettre mensuelle",
+            "sensitive": false
+          }
+        ],
+        "requestId": "0x6aac55135ca83bd31d2b81b9600b5efb82d3971defc619fd6300d4404e9715bd"
+      },
+      "id": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W"
+    },
+    "id": "urn:agreely:receipt:d2722821-ff1c-4a9d-866a-4fde11953ae4",
+    "issuer": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+    "proof": [
+      {
+        "created": "2026-10-21T01:19:54Z",
+        "cryptosuite": "eddsa-jcs-2022",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5HdZP8CHCrNJ7vGod1E7gasgdZUfhfGgEzd72Ne4WoxikbNPLJUN3xe2VAecMnMg6mtrUFgF2KDRDcBEUHdeiiaS",
+        "type": "DataIntegrityProof",
+        "verificationMethod": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1"
+      },
+      {
+        "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAg",
+        "challenge": "0xd68072614e2b142bbbbf37ec10d8926f9404598b597c0a6ad037442db522a8d8",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiMW9CeVlVNHJGQ3U3dnpmc0VOaVNiNVFFV1l0WmZBcHEwRGRFTGJVaXFOZyIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6MTgzOTAiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+        "nonce": "0x3a5fbeb4dcdd73102b903e54e2b189cd6b38585f31eb1236f72cc1bda1cdf47c",
+        "signature": "MEQCIDXDnOKLN47efFubr_E27xM7ujX-TlSA8aMaagpxHbD_AiA1zVnpPOTbLg7oTAdzsA_XDgoIiYq0Tad7McO1ypR3hQ",
+        "type": "WebAuthnAssertion",
+        "verificationMethod": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W#passkey-1"
+      }
+    ],
+    "type": [
+      "VerifiableCredential",
+      "ConsentReceipt"
+    ],
+    "validFrom": "2026-10-21T01:19:55Z",
+    "validUntil": "2027-10-22T03:59:59Z"
+  },
+  "signedOffer": {
+    "consent": {
+      "action": "grant",
+      "items": [
+        {
+          "automatedDecision": false,
+          "category": "numéro de téléphone",
+          "itemId": "0xbed28c156bf1aced7ee0c42ee97168f69100684e287e39e4ecef6859f5c188cc",
+          "legalBasis": "consent",
+          "purpose": "sondage de satisfaction",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "courriel",
+          "itemId": "0x1790c23c2191e37d7fab4ea54bde9a312d4deb134f86a72688190c9267eef3c0",
+          "legalBasis": "consent",
+          "purpose": "infolettre mensuelle",
+          "sensitive": false
+        }
+      ]
+    },
+    "createdAt": "2026-10-21T01:19:54Z",
+    "disclosure": {
+      "categories": {
+        "en": "The categories of personal information covered by this document are: Telephone number, Email.",
+        "fr": "Les catégories de renseignements personnels visées par le présent document sont : Numéro de téléphone, Courriel."
+      },
+      "means": {
+        "en": "We collect your personal information directly from you, in particular through our forms and your dashboard (P-39.1 s. 8, para. 1, subpara. 2).",
+        "fr": "Nous recueillons vos renseignements personnels directement auprès de vous, notamment au moyen de nos formulaires et de votre tableau de bord (P-39.1 art. 8, par. 2°)."
+      },
+      "purpose": {
+        "en": "We collect your personal information for the following specific purposes: Satisfaction survey, Monthly newsletter. This information is used only for those specific purposes and your consent is requested for each of them (P-39.1 s. 8 and 14).",
+        "fr": "Nous recueillons vos renseignements personnels aux fins spécifiques suivantes : Sondage de satisfaction, Infolettre mensuelle. Ces renseignements ne sont utilisés que pour ces fins spécifiques et votre consentement est demandé pour chacune d'elles (P-39.1 art. 8 et 14)."
+      },
+      "recipients": {
+        "en": "People in our organization whose duties require it may access your personal information (P-39.1 s. 20). It is not communicated to any third party without your consent, except in the cases provided for by law (P-39.1 ss. 13, 18 and 18.3).",
+        "fr": "Les personnes de notre organisation dont les fonctions le justifient peuvent accéder à vos renseignements personnels (P-39.1 art. 20). Ceux-ci ne sont communiqués à aucun tiers sans votre consentement, sauf dans les cas prévus par la loi (P-39.1 art. 13, 18 et 18.3)."
+      },
+      "responsable": {
+        "contact": "vie-privee@qa1021b-boulangerie.ca",
+        "name": "Ève-Hélène Côté"
+      },
+      "retention": {
+        "en": "Your personal information is kept only as long as necessary to fulfil the purposes, then destroyed or anonymized in accordance with the law (P-39.1 s. 23). Email - newsletter: kept for 24 months after the purposes are achieved, then destroyed.",
+        "fr": "Vos renseignements personnels sont conservés le temps nécessaire à la réalisation des fins, puis détruits ou anonymisés conformément à la loi (P-39.1 art. 23). Courriel - infolettre : conservation de 24 mois après l'accomplissement des fins, puis destruction."
+      },
+      "rights": {
+        "en": "You have a right of access and rectification, the right to obtain your information in a structured, commonly used technological format, and the right to require that its dissemination cease or that it be de-indexed (P-39.1 s. 27, 28 and 28.1). To exercise these rights, contact the person in charge of the protection of personal information below.",
+        "fr": "Vous disposez d'un droit d'accès et de rectification, du droit d'obtenir vos renseignements dans un format technologique structuré et couramment utilisé, ainsi que du droit d'exiger la cessation de la diffusion ou la désindexation (P-39.1 art. 27, 28 et 28.1). Pour les exercer, communiquez avec le responsable de la protection des renseignements personnels ci-dessous."
+      },
+      "withdrawal": {
+        "en": "You may withdraw your consent to the communication or use of your personal information (P-39.1 s. 8, para. 1, subpara. 4). You may do so at any time, as easily as you gave it, from your Agreely dashboard or by contacting the person in charge of the protection of personal information. Withdrawal applies going forward and has no retroactive effect.",
+        "fr": "Vous pouvez retirer votre consentement à la communication ou à l'utilisation de vos renseignements personnels (P-39.1 art. 8, par. 4°). Vous pouvez le faire à tout moment, aussi simplement que vous l'avez donné, depuis votre tableau de bord Agreely ou en communiquant avec le responsable de la protection des renseignements personnels. Le retrait du consentement vaut pour l'avenir et n'a pas d'effet rétroactif."
+      }
+    },
+    "disclosureHash": "0x8f026745aa816b932bf0d8cc5255acb4fe3dda0d36523d9c9793f06e4077257a",
+    "disclosureVersion": "1",
+    "document": {
+      "code": "infolettre-et-sondages-eve-v2",
+      "effectiveDate": "2026-10-20",
+      "ipfsCid": "QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+      "name": "Infolettre et sondages Ève v2",
+      "nameEn": "Infolettre et sondages Ève v2 (EN)",
+      "version": "1.0"
+    },
+    "expiresAt": "2026-11-20T01:19:54Z",
+    "issuer": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+    "nonce": "0x3a5fbeb4dcdd73102b903e54e2b189cd6b38585f31eb1236f72cc1bda1cdf47c",
+    "requestId": "0x6aac55135ca83bd31d2b81b9600b5efb82d3971defc619fd6300d4404e9715bd",
+    "validUntil": "2027-10-22T03:59:59Z"
+  },
+  "merkleRoot": "0xcd6f531cf85065ca741f21c7bb89c92dbaaddc1394850252bd85e99f5c022b4a",
+  "consentRef": "0xca1ec7c8bfed6c322b74c1b0e9cc6f71e5fd53122c4f23661390b7f098289c4f",
+  "consentRefs": [
+    "0xca1ec7c8bfed6c322b74c1b0e9cc6f71e5fd53122c4f23661390b7f098289c4f"
+  ],
+  "didDocuments": {
+    "issuer": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/data-integrity/v2"
+      ],
+      "id": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+      "alsoKnownAs": [
+        "did:web:qa1021b-boulangerie.ca"
+      ],
+      "verificationMethod": [
+        {
+          "id": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1",
+          "type": "Multikey",
+          "controller": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+          "publicKeyMultibase": "z6MkidMSt22QFskRn7m4CzsoA86qpM9LRDcz7FV79s3jCCKs"
+        },
+        {
+          "id": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#root-1",
+          "type": "WebAuthnAuthenticationKey2024",
+          "controller": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+          "publicKeyCose": "0xa50102032620012158205ce2cce19acb47f3eba7ad8768f7bfcdfa2e8dfded3f155b638e9f6e866a602a225820d18ea7c59aa10e827d649667d98350c44f72dd94dd8dcc72853f2ca0c26c2d1a",
+          "rpId": "localhost"
+        }
+      ],
+      "assertionMethod": [
+        "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1"
+      ],
+      "authentication": [
+        "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1"
+      ],
+      "capabilityDelegation": [
+        "#root-1"
+      ],
+      "delegation": {
+        "type": "agreely.keyDelegation.v1",
+        "body": {
+          "rpId": "localhost",
+          "type": "agreely.keyDelegation.v1",
+          "nonce": "0x3322f036179f28802974867cb22717499013116462d4a89e48790e0b31c453ca",
+          "chainId": "84532",
+          "registry": "0x3532a9dff3c910152543afca49de7c66113c5312",
+          "delegatee": {
+            "keyId": "0x48b694c4043b68070cf270f4bc9b3262b90e56f105a18aed36b0b19e5c9e5b2f"
+          },
+          "rootKeyId": "0x359fa983b9485d87a4c8d3e2fc74e34cb8e94dc8f3375d39600d0b75237eebe9",
+          "validFrom": "2026-10-21T01:11:02Z",
+          "companyDid": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+          "validUntil": "2027-10-21T01:11:02Z"
+        },
+        "proof": {
+          "type": "WebAuthnDelegationProof2026",
+          "verificationMethod": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#root-1",
+          "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAg",
+          "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoieGZrdk9oeGpkcjhyNXpPTlVQcUJBSXVfeDJEUGxLYWlmQTY4b3p1ZUZXWSIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6MTgzODIiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+          "signature": "MEQCIGDm7qhCrR6qo1uouPKvYdwrQdtF2OT7WxlrFWZgxq56AiActQDvAB2-rsFgOY5RKFhVxXC-mOVz6G_3VCDA0-k3cw"
+        }
+      }
+    },
+    "citizen": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/suites/ed25519-2020/v1"
+      ],
+      "id": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W#passkey-1",
+          "controller": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W",
+          "validFrom": "2026-10-21T01:19:55Z",
+          "validUntil": null,
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa5010203262001215820dc75e1578cbe2bc1951cc509a7a398c91a621d1f580a4d24b03badedeb87728a225820f08c7a11d542f50ae9d5b199c52ee97980d5906d60c10723b539d43eb9df7c5f"
+        },
+        {
+          "id": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W#recovery-1",
+          "controller": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W",
+          "validFrom": "2026-10-21T01:19:55Z",
+          "validUntil": null,
+          "type": "Ed25519VerificationKey2020",
+          "publicKeyMultibase": "z6MkfR6kSH3oaKKewWhPCNLpCKYrcYCZ97tSY9Nnkx98MCGz"
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ],
+      "capabilityInvocation": [
+        "#recovery-1"
+      ]
+    }
+  }
+}

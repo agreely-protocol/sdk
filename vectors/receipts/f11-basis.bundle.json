@@ -1,0 +1,323 @@
+{
+  "version": "1",
+  "receipt": {
+    "@context": [
+      "https://www.w3.org/ns/credentials/v2",
+      "https://agreely.ca/credentials/consent/v1"
+    ],
+    "credentialSubject": {
+      "consent": {
+        "action": "grant",
+        "declinedItems": [
+          {
+            "automatedDecision": false,
+            "category": "renseignements médicaux",
+            "itemId": "0x8e7f26463acd5ed0cd36dfdfa48f08804c71fca03d353da4f793e6386152f371",
+            "legalBasis": "consent",
+            "purpose": "évaluation des réclamations",
+            "sensitive": true
+          }
+        ],
+        "disclosureHash": "0x7b47c1188d91d56000e924b1e462562a531a9340d87240cb7243cdf9d49a3734",
+        "disclosureVersion": "2",
+        "document": {
+          "code": "souscription",
+          "effectiveDate": "2026-02-01",
+          "name": "Consentement à la souscription et à la tarification",
+          "version": "1.0",
+          "ipfsCid": "QmSIMULATEDv2"
+        },
+        "grantedAt": "2026-10-24T17:14:04Z",
+        "items": [
+          {
+            "automatedDecision": false,
+            "category": "coordonnées",
+            "itemId": "0x73b495b51886c131fc914c802876ea248e6053c83ceb5ef49eceff1a68461b88",
+            "legalBasis": "necessary_for_service",
+            "purpose": "gestion du dossier client",
+            "sensitive": false
+          },
+          {
+            "automatedDecision": true,
+            "category": "renseignements financiers",
+            "itemId": "0xee5cea7662452e7e4345ffc73c0f77afef9b8a01b2805e6649240c7fdde1db70",
+            "legalBasis": "consent",
+            "purpose": "souscription et tarification",
+            "sensitive": false
+          },
+          {
+            "automatedDecision": false,
+            "category": "renseignements financiers",
+            "itemId": "0xd26cc5406043ba1b9c0c856725f8076ae0d13fd5c58ab6f1ba553e30a16b5bba",
+            "legalBasis": "security_fraud",
+            "purpose": "prévention de la fraude",
+            "sensitive": false
+          },
+          {
+            "automatedDecision": false,
+            "category": "renseignements financiers",
+            "itemId": "0x7658ea8bbc056ec88e07b0f4f90aea90d0ace0bc72cfac9949f6eee85548afc5",
+            "legalBasis": "legal_obligation",
+            "purpose": "conservation des registres fiscaux",
+            "sensitive": false
+          }
+        ],
+        "legalBasis": {
+          "0x73b495b51886c131fc914c802876ea248e6053c83ceb5ef49eceff1a68461b88": {
+            "basis": "contract",
+            "justificationEn": "Maintaining the client file is necessary to supply the insurance product and deliver the services requested by the policyholder (s. 12 para. 2 (4) of the Act respecting the protection of personal information in the private sector). Without this information, the contract cannot be administered.",
+            "justificationFr": "La tenue du dossier client est nécessaire à la fourniture du produit d'assurance et à la prestation des services demandés par le preneur (art. 12 al. 2 (4) de la Loi sur la protection des renseignements personnels dans le secteur privé). Sans ces renseignements, le contrat ne peut être administré."
+          },
+          "0x7658ea8bbc056ec88e07b0f4f90aea90d0ace0bc72cfac9949f6eee85548afc5": {
+            "basis": "contract",
+            "justificationEn": "The Tax Administration Act (CQLR, c. A-6.002, s. 35.6) and the Income Tax Act (R.S.C. 1985, c. 1, 5th Supp., s. 230) require the company to keep its books, records and supporting documents for six years after the end of the taxation year concerned. This retention period is set by law (P-39.1 s. 18 and s. 23).",
+            "justificationFr": "La Loi sur l'administration fiscale (RLRQ, c. A-6.002, art. 35.6) et la Loi de l'impôt sur le revenu (L.R.C. 1985, ch. 1, 5e suppl., art. 230) obligent l'entreprise à conserver ses registres et pièces justificatives pendant six ans après la fin de l'année d'imposition visée. Ce délai de conservation est prévu par la loi (P-39.1 art. 18 et art. 23)."
+          },
+          "0xd26cc5406043ba1b9c0c856725f8076ae0d13fd5c58ab6f1ba553e30a16b5bba": {
+            "basis": "contract",
+            "justificationEn": "Using this information is necessary to prevent and detect insurance fraud and to assess and improve our protection and security measures (s. 12 para. 2 (3) of the Act respecting the protection of personal information in the private sector).",
+            "justificationFr": "L'utilisation de ces renseignements est nécessaire à la prévention et à la détection de la fraude à l'assurance ainsi qu'à l'évaluation et à l'amélioration de nos mesures de protection et de sécurité (art. 12 al. 2 (3) de la Loi sur la protection des renseignements personnels dans le secteur privé)."
+          }
+        },
+        "requestId": "0x0d25c288ae7acc694fc8fe87ccf6b66a835d616cc0cbe679fb4c6af4dc07b333"
+      },
+      "id": "did:agreely:citizen:demo-a8eb17f57983a6e87870"
+    },
+    "id": "urn:agreely:receipt:bb80ff94-9d37-4395-ab37-82e6e5a0d799",
+    "issuer": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+    "proof": [
+      {
+        "created": "2026-10-24T17:14:04Z",
+        "cryptosuite": "eddsa-jcs-2022",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2BPFWJVk4bRMekiga67didXAekCMnrgyqZzbP91g2cG1TCKekzgC2WtP67GhXaqeCgUwdk5munzQ8TV7o8TukAbT",
+        "type": "DataIntegrityProof",
+        "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+      },
+      {
+        "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+        "challenge": "0xc842258def9b9536e5975de105ba767fed3ff1123656449816c6ce8625b8d1ab",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoieUVJbGplLWJsVGJsbDEzaEJicDJmLTBfOFJJMlZrU1lGc2JPaGlXNDBhcyIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA5MCJ9",
+        "nonce": "0xaf686942b0c01dbf124bf9038df4e38fe72c931cc1b08af50bb9e47695a79dcf",
+        "signature": "MEUCIQCeTIYpayqywHdqlgDi_-4uJs62llWynoDma0W_BeTbHwIgJiukm5U-EO22JQBG84Bn5nEDbh35wHelVOVn0jokhw8",
+        "type": "WebAuthnAssertion",
+        "verificationMethod": "did:agreely:citizen:demo-a8eb17f57983a6e87870#passkey-1"
+      }
+    ],
+    "type": [
+      "VerifiableCredential",
+      "ConsentReceipt"
+    ],
+    "validFrom": "2026-10-24T17:14:04Z",
+    "validUntil": "2029-10-25T03:59:59Z"
+  },
+  "signedOffer": {
+    "consent": {
+      "action": "grant",
+      "items": [
+        {
+          "automatedDecision": false,
+          "category": "coordonnées",
+          "itemId": "0x73b495b51886c131fc914c802876ea248e6053c83ceb5ef49eceff1a68461b88",
+          "legalBasis": "necessary_for_service",
+          "purpose": "gestion du dossier client",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": true,
+          "category": "renseignements financiers",
+          "itemId": "0xee5cea7662452e7e4345ffc73c0f77afef9b8a01b2805e6649240c7fdde1db70",
+          "legalBasis": "consent",
+          "purpose": "souscription et tarification",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "renseignements financiers",
+          "itemId": "0xd26cc5406043ba1b9c0c856725f8076ae0d13fd5c58ab6f1ba553e30a16b5bba",
+          "legalBasis": "security_fraud",
+          "purpose": "prévention de la fraude",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "renseignements médicaux",
+          "itemId": "0x8e7f26463acd5ed0cd36dfdfa48f08804c71fca03d353da4f793e6386152f371",
+          "legalBasis": "consent",
+          "purpose": "évaluation des réclamations",
+          "sensitive": true
+        },
+        {
+          "automatedDecision": false,
+          "category": "renseignements financiers",
+          "itemId": "0x7658ea8bbc056ec88e07b0f4f90aea90d0ace0bc72cfac9949f6eee85548afc5",
+          "legalBasis": "legal_obligation",
+          "purpose": "conservation des registres fiscaux",
+          "sensitive": false
+        }
+      ]
+    },
+    "createdAt": "2026-10-24T17:14:04Z",
+    "disclosure": {
+      "automatedDecision": {
+        "en": "The initial premium is set by a fully automated processing based on your risk profile. You will be informed of any decision so rendered and may submit observations to an advisor.",
+        "fr": "La prime initiale est établie par un traitement entièrement automatisé fondé sur votre profil de risque. Vous serez informé de toute décision ainsi rendue et pouvez présenter vos observations à un conseiller."
+      },
+      "categories": {
+        "en": "Contact details, financial information, claim history and, for disability or life claims, medical information.",
+        "fr": "Coordonnées, renseignements financiers, antécédents de réclamation et, pour les réclamations invalidité ou vie, renseignements médicaux."
+      },
+      "crossBorder": {
+        "en": "Some information is hosted by Nordlys Cloud Services in Ireland (European Union). A privacy impact assessment (s. 17) concludes the protection is adequate.",
+        "fr": "Certains renseignements sont hébergés par Nordlys Cloud Services en Irlande (Union européenne). Une évaluation des facteurs relatifs à la vie privée (art. 17) conclut à une protection adéquate."
+      },
+      "means": {
+        "en": "Information collected directly from you at quotation time, supplemented, with your authorization, by the credit file and industry claim databases.",
+        "fr": "Renseignements recueillis directement auprès de vous au moment de la soumission, complétés, avec votre autorisation, par le dossier de crédit et les bases sectorielles de réclamation."
+      },
+      "purpose": {
+        "en": "Assess your eligibility, set your insurance premium, manage your client file, assess your claims, prevent fraud and keep the records required by tax laws.",
+        "fr": "Évaluer votre admissibilité, établir votre prime d'assurance, gérer votre dossier client, évaluer vos réclamations, prévenir la fraude et tenir les registres exigés par les lois fiscales."
+      },
+      "recipients": {
+        "en": "Our reinsurers, our industry antifraud platform and our cloud host, all bound by confidentiality agreements.",
+        "fr": "Nos réassureurs, notre plateforme antifraude sectorielle et notre hébergeur infonuagique, tous liés par des ententes de confidentialité."
+      },
+      "responsable": {
+        "contact": "protection@assurance-boreale.example",
+        "name": "Marie-Claude Gagnon"
+      },
+      "retention": {
+        "en": "Kept 7 years after the end of the contract, then destroyed; claim files with a medical assessment are kept 10 years after the decision (s. 23 and s. 11 para. 2). Tax records are kept six years after the end of the taxation year, a period set by law.",
+        "fr": "Conservés 7 ans après la fin du contrat, puis détruits; les dossiers de réclamation avec évaluation médicale sont conservés 10 ans après la décision (art. 23 et art. 11 al. 2). Les registres fiscaux sont conservés six ans après la fin de l'année d'imposition, un délai prévu par la loi."
+      },
+      "rights": {
+        "en": "You have the rights of access (s. 27), rectification (s. 28), withdrawal and portability (s. 27 para. 3). Any decision based exclusively on automated processing may be reviewed by an advisor (s. 12.1).",
+        "fr": "Vous disposez des droits d'accès (art. 27), de rectification (art. 28), de retrait et de portabilité (art. 27 al. 3). Toute décision fondée exclusivement sur un traitement automatisé peut être révisée par un conseiller (art. 12.1)."
+      },
+      "withdrawal": {
+        "en": "You may withdraw your consent at any time. Withdrawing information necessary to the contract may however prevent it from continuing; we will explain the consequences before acting.",
+        "fr": "Vous pouvez retirer votre consentement en tout temps. Le retrait des renseignements nécessaires au contrat peut toutefois empêcher son maintien; nous vous informerons des conséquences avant d'agir."
+      }
+    },
+    "disclosureHash": "0xb8be94232d665b766fe61a37476413b436147d59782b7fac8f7f91e123375fea",
+    "disclosureVersion": "2",
+    "document": {
+      "code": "souscription",
+      "effectiveDate": "2026-02-01",
+      "name": "Consentement à la souscription et à la tarification",
+      "version": "1.0"
+    },
+    "expiresAt": "2026-11-23T17:14:04Z",
+    "issuer": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+    "legalBasis": {
+      "0x73b495b51886c131fc914c802876ea248e6053c83ceb5ef49eceff1a68461b88": {
+        "basis": "necessary_for_service",
+        "justificationEn": "Maintaining the client file is necessary to supply the insurance product and deliver the services requested by the policyholder (s. 12 para. 2 (4) of the Act respecting the protection of personal information in the private sector). Without this information, the contract cannot be administered.",
+        "justificationFr": "La tenue du dossier client est nécessaire à la fourniture du produit d'assurance et à la prestation des services demandés par le preneur (art. 12 al. 2 (4) de la Loi sur la protection des renseignements personnels dans le secteur privé). Sans ces renseignements, le contrat ne peut être administré."
+      },
+      "0x7658ea8bbc056ec88e07b0f4f90aea90d0ace0bc72cfac9949f6eee85548afc5": {
+        "basis": "legal_obligation",
+        "justificationEn": "The Tax Administration Act (CQLR, c. A-6.002, s. 35.6) and the Income Tax Act (R.S.C. 1985, c. 1, 5th Supp., s. 230) require the company to keep its books, records and supporting documents for six years after the end of the taxation year concerned. This retention period is set by law (P-39.1 s. 18 and s. 23).",
+        "justificationFr": "La Loi sur l'administration fiscale (RLRQ, c. A-6.002, art. 35.6) et la Loi de l'impôt sur le revenu (L.R.C. 1985, ch. 1, 5e suppl., art. 230) obligent l'entreprise à conserver ses registres et pièces justificatives pendant six ans après la fin de l'année d'imposition visée. Ce délai de conservation est prévu par la loi (P-39.1 art. 18 et art. 23)."
+      },
+      "0xd26cc5406043ba1b9c0c856725f8076ae0d13fd5c58ab6f1ba553e30a16b5bba": {
+        "basis": "security_fraud",
+        "justificationEn": "Using this information is necessary to prevent and detect insurance fraud and to assess and improve our protection and security measures (s. 12 para. 2 (3) of the Act respecting the protection of personal information in the private sector).",
+        "justificationFr": "L'utilisation de ces renseignements est nécessaire à la prévention et à la détection de la fraude à l'assurance ainsi qu'à l'évaluation et à l'amélioration de nos mesures de protection et de sécurité (art. 12 al. 2 (3) de la Loi sur la protection des renseignements personnels dans le secteur privé)."
+      }
+    },
+    "nonce": "0xaf686942b0c01dbf124bf9038df4e38fe72c931cc1b08af50bb9e47695a79dcf",
+    "requestId": "0x0d25c288ae7acc694fc8fe87ccf6b66a835d616cc0cbe679fb4c6af4dc07b333",
+    "validUntil": "2029-10-25T03:59:59Z"
+  },
+  "merkleRoot": "0x80606442d3bc7cf58e54bd19dfb5b59760c10eb70f91547a1d3cf62c2895123d",
+  "consentRef": "0x6f2ce888518ada55740d5d84c79bb9ac2cccb093762aa9ca241b22b4494ecdc8",
+  "consentRefs": [
+    "0x6f2ce888518ada55740d5d84c79bb9ac2cccb093762aa9ca241b22b4494ecdc8",
+    "0xd071056e2f691c468898f3c57b5f21a3994392b0bc3de8ec8d1121ea8ec921ed",
+    "0xbba364b343fb38a3178e659ffb4b5d06d6055bd8b4cb8782f534b979a298277f",
+    "0xd71ab19254d036464588bd70f860ca499ec29c463a3e4384825227d810c09314"
+  ],
+  "didDocuments": {
+    "issuer": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/data-integrity/v2"
+      ],
+      "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+      "alsoKnownAs": [
+        "did:web:assurance-boreale.example"
+      ],
+      "verificationMethod": [
+        {
+          "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1",
+          "type": "Multikey",
+          "controller": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+          "publicKeyMultibase": "z6MkiyEw5Q64vrEDKjq3PysCAftZGEmcyzjsDTSnufbq85YA"
+        },
+        {
+          "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale#root-1",
+          "type": "WebAuthnAuthenticationKey2024",
+          "controller": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+          "publicKeyCose": "0xa5010203262001215820a876df4e3132b838f351e07be0ac755f18dc8898ed020dd7e6ba0540828404f522582058c288a2da23df8d9ba58f526974a17b143f3287e6316b7ccbf90fab34c8eb80",
+          "rpId": "localhost"
+        }
+      ],
+      "assertionMethod": [
+        "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+      ],
+      "authentication": [
+        "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+      ],
+      "capabilityDelegation": [
+        "#root-1"
+      ],
+      "delegation": {
+        "type": "agreely.keyDelegation.v1",
+        "body": {
+          "rpId": "localhost",
+          "type": "agreely.keyDelegation.v1",
+          "nonce": "0x031d6f920a0d125b9d03762049bc7716a218dd06e2acc23a3ec873ce18aab25f",
+          "chainId": "84532",
+          "registry": "0x3532a9dff3c910152543afca49de7c66113c5312",
+          "delegatee": {
+            "keyId": "0xa2a946771b18babb9008bb48691f8f429805626e1ce81e5c416d8a76004429a2"
+          },
+          "rootKeyId": "0x424da44937462aec54b575fc986476c6b398779d56ddc88872d138d962071774",
+          "validFrom": "2026-10-24T17:14:02Z",
+          "companyDid": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+          "validUntil": "2027-10-24T17:14:02Z"
+        },
+        "proof": {
+          "type": "WebAuthnDelegationProof2026",
+          "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#root-1",
+          "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+          "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiZDd1RTMxUm1sdk9kNnlHbG5KbTlrN1hhOFZ4cURfRHN5NUZzUGRiNEVWdyIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA5MCJ9",
+          "signature": "MEUCIQCweXnKaJkTq1fJV7MAVS160ib-oJVVdvFp3AvhsmXPjAIgWkWCHjj-Fi_F7EzyeKrfPUms9OOdLX8qRKTJbrf2aG0"
+        }
+      }
+    },
+    "citizen": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/suites/ed25519-2020/v1"
+      ],
+      "id": "did:agreely:citizen:demo-a8eb17f57983a6e87870",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:demo-a8eb17f57983a6e87870#passkey-1",
+          "controller": "did:agreely:citizen:demo-a8eb17f57983a6e87870",
+          "validFrom": "2026-10-24T17:14:04Z",
+          "validUntil": null,
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa501020326200121582009a0de8537749c3cc7b16dde7cac96ff14143a8465adebccef995d642f254e23225820f21f0665765ffecabcad9efef464cf94120a96d7375bab663a60c9f9185e3de1"
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ],
+      "capabilityInvocation": []
+    }
+  }
+}

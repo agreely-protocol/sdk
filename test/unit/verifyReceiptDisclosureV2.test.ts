@@ -2,9 +2,11 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { Agreely } from "../../src/index.js";
 import { canonicalize } from "../../src/crypto/jcs.js";
+import { testIssuer } from "./signing.js";
 
-// A v2 receipt: at least one cell rests on a non-consent basis, so the app seals the disclosureHash over
-// {disclosure, legalBasis} and stamps disclosureVersion "2" (ConsentRequestService, the v2 branch).
+// A v2 consent: at least one cell rests on a non-consent basis, so the app seals the disclosureHash over
+// {disclosure, legalBasis} and stamps disclosureVersion "2" (ConsentRequestService, the v2 branch). On a
+// passkey consent only the OFFER is company-signed: the copy is checked against the offer's hash and basis.
 
 const DISCLOSURE = {
   purpose: { fr: "Fins de prestation du service demandé.", en: "Purposes of the requested service." },
@@ -38,181 +40,268 @@ const IPFS_BODY = {
   disclosure: DISCLOSURE,
 };
 
+const DOCUMENT = { code: "marketing", name: "Marketing", version: "1.0", effectiveDate: "2026-01-01", ipfsCid: CID };
+const ITEMS = [{ itemId: "0x01", category: "email address", purpose: "marketing outreach" }];
+const GRANTED_AT = "2026-01-15T12:00:00Z";
+
+const company = testIssuer();
+
 function sha256Of(preimage: unknown): string {
   return "0x" + createHash("sha256").update(canonicalize(preimage)).digest("hex");
 }
 
-function baseReceipt(): Record<string, unknown> {
+/** A company-signed v2 offer (edit it before signing for a v1 or another variant). */
+function offer(edit: (o: Record<string, unknown>) => void = () => {}): Record<string, unknown> {
+  const o: Record<string, unknown> = {
+    issuer: company.issuer,
+    requestId: "0x" + "cd".repeat(32),
+    nonce: "0x" + "ef".repeat(32),
+    validUntil: "",
+    consent: { action: "grant", items: structuredClone(ITEMS) },
+    document: structuredClone(DOCUMENT),
+    disclosure: structuredClone(DISCLOSURE),
+    disclosureHash: PHP_V2_DISCLOSURE_HASH,
+    disclosureVersion: "2",
+    legalBasis: structuredClone(LEGAL_BASIS),
+  };
+  edit(o);
+  return o;
+}
+
+/** The passkey receipt the app derives from `o`, signed (proof[0]) over the offer. No passkey proof: only the company half matters here. */
+function bundleOf(o: Record<string, unknown>, editConsent: (c: Record<string, unknown>) => void = () => {}) {
+  const consent: Record<string, unknown> = {
+    action: "grant",
+    items: structuredClone(ITEMS),
+    requestId: o["requestId"],
+    grantedAt: GRANTED_AT,
+    document: structuredClone(o["document"]),
+    disclosureHash: o["disclosureHash"],
+  };
+  if (o["legalBasis"] !== undefined) {
+    consent["disclosureVersion"] = o["disclosureVersion"];
+    consent["legalBasis"] = structuredClone(o["legalBasis"]);
+  }
+  editConsent(consent);
   return {
-    type: ["VerifiableCredential", "ConsentReceipt"],
-    issuer: "did:web:api.agreely.ca:c:acme",
-    credentialSubject: {
-      id: "did:agreely:citizen:v2",
-      consent: {
-        action: "grant",
-        items: [{ itemId: "0x01", category: "email address", purpose: "marketing outreach" }],
-        requestId: "0x" + "cd".repeat(32),
-        grantedAt: "2026-01-15T12:00:00Z",
-        document: {
-          code: "marketing",
-          name: "Marketing",
-          version: "1.0",
-          effectiveDate: "2026-01-01",
-          ipfsCid: CID,
-        },
-        disclosureHash: PHP_V2_DISCLOSURE_HASH,
-        disclosureVersion: "2",
-        legalBasis: structuredClone(LEGAL_BASIS),
-      },
+    version: "1",
+    receipt: {
+      "@context": ["https://www.w3.org/ns/credentials/v2", "https://agreely.ca/credentials/consent/v1"],
+      type: ["VerifiableCredential", "ConsentReceipt"],
+      id: "urn:agreely:receipt:00000000-0000-4000-8000-000000000002",
+      issuer: company.issuer,
+      validFrom: GRANTED_AT,
+      validUntil: "",
+      credentialSubject: { id: "did:agreely:citizen:v2", consent },
+      proof: [company.proofOver(o)],
     },
-    proof: [],
+    signedOffer: o,
+    merkleRoot: "0x" + "ab".repeat(32),
   };
 }
 
-/** A fresh receipt, with the consent block edited by `edit`. */
-function receiptWith(edit: (consent: Record<string, unknown>) => void): Record<string, unknown> {
-  const receipt = baseReceipt();
-  edit((receipt["credentialSubject"] as { consent: Record<string, unknown> }).consent);
-  return receipt;
+function gateway(body: unknown, status = 200) {
+  const fetched: string[] = [];
+  const fetchImpl = (async (input: string | URL) => {
+    fetched.push(String(input));
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  }) as unknown as typeof fetch;
+  return { fetchImpl, fetched };
 }
 
-/** Runs the verifier with the IPFS body stubbed. Only the disclosureCopy check is asserted on. */
-async function disclosureCopyOf(receipt: Record<string, unknown>, body: unknown = IPFS_BODY) {
-  return Agreely.verifyReceipt(receipt, {
-    resolver: () => null,
+/** Runs the verifier with the disclosure check requested and the IPFS body stubbed. */
+async function verifyWithCopy(input: unknown, body: unknown = IPFS_BODY) {
+  return Agreely.verifyReceipt(input, {
+    resolver: company.resolver,
+    verifyDisclosure: true,
     ipfsGateway: (cid: string) => `https://ipfs.test/${cid}`,
-    fetch: (async () =>
-      new Response(JSON.stringify(body), {
-        headers: { "Content-Type": "application/json" },
-      })) as unknown as typeof fetch,
+    fetch: gateway(body).fetchImpl,
   });
 }
 
-describe("disclosureCopy recomputes a v2 disclosureHash over {disclosure, legalBasis}", () => {
+describe("disclosureCopy of a passkey bundle is checked against the SIGNED offer", () => {
   it("the TS formula reproduces the app's PHP v2 hash, and the v1 formula does not", () => {
     expect(sha256Of({ disclosure: DISCLOSURE, legalBasis: LEGAL_BASIS })).toBe(PHP_V2_DISCLOSURE_HASH);
     expect(sha256Of(DISCLOSURE)).not.toBe(PHP_V2_DISCLOSURE_HASH);
   });
 
-  it("a v2 receipt with an authentic body and legalBasis passes, and the note names the version", async () => {
-    const result = await disclosureCopyOf(baseReceipt());
+  it("a v2 bundle with an authentic body passes, and the note names the version", async () => {
+    const result = await verifyWithCopy(bundleOf(offer()));
+    expect(result.companySignature).toBe("pass");
+    expect(result.receiptIntegrity).toBe("pass");
     expect(result.disclosureCopy).toBe("pass");
     expect(result.notes.join("\n")).toContain("disclosureVersion 2");
   });
 
-  it("a v2 receipt with one tampered justificationFr FAILS", async () => {
-    const receipt = receiptWith((consent) => {
-      (consent["legalBasis"] as Record<string, Record<string, string>>)["0x01"]!["justificationFr"] =
-        "Consentement obtenu de force.";
-    });
-    const result = await disclosureCopyOf(receipt);
-    expect(result.disclosureCopy).toBe("fail");
-    expect(result.notes.join("\n")).toContain("disclosureVersion 2");
-  });
-
-  it("a v2 receipt whose disclosure body was tampered FAILS", async () => {
-    const tampered = structuredClone(IPFS_BODY) as typeof IPFS_BODY;
+  it("a v2 bundle whose IPFS disclosure was tampered FAILS", async () => {
+    const tampered = structuredClone(IPFS_BODY);
     tampered.disclosure.purpose.en = "Marketing, shared with partners.";
-    const result = await disclosureCopyOf(baseReceipt(), tampered);
+    const result = await verifyWithCopy(bundleOf(offer()), tampered);
     expect(result.disclosureCopy).toBe("fail");
   });
 
-  it("a v2 receipt with NO legalBasis FAILS, and never falls back to the v1 formula", async () => {
-    // The hash here is the v1 formula over the disclosure alone: a fallback would wrongly pass it.
-    const receipt = receiptWith((consent) => {
-      delete consent["legalBasis"];
-      consent["disclosureHash"] = sha256Of(DISCLOSURE);
+  it("an IPFS body carrying a legalBasis that differs from the signed one FAILS", async () => {
+    const body = { ...IPFS_BODY, legalBasis: { "0x01": { basis: "consent", justificationFr: "" } } };
+    const result = await verifyWithCopy(bundleOf(offer()), body);
+    expect(result.disclosureCopy).toBe("fail");
+    expect(result.notes.join("\n")).toContain("differs from the signed one");
+  });
+
+  it("an IPFS body carrying the signed legalBasis still passes", async () => {
+    const result = await verifyWithCopy(bundleOf(offer()), { ...IPFS_BODY, legalBasis: structuredClone(LEGAL_BASIS) });
+    expect(result.disclosureCopy).toBe("pass");
+  });
+
+  it("a v1 offer (no legalBasis) passes on the disclosure alone", async () => {
+    const v1 = offer((o) => {
+      delete o["legalBasis"];
+      o["disclosureVersion"] = "1";
+      o["disclosureHash"] = sha256Of(DISCLOSURE);
     });
-    const result = await disclosureCopyOf(receipt);
+    const result = await verifyWithCopy(bundleOf(v1));
+    expect(result.receiptIntegrity).toBe("pass");
+    expect(result.disclosureCopy).toBe("pass");
+  });
+
+  it("a receipt whose legalBasis was rewritten with a recomputed hash fails its integrity, the copy being judged on the offer", async () => {
+    const forgedBasis = { "0x01": { basis: "contract", justificationFr: "Contrat.", justificationEn: "Contract." } };
+    const forged = bundleOf(offer(), (c) => {
+      c["legalBasis"] = forgedBasis;
+      c["disclosureHash"] = sha256Of({ disclosure: DISCLOSURE, legalBasis: forgedBasis });
+    });
+    const result = await verifyWithCopy(forged);
+    expect(result.receiptIntegrity).toBe("fail");
+    expect(result.overall).toBe("failed");
+    expect(result.notes.join("\n")).toContain(`matches the signed disclosureHash ${PHP_V2_DISCLOSURE_HASH}`);
+  });
+
+  it("an offer whose signature cannot be checked is not compared: there is no signed hash", async () => {
+    const result = await Agreely.verifyReceipt(bundleOf(offer()), {
+      resolver: () => null,
+      verifyDisclosure: true,
+      fetch: gateway(IPFS_BODY).fetchImpl,
+    });
+    expect(result.disclosureCopy).toBe("skipped");
+    expect(result.notes.join("\n")).toContain("no signed disclosureHash");
+  });
+
+  it("an IPFS body whose disclosure holds a number FAILS, and does not throw", async () => {
+    const result = await verifyWithCopy(bundleOf(offer()), { ...IPFS_BODY, disclosure: { ...DISCLOSURE, copies: 3 } });
+    expect(result.disclosureCopy).toBe("fail");
+    expect(result.notes.join("\n")).toContain("cannot be canonicalized");
+  });
+});
+
+describe("the disclosure check is opt-in and a gateway error is never a hash mismatch", () => {
+  it("is not run, and the gateway never called, unless verifyDisclosure is true", async () => {
+    const gw = gateway(IPFS_BODY);
+    const result = await Agreely.verifyReceipt(bundleOf(offer()), { resolver: company.resolver, fetch: gw.fetchImpl });
+    expect(result.disclosureCopy).toBe("skipped");
+    expect(gw.fetched).toEqual([]);
+    expect(result.notes.join("\n")).toContain("verifyDisclosure: true");
+  });
+
+  it("a gateway answering 404 with a JSON body is unavailable, not a mismatch", async () => {
+    const result = await Agreely.verifyReceipt(bundleOf(offer()), {
+      resolver: company.resolver,
+      verifyDisclosure: true,
+      fetch: gateway({ error: "not found" }, 404).fetchImpl,
+    });
+    expect(result.disclosureCopy).toBe("unavailable");
+    expect(result.notes.join("\n")).toContain("HTTP 404");
+  });
+
+  it("an unreachable gateway is unavailable", async () => {
+    const result = await Agreely.verifyReceipt(bundleOf(offer()), {
+      resolver: company.resolver,
+      verifyDisclosure: true,
+      fetch: (async () => {
+        throw new TypeError("fetch failed");
+      }) as unknown as typeof fetch,
+    });
+    expect(result.disclosureCopy).toBe("unavailable");
+  });
+});
+
+describe("a BARE passkey receipt never passes its disclosure copy (its hash and legalBasis are signed by nobody)", () => {
+  it("a bare v2 receipt with a rewritten legalBasis and a recomputed hash is unsupported, and the gateway is never called", async () => {
+    const forgedBasis = { "0x01": { basis: "contract", justificationFr: "Contrat.", justificationEn: "Contract." } };
+    const { receipt } = bundleOf(offer(), (c) => {
+      c["legalBasis"] = forgedBasis;
+      c["disclosureHash"] = sha256Of({ disclosure: DISCLOSURE, legalBasis: forgedBasis });
+    });
+    const gw = gateway(IPFS_BODY);
+    const result = await Agreely.verifyReceipt(receipt, {
+      resolver: company.resolver,
+      verifyDisclosure: true,
+      fetch: gw.fetchImpl,
+    });
+    expect(result.disclosureCopy).toBe("unsupported");
+    expect(result.overall).not.toBe("verified");
+    expect(gw.fetched).toEqual([]);
+  });
+});
+
+describe("a RECORDED receipt's disclosure copy reads the version and basis under the company signature", () => {
+  /** A company-attested receipt carrying a CID and a disclosureHash, signed over its body. */
+  function recorded(edit: (consent: Record<string, unknown>) => void): Record<string, unknown> {
+    const consent: Record<string, unknown> = {
+      action: "grant",
+      items: structuredClone(ITEMS),
+      document: structuredClone(DOCUMENT),
+      grantedAt: GRANTED_AT,
+      disclosureHash: PHP_V2_DISCLOSURE_HASH,
+      disclosureVersion: "2",
+      legalBasis: structuredClone(LEGAL_BASIS),
+    };
+    edit(consent);
+    const body = {
+      type: ["VerifiableCredential", "ConsentReceipt", "CompanyAttestedConsentReceipt"],
+      issuer: company.issuer,
+      assuranceLevel: "company_attested",
+      validFrom: GRANTED_AT,
+      credentialSubject: { consent },
+      evidence: { type: "HandSignedPaperConsent", pdfHash: "0x" + "11".repeat(32) },
+    };
+    return { ...body, proof: [company.proofOver(body)] };
+  }
+
+  it("an authentic v2 recorded receipt passes", async () => {
+    const result = await verifyWithCopy(recorded(() => {}));
+    expect(result.companySignature).toBe("pass");
+    expect(result.disclosureCopy).toBe("pass");
+  });
+
+  it("a v2 recorded receipt with NO legalBasis FAILS, and never falls back to the v1 formula", async () => {
+    const result = await verifyWithCopy(
+      recorded((c) => {
+        delete c["legalBasis"];
+        c["disclosureHash"] = sha256Of(DISCLOSURE);
+      }),
+    );
     expect(result.disclosureCopy).toBe("fail");
     expect(result.notes.join("\n")).toContain("carries no legalBasis");
   });
 
-  it("a v2 body that carries a legalBasis differing from the receipt's FAILS", async () => {
-    const body = { ...IPFS_BODY, legalBasis: { "0x01": { basis: "consent", justificationFr: "" } } };
-    const result = await disclosureCopyOf(baseReceipt(), body);
-    expect(result.disclosureCopy).toBe("fail");
-    expect(result.notes.join("\n")).toContain("differs from the receipt's");
-  });
-
-  it("a v2 body that carries the same legalBasis as the receipt still passes", async () => {
-    const body = { ...IPFS_BODY, legalBasis: structuredClone(LEGAL_BASIS) };
-    const result = await disclosureCopyOf(baseReceipt(), body);
-    expect(result.disclosureCopy).toBe("pass");
-  });
-
   it("a legalBasis without disclosureVersion 2 FAILS, the preimage being ambiguous", async () => {
-    const receipt = receiptWith((consent) => {
-      consent["disclosureVersion"] = "1";
-    });
-    const result = await disclosureCopyOf(receipt);
+    const result = await verifyWithCopy(recorded((c) => (c["disclosureVersion"] = "1")));
     expect(result.disclosureCopy).toBe("fail");
   });
 
   it("an unknown disclosureVersion FAILS", async () => {
-    const receipt = receiptWith((consent) => {
-      consent["disclosureVersion"] = "3";
-    });
-    const result = await disclosureCopyOf(receipt);
+    const result = await verifyWithCopy(recorded((c) => (c["disclosureVersion"] = "3")));
     expect(result.disclosureCopy).toBe("fail");
     expect(result.notes.join("\n")).toContain("unknown disclosureVersion");
   });
 
-  it("a v1 receipt (no legalBasis, no disclosureVersion) still passes on the disclosure alone", async () => {
-    const receipt = receiptWith((consent) => {
-      delete consent["legalBasis"];
-      delete consent["disclosureVersion"];
-      consent["disclosureHash"] = sha256Of(DISCLOSURE);
-    });
-    const result = await disclosureCopyOf(receipt);
+  it("an explicit disclosureVersion 1 with no legalBasis passes on the disclosure alone", async () => {
+    const result = await verifyWithCopy(
+      recorded((c) => {
+        delete c["legalBasis"];
+        c["disclosureVersion"] = "1";
+        c["disclosureHash"] = sha256Of(DISCLOSURE);
+      }),
+    );
     expect(result.disclosureCopy).toBe("pass");
-  });
-
-  it("an explicit disclosureVersion 1 with no legalBasis still passes", async () => {
-    const receipt = receiptWith((consent) => {
-      delete consent["legalBasis"];
-      consent["disclosureVersion"] = "1";
-      consent["disclosureHash"] = sha256Of(DISCLOSURE);
-    });
-    const result = await disclosureCopyOf(receipt);
-    expect(result.disclosureCopy).toBe("pass");
-  });
-});
-
-describe("a value the canonicalizer refuses is a verdict, never a throw out of verifyReceipt", () => {
-  // A number is the one value the JCS canonicalizer refuses here (numbers travel as strings).
-  it("a v2 legalBasis holding a number FAILS the disclosure check, with the reason, and does not throw", async () => {
-    const receipt = receiptWith((consent) => {
-      (consent["legalBasis"] as Record<string, Record<string, unknown>>)["0x01"]!["weight"] = 3;
-    });
-    const result = await disclosureCopyOf(receipt);
-    expect(result.disclosureCopy).toBe("fail");
-    expect(result.notes.join("\n")).toContain("the receipt's legalBasis cannot be canonicalized");
-  });
-
-  it("a v2 IPFS body carrying a legalBasis with a number FAILS the disclosure check, and does not throw", async () => {
-    const body = { ...IPFS_BODY, legalBasis: { "0x01": { basis: "consent", weight: 3 } } };
-    const result = await disclosureCopyOf(baseReceipt(), body);
-    expect(result.disclosureCopy).toBe("fail");
-    expect(result.notes.join("\n")).toContain("the IPFS document body cannot be canonicalized");
-  });
-
-  it("a v2 IPFS body whose disclosure holds a number FAILS the disclosure check, and does not throw", async () => {
-    const body = { ...IPFS_BODY, disclosure: { ...DISCLOSURE, copies: 3 } };
-    const result = await disclosureCopyOf(baseReceipt(), body);
-    expect(result.disclosureCopy).toBe("fail");
-    expect(result.notes.join("\n")).toContain("the IPFS document body cannot be canonicalized");
-  });
-
-  it("a v1 IPFS body whose disclosure holds a number FAILS the disclosure check, and does not throw", async () => {
-    const receipt = receiptWith((consent) => {
-      delete consent["legalBasis"];
-      delete consent["disclosureVersion"];
-      consent["disclosureHash"] = sha256Of(DISCLOSURE);
-    });
-    const body = { ...IPFS_BODY, disclosure: { ...DISCLOSURE, copies: 3 } };
-    const result = await disclosureCopyOf(receipt, body);
-    expect(result.disclosureCopy).toBe("fail");
-    expect(result.notes.join("\n")).toContain("the IPFS document body cannot be canonicalized");
   });
 });

@@ -1,0 +1,62 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://agreely.ca/credentials/consent/v1"
+  ],
+  "assuranceLevel": "company_attested",
+  "credentialSubject": {
+    "consent": {
+      "action": "grant",
+      "confirms": {
+        "assuranceLevel": "company_documented",
+        "grantedAt": "2026-10-04T19:00:09Z",
+        "merkleRoot": "0x1765243021b6dc0e40e01760b74d9fbce8c00633731f9c6b8d1b4453494fcc8f"
+      },
+      "document": {
+        "code": "consentement-et-avis-de-collecte-personnes-desservies",
+        "effectiveDate": "2026-09-29",
+        "ipfsCid": "QmTkkcNfcaR1cFk4iTDRcfmALM3UpF9tUm2EWaT8jqEAAg",
+        "name": "Consentement et avis de collecte : personnes desservies",
+        "nameEn": "Consent and collection notice: persons served",
+        "version": "1.0"
+      },
+      "documentVersion": "88805dc8-d85f-4e16-8d89-9448f3a57569",
+      "effectiveDate": "2026-10-04T19:00:09Z",
+      "grantedAt": "2026-10-04T19:00:09Z",
+      "items": [
+        {
+          "category": "observations sur la situation de la personne (ce que remarquent les bénévoles et le bureau, suites données)",
+          "itemId": "0xfd16085c07cc9024dca0f04435ba76a64999abb1f3478aa0143f47ff55a6688d",
+          "purpose": "repérer, d'un service à l'autre, une personne dont la situation change et lui proposer de l'aide"
+        }
+      ],
+      "recordedAt": "2026-10-04T19:11:50Z"
+    }
+  },
+  "evidence": {
+    "documentVersion": "88805dc8-d85f-4e16-8d89-9448f3a57569",
+    "pdfHash": "0xdf257009b71f175a22e3023f79908078345cdef341f1b4fe58811dcc8ebb8c0c",
+    "pdfHeldBy": "agreely-escrow",
+    "type": "HandSignedPaperConsent"
+  },
+  "id": "urn:agreely:receipt:20def61e-6e9a-437e-9572-709ce358a961",
+  "issuer": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee",
+  "proof": [
+    {
+      "created": "2026-10-04T19:11:50Z",
+      "cryptosuite": "eddsa-jcs-2022",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z4AXaUfx9TydMLQubQKPxhnY3yjz7ii2gap9Z9KoV3BjTzuXobMKJmnEvUUJj7iNHao7QPNKaU2whqpKm2y5yA2TP",
+      "type": "DataIntegrityProof",
+      "verificationMethod": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1"
+    }
+  ],
+  "receiptVersion": "2",
+  "type": [
+    "VerifiableCredential",
+    "ConsentReceipt",
+    "CompanyAttestedConsentReceipt"
+  ],
+  "validFrom": "2026-10-04T19:00:09Z",
+  "validUntil": "2026-11-04T04:59:59Z"
+}

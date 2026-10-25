@@ -56,6 +56,7 @@ function optionsFor(c: (typeof cases)[number]): VerifyReceiptOptions {
     opts.resolver = (did: string) => fixtures.didDocuments[did] ?? null;
   }
   if (c.ipfs) {
+    opts.verifyDisclosure = true;
     opts.ipfsGateway = (cid: string) => `https://ipfs.test/${cid}`;
     opts.fetch = (async () =>
       new Response(JSON.stringify(fixtures.ipfsBody), {
@@ -73,6 +74,59 @@ describe("Agreely.verifyReceipt (offline golden vectors, byte-identical across S
       // discipline the PHP suite uses, so TS and PHP can never drift).
       expect(canonicalize(result as unknown)).toBe(canonicalize(c.expect));
       expect(result).toEqual(c.expect);
+    });
+  }
+});
+
+/**
+ * A JSON-RPC endpoint stub that answers per method: eth_blockNumber with `head`, eth_getLogs with `logs`.
+ * Every eth_getLogs request body is recorded in `sent`.
+ */
+function chainFetch(logs: unknown[], head = "0x3000000"): { fetch: typeof fetch; sent: string[] } {
+  const sent: string[] = [];
+  const impl = (async (_input: string | URL, init?: RequestInit) => {
+    if (init?.method === "POST") {
+      const req = JSON.parse(String(init.body)) as { method: string };
+      if (req.method === "eth_getLogs") sent.push(String(init.body));
+      const result = req.method === "eth_blockNumber" ? head : logs;
+      return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify(fixtures.ipfsBody), { headers: { "Content-Type": "application/json" } });
+  }) as unknown as typeof fetch;
+  return { fetch: impl, sent };
+}
+
+const bundleVectors = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../../vectors/vectors.json", import.meta.url)), "utf8"),
+) as {
+  bundleVerification: {
+    didDocuments: string;
+    cases: Array<{ name: string; file: string; resolveDids: boolean | "none"; ipfsBody?: unknown; expect: unknown }>;
+  };
+};
+
+function vectorFile(rel: string): unknown {
+  return JSON.parse(readFileSync(fileURLToPath(new URL(`../../vectors/${rel}`, import.meta.url)), "utf8"));
+}
+
+describe("Agreely.verifyReceipt on genuine and forged receipts and bundles (golden vectors, byte-identical across SDKs)", () => {
+  const { cases: bundleCases, didDocuments } = bundleVectors.bundleVerification;
+  const docs = vectorFile(didDocuments) as Record<string, DidDocument>;
+  for (const c of bundleCases) {
+    it(c.name, async () => {
+      const opts: VerifyReceiptOptions = {
+        resolver: c.resolveDids === "none" ? () => null : (did: string) => docs[did] ?? null,
+      };
+      if (c.ipfsBody !== undefined) {
+        opts.verifyDisclosure = true;
+        opts.ipfsGateway = (cid: string) => `https://ipfs.test/${cid}`;
+        opts.fetch = (async () =>
+          new Response(JSON.stringify(c.ipfsBody), { headers: { "Content-Type": "application/json" } })) as unknown as typeof fetch;
+      }
+      const result = await Agreely.verifyReceipt(vectorFile(c.file), opts);
+      expect(canonicalize(result as unknown)).toBe(canonicalize(c.expect));
     });
   }
 });
@@ -124,22 +178,9 @@ describe("verifyReceipt honesty matrix edge cases", () => {
 
   it("documentAnchor passes when a matching on-chain log is returned (opt-in rpcUrl, explicit Base Sepolia)", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
-    const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
-      if (init?.method === "POST") {
-        // eth_getLogs, return one matching log.
-        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [{ blockNumber: "0x1" }] }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify(fixtures.ipfsBody), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }) as unknown as typeof fetch;
-
     const result = await Agreely.verifyReceipt(citizenCase.receipt, {
       resolver: (did) => fixtures.didDocuments[did] ?? null,
-      ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
-      fetch: fetchImpl,
+      fetch: chainFetch([{ blockNumber: "0x1" }]).fetch,
       rpcUrl: "https://rpc.test",
       // Base Sepolia (84532) is no longer the default; passing it explicitly still
       // resolves the known testnet registry, so an integrator can test on Sepolia.
@@ -150,30 +191,18 @@ describe("verifyReceipt honesty matrix edge cases", () => {
 
   it("documentAnchor resolves the deployed Base mainnet registry by default and attempts the on-chain check", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
-    let anchorRequestBody: string | undefined;
-    const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
-      if (init?.method === "POST") {
-        anchorRequestBody = String(init.body);
-        // eth_getLogs, return one matching log.
-        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [{ blockNumber: "0x1" }] }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify(fixtures.ipfsBody), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }) as unknown as typeof fetch;
+    const chain = chainFetch([{ blockNumber: "0x1" }]);
 
     // No chainId passed -> default is Base mainnet (8453). The registry is now DEPLOYED
     // and VERIFIED, so the anchor check is no longer "skipped": the verifier resolves the
     // live mainnet AgreelyRegistry and performs the on-chain documentAnchor lookup.
     const result = await Agreely.verifyReceipt(citizenCase.receipt, {
       resolver: (did) => fixtures.didDocuments[did] ?? null,
-      ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
-      fetch: fetchImpl,
+      fetch: chain.fetch,
       rpcUrl: "https://rpc.test",
     });
     expect(result.documentAnchor).toBe("pass");
+    const anchorRequestBody = chain.sent[0];
     // Prove the check targeted the LIVE deployed Base mainnet registry address.
     //
     // This assertion is the whole guard against a silent, invisible correctness bug.
@@ -250,25 +279,13 @@ describe("verifyReceipt honesty matrix edge cases", () => {
 
   it("sends an EIP-55 checksummed mainnet registry address", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
-    let sent: string | undefined;
-    const fetchImpl = (async (_input: string | URL, init?: RequestInit) => {
-      if (init?.method === "POST") {
-        sent = JSON.parse(String(init.body)).params[0].address as string;
-        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [] }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify(fixtures.ipfsBody), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }) as unknown as typeof fetch;
-
+    const chain = chainFetch([]);
     await Agreely.verifyReceipt(citizenCase.receipt, {
       resolver: (did) => fixtures.didDocuments[did] ?? null,
-      ipfsGateway: (cid) => `https://ipfs.test/${cid}`,
-      fetch: fetchImpl,
+      fetch: chain.fetch,
       rpcUrl: "https://rpc.test",
     });
+    const sent = (JSON.parse(chain.sent[0]!) as { params: Array<{ address: string }> }).params[0]?.address;
 
     expect(sent).toBeDefined();
     expect(sent).toBe(eip55(sent!));
@@ -469,11 +486,12 @@ describe("a VERBAL receipt (VerbalConsentReceipt, company_documented) is never r
     expect(result.overall).toBe("unavailable");
   });
 
-  it("a receipt body holding a number the canonicalizer refuses FAILS the company signature, and does not throw", async () => {
+  it("a receipt body holding a number the canonicalizer refuses is malformed, and does not throw", async () => {
     const receipt = signedVerbalReceipt();
     (receipt.evidence as Record<string, unknown>).attempts = 2;
     const result = await Agreely.verifyReceipt(receipt, { resolver });
-    expect(result.companySignature).toBe("fail");
+    expect(result.overall).toBe("malformed");
+    expect(result.receiptType).toBe("company_documented");
     expect(result.notes.join(" ")).toContain("the receipt body cannot be canonicalized");
   });
 });

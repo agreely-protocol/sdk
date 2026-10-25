@@ -3,7 +3,7 @@
 
 export { Agreely, BATCH_CAP, RATE_LIMIT_PER_MINUTE } from "./client.js";
 export { BreakGlass } from "./breakGlass.js";
-export { ReceiptVerifier } from "./verify/receipt.js";
+export { ReceiptVerifier, isVerificationBundle } from "./verify/receipt.js";
 export {
   PURGE_RECORDS_MAX,
   PURGE_REFERENCES_MAX,

@@ -1,0 +1,244 @@
+{
+  "version": "1",
+  "receipt": {
+    "@context": [
+      "https://www.w3.org/ns/credentials/v2",
+      "https://agreely.ca/credentials/consent/v1"
+    ],
+    "credentialSubject": {
+      "consent": {
+        "action": "grant",
+        "disclosureHash": "0xe2ae8164087badb271be62a492a2d7b6a65a6a091b4bdfd5f6e0d5bc0d0fe3fd",
+        "document": {
+          "code": "communications",
+          "effectiveDate": "2026-05-01",
+          "name": "Consentement aux communications",
+          "version": "1.1"
+        },
+        "grantedAt": "2026-10-24T17:14:04Z",
+        "items": [
+          {
+            "automatedDecision": false,
+            "category": "coordonnées",
+            "itemId": "0x9b19fdde59a85e5092aa11301dc6eb48119f2ea7ad60e62c3e81eb8199c175db",
+            "legalBasis": "consent",
+            "purpose": "communications marketing",
+            "sensitive": false
+          },
+          {
+            "automatedDecision": false,
+            "category": "coordonnées",
+            "itemId": "0x8e06594a4b0103ea1a045b73899fd26cec5642adf4713ed15b8134ae86def209",
+            "legalBasis": "consent",
+            "purpose": "sondages et amélioration des services",
+            "sensitive": false
+          },
+          {
+            "automatedDecision": false,
+            "category": "historique de conduite",
+            "itemId": "0x2e576522496355465358d7637d2818febab935328eb8da2f8718007769679d39",
+            "legalBasis": "consent",
+            "purpose": "programme de conduite préventive",
+            "sensitive": false
+          }
+        ],
+        "requestId": "0x56d2852683bcbdcbdc7f900c19150af617e10823053a70b15be8e551fdea9886"
+      },
+      "id": "did:agreely:citizen:demo-91bf5c897c067cb69df0"
+    },
+    "id": "urn:agreely:receipt:95c2718f-c8c0-4369-b444-7e670502ca10",
+    "issuer": "did:web:app.agreely.ca:c:showcase-studio-pixel-boreal",
+    "proof": [
+      {
+        "created": "2026-10-24T17:14:04Z",
+        "cryptosuite": "eddsa-jcs-2022",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5T8ALdiVxr57Mh3p9NQo1fmjyu9JGcybbERvYDuwPRiA72RdCSv85ugyZrwxH5KVEDX1zvZUaRgfZ7yhGHeinD1R",
+        "type": "DataIntegrityProof",
+        "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+      },
+      {
+        "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+        "challenge": "0xc3e2fab98b50b62356a2e159215072578eccab9cc5e982c5ccfdfd7dc3ed5d49",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoidy1MNnVZdFF0aU5Xb3VGWklWQnlWNDdNcTV6RjZZTEZ6UDM5ZmNQdFhVayIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA5MCJ9",
+        "nonce": "0x4f6003e0ae046facb1d62399f0f401ec019d86e25768575268bb9c9b6aed6317",
+        "signature": "MEUCICqMcUgeUnAFJHI1VegfxuvYLXz82A_3AQT5qTWxupIrAiEAxLIZm8UZHjAY7f80ZikK_mdQn0icnA76xmE9TqvCPXI",
+        "type": "WebAuthnAssertion",
+        "verificationMethod": "did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1"
+      }
+    ],
+    "type": [
+      "VerifiableCredential",
+      "ConsentReceipt"
+    ],
+    "validFrom": "2026-10-24T17:14:04Z",
+    "validUntil": "2028-10-25T03:59:59Z"
+  },
+  "signedOffer": {
+    "consent": {
+      "action": "grant",
+      "items": [
+        {
+          "automatedDecision": false,
+          "category": "coordonnées",
+          "itemId": "0x9b19fdde59a85e5092aa11301dc6eb48119f2ea7ad60e62c3e81eb8199c175db",
+          "legalBasis": "consent",
+          "purpose": "communications marketing",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "coordonnées",
+          "itemId": "0x8e06594a4b0103ea1a045b73899fd26cec5642adf4713ed15b8134ae86def209",
+          "legalBasis": "consent",
+          "purpose": "sondages et amélioration des services",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "historique de conduite",
+          "itemId": "0x2e576522496355465358d7637d2818febab935328eb8da2f8718007769679d39",
+          "legalBasis": "consent",
+          "purpose": "programme de conduite préventive",
+          "sensitive": false
+        }
+      ]
+    },
+    "createdAt": "2026-10-24T17:14:04Z",
+    "disclosure": {
+      "categories": {
+        "en": "Name, email address, phone number, communication preferences.",
+        "fr": "Nom, adresse courriel, numéro de téléphone, préférences de communication."
+      },
+      "means": {
+        "en": "Information collected directly from you when your file is opened, in branch, by phone or in your online client space.",
+        "fr": "Renseignements recueillis directement auprès de vous lors de l'ouverture de votre dossier, en succursale, au téléphone ou dans votre espace client en ligne."
+      },
+      "purpose": {
+        "en": "Send you our insurance offers, renewal reminders and newsletter, and occasionally invite you to surveys about the quality of our services. Since May 1, 2026, this consent also covers safe driving program communications.",
+        "fr": "Vous transmettre nos offres d'assurance, les rappels de renouvellement et notre infolettre, et vous inviter à l'occasion à des sondages sur la qualité de nos services. Depuis le 1er mai 2026, ce consentement couvre aussi les communications du programme de conduite préventive."
+      },
+      "recipients": {
+        "en": "Our email delivery provider, as a processor bound by contract. Your information is never sold or rented.",
+        "fr": "Notre fournisseur d'envoi de courriels, à titre de sous-traitant lié par contrat. Aucune vente ni location de vos renseignements."
+      },
+      "responsable": {
+        "contact": "protection@assurance-boreale.example",
+        "name": "Marie-Claude Gagnon"
+      },
+      "retention": {
+        "en": "Kept 3 years after your last interaction, then destroyed (s. 23). Withdrawing consent immediately stops the mailings.",
+        "fr": "Conservés 3 ans après votre dernière interaction, puis détruits (art. 23). Le retrait du consentement entraîne la cessation immédiate des envois."
+      },
+      "rights": {
+        "en": "You have the rights of access (s. 27), rectification (s. 28) and withdrawal, and the right to obtain your information in a structured technological format (s. 27 para. 3).",
+        "fr": "Vous disposez des droits d'accès (art. 27), de rectification (art. 28) et de retrait, ainsi que du droit d'obtenir vos renseignements dans un format technologique structuré (art. 27 al. 3)."
+      },
+      "withdrawal": {
+        "en": "You may withdraw your consent at any time, free of charge and without justification, from your Agreely citizen space or through the person in charge of the protection of personal information.",
+        "fr": "Vous pouvez retirer votre consentement en tout temps, sans frais et sans justification, depuis votre espace citoyen Agreely ou auprès de notre responsable de la protection des renseignements personnels."
+      }
+    },
+    "disclosureHash": "0xe2ae8164087badb271be62a492a2d7b6a65a6a091b4bdfd5f6e0d5bc0d0fe3fd",
+    "disclosureVersion": "1",
+    "document": {
+      "code": "communications",
+      "effectiveDate": "2026-05-01",
+      "name": "Consentement aux communications",
+      "version": "1.1"
+    },
+    "expiresAt": "2026-11-23T17:14:04Z",
+    "issuer": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+    "nonce": "0x4f6003e0ae046facb1d62399f0f401ec019d86e25768575268bb9c9b6aed6317",
+    "requestId": "0x56d2852683bcbdcbdc7f900c19150af617e10823053a70b15be8e551fdea9886",
+    "validUntil": "2028-10-25T03:59:59Z"
+  },
+  "merkleRoot": "0x47f0c31bce13830b27277e6c13e48b7146cc1c7fbed4d19a1f0c75e04cacae36",
+  "consentRef": "0x5db1ed5661505e696156e3c95342e36169419c98440725110493fe1a9915015f",
+  "consentRefs": [
+    "0x5db1ed5661505e696156e3c95342e36169419c98440725110493fe1a9915015f",
+    "0x2f8292de6570771476a737f33d3e8a051cc3f759da3b452c9026d34eebb774c7",
+    "0x34dddbd476a8a5627a25a1e7216b41c75762eaf624492c7e07cd4e262325992f"
+  ],
+  "didDocuments": {
+    "issuer": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/data-integrity/v2"
+      ],
+      "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+      "alsoKnownAs": [
+        "did:web:assurance-boreale.example"
+      ],
+      "verificationMethod": [
+        {
+          "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1",
+          "type": "Multikey",
+          "controller": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+          "publicKeyMultibase": "z6MkiyEw5Q64vrEDKjq3PysCAftZGEmcyzjsDTSnufbq85YA"
+        },
+        {
+          "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale#root-1",
+          "type": "WebAuthnAuthenticationKey2024",
+          "controller": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+          "publicKeyCose": "0xa5010203262001215820a876df4e3132b838f351e07be0ac755f18dc8898ed020dd7e6ba0540828404f522582058c288a2da23df8d9ba58f526974a17b143f3287e6316b7ccbf90fab34c8eb80",
+          "rpId": "localhost"
+        }
+      ],
+      "assertionMethod": [
+        "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+      ],
+      "authentication": [
+        "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+      ],
+      "capabilityDelegation": [
+        "#root-1"
+      ],
+      "delegation": {
+        "type": "agreely.keyDelegation.v1",
+        "body": {
+          "rpId": "localhost",
+          "type": "agreely.keyDelegation.v1",
+          "nonce": "0x031d6f920a0d125b9d03762049bc7716a218dd06e2acc23a3ec873ce18aab25f",
+          "chainId": "84532",
+          "registry": "0x3532a9dff3c910152543afca49de7c66113c5312",
+          "delegatee": {
+            "keyId": "0xa2a946771b18babb9008bb48691f8f429805626e1ce81e5c416d8a76004429a2"
+          },
+          "rootKeyId": "0x424da44937462aec54b575fc986476c6b398779d56ddc88872d138d962071774",
+          "validFrom": "2026-10-24T17:14:02Z",
+          "companyDid": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+          "validUntil": "2027-10-24T17:14:02Z"
+        },
+        "proof": {
+          "type": "WebAuthnDelegationProof2026",
+          "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#root-1",
+          "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+          "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiZDd1RTMxUm1sdk9kNnlHbG5KbTlrN1hhOFZ4cURfRHN5NUZzUGRiNEVWdyIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA5MCJ9",
+          "signature": "MEUCIQCweXnKaJkTq1fJV7MAVS160ib-oJVVdvFp3AvhsmXPjAIgWkWCHjj-Fi_F7EzyeKrfPUms9OOdLX8qRKTJbrf2aG0"
+        }
+      }
+    },
+    "citizen": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/suites/ed25519-2020/v1"
+      ],
+      "id": "did:agreely:citizen:demo-91bf5c897c067cb69df0",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1",
+          "controller": "did:agreely:citizen:demo-91bf5c897c067cb69df0",
+          "validFrom": "2026-10-24T17:14:04Z",
+          "validUntil": null,
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa5010203262001215820f53d0d5fb21714ed3e46fe020373cad320f285ad15fff8c450309aeb9d24ed90225820639ec7174ea340653740eecfd41387d3c137c972544bac6f4819f27df19d5b7f"
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ],
+      "capabilityInvocation": []
+    }
+  }
+}

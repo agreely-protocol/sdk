@@ -1,32 +1,44 @@
-// The result surface of the offline receipt verifier. HONESTY IS THE POINT: each
-// field reports exactly what was PROVED vs merely TRUSTED, and `overall` never
-// overstates it (a citizen receipt is at most "partial" offline).
+// The result surface of the receipt verifier. HONESTY IS THE POINT: each field
+// reports exactly what was PROVED vs merely TRUSTED, and `overall` never
+// overstates it (a bare passkey receipt is at most "incomplete").
 
 /**
  * The outcome of a single verification check.
  *
  *   - pass         the cryptography verified.
- *   - fail         the cryptography actively did NOT verify (a tamper / wrong key).
- *   - unavailable  the check could NOT be completed, the issuer/citizen DID could
- *                  not be resolved (network outage, unreachable host, key not
- *                  found). DISTINCT from "fail": a valid receipt during a DID
- *                  outage must never look byte-identical to a forgery.
+ *   - fail         the cryptography actively did NOT verify, or the chain answered
+ *                  and contradicts the receipt (a tamper / wrong key).
+ *   - unavailable  the check could NOT be completed: a DID could not be resolved,
+ *                  a gateway or an RPC failed, refused or timed out. DISTINCT from
+ *                  "fail": a valid receipt during an outage must never look
+ *                  byte-identical to a forgery.
+ *   - unbound      the signature verifies, but nothing ties it to this receipt's
+ *                  content (a bare passkey receipt's assertion). Proves nothing
+ *                  about the receipt.
  *   - skipped      the input needed for this check was absent (or not requested).
- *   - unsupported  the check is not applicable to this receipt type.
+ *   - unsupported  the check is not applicable to this input.
  */
-export type CheckStatus = "pass" | "fail" | "unavailable" | "skipped" | "unsupported";
+export type CheckStatus = "pass" | "fail" | "unavailable" | "unbound" | "skipped" | "unsupported";
 
 /**
  * The aggregate verdict.
  *
- *   - verified     a company-attested receipt, fully sound.
- *   - partial      a citizen receipt offline, or a verbal (company_documented)
- *                  receipt whose company signature verified: honest, not a failure.
- *   - failed       a decisive check ACTIVELY failed (a tamper / wrong key).
+ *   - verified     a company-attested receipt, or a passkey receipt verified from
+ *                  its bundle: every decisive check passed.
+ *   - partial      a verbal (company_documented) receipt whose company signature
+ *                  verified: the organisation's word, authenticated.
+ *   - incomplete   a bare passkey receipt: it cannot be verified on its own. Verify
+ *                  the bundle issued with it. Never a pass, never a tamper.
+ *   - failed       a check ACTIVELY failed (a tamper / wrong key / contradiction).
  *   - unavailable  a decisive check could NOT be completed (the DID could not be
  *                  resolved). Verification is inconclusive, NOT a forgery.
+ *   - malformed    the input is not a receipt or bundle this verifier can read: not
+ *                  an object, a bundle of another version, a bundle whose receipt or
+ *                  signed offer is missing or not an object, a value the
+ *                  canonicalizer refuses, or nesting past 64 levels. No check ran,
+ *                  so it says nothing about alteration. Never a pass.
  */
-export type OverallStatus = "verified" | "partial" | "failed" | "unavailable";
+export type OverallStatus = "verified" | "partial" | "incomplete" | "failed" | "unavailable" | "malformed";
 
 /**
  * Which kind of receipt was verified.
@@ -43,36 +55,48 @@ export type ReceiptType = "company_attested" | "company_documented" | "citizen";
 /**
  * The full, honest verification report.
  *
- *   - companySignature  pass/fail for a company-attested receipt; "unavailable"
- *                       when the issuer DID could not be resolved (outage, not a
- *                       tamper); "unsupported" OFFLINE for a citizen receipt (the
- *                       company signed the original offer, which the receipt omits
- *                       for unlinkability).
- *   - citizenAssertion  pass/fail of the citizen WebAuthn passkey assertion for a
- *                       citizen receipt; "unavailable" when the citizen DID/passkey
- *                       could not be resolved; "unsupported" for a company-attested
- *                       one (there is no citizen signature).
- *   - disclosureCopy    pass/fail when the receipt carries a document.ipfsCid +
- *                       disclosureHash; "skipped" otherwise.
- *   - documentAnchor    pass/fail of the opt-in on-chain check; "skipped" without
- *                       an rpcUrl (or a CID to look up).
- *   - cellLabelBinding  whether the human-readable cell labels (category/purpose)
- *                       are CRYPTOGRAPHICALLY bound in THIS offline verification,
- *                       the one field to read before trusting a displayed label.
- *                       company_attested: tracks companySignature (the labels sit
- *                       inside the signed body, so a mutation breaks it). citizen:
- *                       "unsupported" OFFLINE (the receipt omits the salted
- *                       commitment + Merkle root that bind the labels for
- *                       unlinkability). No server endpoint re-checks it: the
- *                       labels are covered only by the company signature over
- *                       the OFFER, which travels in the verification bundle.
+ *   - input             "bundle" when the input was a verification bundle (detected,
+ *                       never misread as a receipt), "receipt" for a bare receipt.
+ *   - companySignature  recorded receipt: the Ed25519 signature over the body. Passkey
+ *                       bundle: proof[0] over the signed offer. "unsupported" on a
+ *                       bare passkey receipt (the offer travels only in the bundle).
+ *   - receiptIntegrity  passkey bundle: the receipt matches the signed offer field by
+ *                       field, the disclosureHash recomputes from the offer, validFrom
+ *                       equals grantedAt, and, once the company signature holds,
+ *                       grantedAt lies between the offer's createdAt and expiresAt
+ *                       (whole seconds). Recorded receipt: the same value as
+ *                       companySignature (the signature covers the body). "unsupported"
+ *                       on a bare passkey receipt.
+ *   - citizenAssertion  passkey bundle: the WebAuthn assertion verifies, its
+ *                       challenge recomputes from this receipt and the bundle, AND the
+ *                       citizen's DID document (id = the subject) lists that exact key
+ *                       under `authentication` with a window [validFrom, validUntil)
+ *                       covering grantedAt. A document that lists it otherwise is
+ *                       "fail"; one that cannot be read as the subject's is
+ *                       "unavailable".
+ *                       "unbound" on a bare passkey receipt whose assertion verifies:
+ *                       nothing ties it to the content. "unsupported" on a recorded one.
+ *   - disclosureCopy    OPT-IN (verifyDisclosure): the IPFS copy against the SIGNED
+ *                       disclosureHash (and v2 legalBasis). "unsupported" on a bare
+ *                       passkey receipt, whose hash is signed by nobody.
+ *   - documentAnchor    OPT-IN (rpcUrl): the document CID's on-chain anchor, a bounded
+ *                       best-effort log query.
+ *   - consentAnchor     OPT-IN (rpcUrl), bundle only: the consent's on-chain record,
+ *                       read with registry(consentRef) and tied by the bound Merkle root.
+ *                       "pass" only when every cell's record was read.
+ *   - cellLabelBinding  whether the human-readable cell labels (category/purpose) are
+ *                       CRYPTOGRAPHICALLY bound, the one field to read before trusting
+ *                       a displayed label.
  */
 export interface ReceiptVerification {
+  input: "bundle" | "receipt";
   receiptType: ReceiptType;
   companySignature: CheckStatus;
+  receiptIntegrity: CheckStatus;
   citizenAssertion: CheckStatus;
   disclosureCopy: CheckStatus;
   documentAnchor: CheckStatus;
+  consentAnchor: CheckStatus;
   cellLabelBinding: CheckStatus;
   overall: OverallStatus;
   /** Plain-language notes stating what each result proves vs trusts. */
@@ -83,6 +107,8 @@ export interface ReceiptVerification {
 export interface DidDocument {
   id?: string;
   verificationMethod?: DidVerificationMethod[];
+  /** Method references (`#passkey-1` or the full id) a citizen key must appear under. */
+  authentication?: unknown[];
   [key: string]: unknown;
 }
 
@@ -94,6 +120,10 @@ export interface DidVerificationMethod {
   publicKeyMultibase?: string;
   /** WebAuthn (citizen) COSE key, 0x-hex. */
   publicKeyCose?: string;
+  /** Citizen key: the instant it starts to belong to the person (RFC 3339 or a date). */
+  validFrom?: string;
+  /** Citizen key: the instant it stops, exclusive; null while it is current. */
+  validUntil?: string | null;
   [key: string]: unknown;
 }
 
@@ -108,11 +138,17 @@ export interface VerifyReceiptOptions {
    * `did:agreely:*` resolution via `${citizenResolverBaseUrl}/did/{did}`. HTTPS is
    * enforced (no http/file).
    *
-   * SECURITY: the default did:web resolver fetches a host TAKEN FROM THE RECEIPT.
-   * It can never yield a false "verified" (the key must still verify the
-   * signature), but when verifying UNTRUSTED receipts you SHOULD inject your own
-   * `resolver` (or supply DID documents locally) to control the request surface
-   * (SSRF) rather than letting an attacker-chosen host be fetched.
+   * SECURITY: the default did:web resolver fetches whatever host the receipt
+   * names. A "verified" therefore says the receipt was signed by whoever controls
+   * that host's DID document, not that the host is the organisation you expect: a
+   * receipt under `did:web:any-host` signed by that host's own key verifies. When
+   * verifying UNTRUSTED receipts, inject your own `resolver` (or supply DID
+   * documents locally) to pin the issuers you trust and control the request
+   * surface (SSRF). The keys are never taken from a bundle's own didDocuments.
+   *
+   * The citizen half is checked only for a `did:agreely:citizen:` subject, whatever
+   * the resolver: any other subject (a `did:web` the forger hosts) makes the
+   * assertion "unavailable", so such a bundle is never "verified".
    */
   resolver?: DidResolver;
   /**
@@ -129,19 +165,33 @@ export interface VerifyReceiptOptions {
    */
   citizenResolverBaseUrl?: string;
   /**
-   * Whether to fetch + compare the IPFS disclosure copy when the receipt carries
-   * a document.ipfsCid. Default true. Set false to keep verification network-free
-   * for disclosure (it is then reported "skipped").
+   * OPT-IN: fetch the IPFS disclosure copy from a third-party gateway and compare
+   * it with the signed disclosureHash. Default false (reported "skipped"): the
+   * call is a privacy and availability cost the caller chooses.
    */
   verifyDisclosure?: boolean;
   /** Map an IPFS CID to a gateway URL. Default: the Lighthouse gateway. */
   ipfsGateway?: (cid: string) => string;
-  /** JSON-RPC URL for the opt-in on-chain documentAnchor check. Omit to skip it. */
+  /** JSON-RPC URL for the opt-in on-chain checks (documentAnchor, consentAnchor). Omit to skip them. */
   rpcUrl?: string;
   /** AgreelyRegistry address. Defaults per chainId (Base mainnet 8453). */
   registryAddress?: string;
-  /** Chain id for the anchor check. Default 8453 (Base mainnet); pass 84532 to test on Base Sepolia. */
+  /** Chain id for the anchor checks. Default 8453 (Base mainnet); pass 84532 to test on Base Sepolia. */
   chainId?: number;
+  /** First block of the document-anchor log query. Default: the registry's deploy block (48889369 on 8453), else 0. */
+  registryDeployBlock?: number;
+  /** Blocks per paged log query when the RPC refuses the full range. Default 10000. */
+  logRangeLimit?: number;
+  /** At most this many paged log queries; past it, documentAnchor is "unavailable", never "fail". Default 10. */
+  maxLogQueries?: number;
+  /** Timeout of each RPC, IPFS and DID call, in milliseconds. Default 10000. */
+  timeoutMs?: number;
+  /**
+   * Deadline for the whole on-chain sequence of one verification, in milliseconds, from
+   * its first RPC call. Past it, no further RPC call is made and the anchor checks still
+   * pending read "unavailable". Default 30000.
+   */
+  rpcDeadlineMs?: number;
   /** Injectable fetch (tests / custom transport). Defaults to global fetch. */
   fetch?: typeof fetch;
 }

@@ -1,0 +1,127 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://agreely.ca/credentials/consent/v1"
+  ],
+  "assuranceLevel": "company_documented",
+  "credentialSubject": {
+    "consent": {
+      "action": "grant",
+      "channel": "telephone",
+      "declinedItems": [],
+      "document": {
+        "code": "consentement-et-avis-de-collecte-personnes-desservies",
+        "effectiveDate": "2026-09-29",
+        "ipfsCid": "QmTkkcNfcaR1cFk4iTDRcfmALM3UpF9tUm2EWaT8jqEAAg",
+        "name": "Consentement et avis de collecte : personnes desservies",
+        "nameEn": "Consent and collection notice: persons served",
+        "version": "1.0"
+      },
+      "documentVersion": "88805dc8-d85f-4e16-8d89-9448f3a57569",
+      "grantedAt": "2026-10-04T18:56:47Z",
+      "items": [
+        {
+          "category": "observations sur la situation de la personne (ce que remarquent les bénévoles et le bureau, suites données)",
+          "itemId": "0xf137740ca4c3fee10466f7743cf1598677f7206dbe2c4862a9a0ca3a51eece1c",
+          "purpose": "repérer, d'un service à l'autre, une personne dont la situation change et lui proposer de l'aide"
+        },
+        {
+          "category": "alertes de la veille (étapes de la cascade, répondants joints, réponses, issue, notes)",
+          "itemId": "0x09b56630fec4cff9ffcd578bc0adca0a054ef24280b5655256c5f87f75f3d329",
+          "purpose": "traiter une alerte jusqu'à sa fermeture et garder la trace de ce qui a été fait"
+        },
+        {
+          "category": "compteurs mensuels des appels de sécurité (par abonnée et par bénévole)",
+          "itemId": "0xc295987ad2ab7377adb30ae0dcac526c32d4f2810aa08b8248966e9f38c910ea",
+          "purpose": "produire les statistiques de la veille, la reddition de comptes et les heures des bénévoles"
+        },
+        {
+          "category": "détail des appels de sécurité (jour, heure, essais, résultat, bénévole qui appelle)",
+          "itemId": "0xb8a5e330135e7a62781be0a3518b26c704ff48a54b9eefe3d48898ef484880b0",
+          "purpose": "faire et consigner chaque appel de sécurité et déclencher une alerte sans réponse"
+        },
+        {
+          "category": "accès au domicile (code de porte, emplacement de la clé, consignes d'entrée et d'urgence)",
+          "itemId": "0x183bc3d800e4956ee520e7a04788589d9577ca29d200f154e27830e831558d54",
+          "purpose": "permettre, en cas d'alerte, d'entrer chez la personne ou d'y envoyer quelqu'un"
+        },
+        {
+          "category": "veille de sécurité : inscription et fiche (heures d'appel, vit seule, ménage, gestionnaire d'immeuble, absences)",
+          "itemId": "0x4b53b30ed599f678ae9e811f976ae0a2cea161956b9373a8242c8e09ff0f17cb",
+          "purpose": "appeler la personne à heure fixe et, sans réponse, suivre la cascade vers ses répondants puis les services d'urgence"
+        },
+        {
+          "category": "registre des transports (chauffeur, personnes transportées, date, origine, distance, destination)",
+          "itemId": "0x2209933622a29e09183a0479518fa6d04e81cbe2e6c9c40d69d97e2914eac87a",
+          "purpose": "garder la trace de chaque transport fait et en rendre compte"
+        },
+        {
+          "category": "comptes rendus des appels et visites d'amitié (texte, auteur, date, jumelage)",
+          "itemId": "0x9132e1e666af6335d69b53750294bf0ed28053ec89a74fb81eb9d5ad655df22c",
+          "purpose": "garder le fil du jumelage et remarquer un changement dans la situation de la personne"
+        },
+        {
+          "category": "aide financière versée à une personne (projet, montant, date, mode)",
+          "itemId": "0xe897b49eee02f9ed59b074ceecc020650d7844dcd8ae0aa179eca6db3a148718",
+          "purpose": "verser une aide tirée d'un projet financé par les dons et en tenir les pièces comptables"
+        },
+        {
+          "category": "contributions et états de compte (montants demandés et reçus, paiements, parts, motifs de réduction, sommaire fiscal)",
+          "itemId": "0xb405bbab160d7540efe890f67261c2dd3d5f22ff74de01a8642dea2bc03f017e",
+          "purpose": "demander et recevoir les contributions, tenir les états de compte et remettre le sommaire pour le crédit d'impôt"
+        },
+        {
+          "category": "observations sur la situation de la personne (ce que remarquent les bénévoles et le bureau, suites données)",
+          "itemId": "0x71271d3fadef0cb8691bd0f72580a1dff9c9dc44829a40015eef685145117560",
+          "purpose": "donner suite, dans le service qui l'a remarqué, à un changement dans la situation de la personne"
+        },
+        {
+          "category": "services rendus (inscriptions, choix de repas, tournées, demandes de transport, accompagnements, jumelages, contacts)",
+          "itemId": "0x5baa650e3fcc0a4c6869abedca2876926111a4e49f9313826b6720b109fefb73",
+          "purpose": "planifier, rendre et suivre les services : repas livrés, accompagnements-transports, appels et visites d'amitié"
+        },
+        {
+          "category": "demande de service (personne visée, municipalité, besoin, personne qui appelle ou réfère, téléphone, courriel d'avis)",
+          "itemId": "0x8b9f467522cc96bdff96a43f0048951db2ae8786c80b7e8b6bc090e2fce800a9",
+          "purpose": "recevoir une demande de service ou une référence et y donner suite"
+        },
+        {
+          "category": "santé et autonomie de la personne desservie (allergies, diète, texture, mobilité, transferts, motif médical)",
+          "itemId": "0x3d4a8af222731adcf8f986d24396456606b37b2286ffffc83e587dc3f2f0ad9b",
+          "purpose": "rendre les services de façon sécuritaire et adaptée à l'état de la personne"
+        },
+        {
+          "category": "dossier de la personne desservie (nom, date de naissance, adresse, téléphones, langue, statut)",
+          "itemId": "0x6bc3740bdee9732ce8141d21cc1a36b5709fa2670528f0e5fad2507f136da98d",
+          "purpose": "tenir le dossier unique de la personne et lui rendre les services qu'elle a demandés"
+        }
+      ],
+      "recordedAt": "2026-10-04T18:56:47Z"
+    }
+  },
+  "evidence": {
+    "documentVersion": "88805dc8-d85f-4e16-8d89-9448f3a57569",
+    "scriptVersion": "corvee-admission-1-fr",
+    "type": "VerbalConsentDocumentedByOrganisation"
+  },
+  "id": "urn:agreely:receipt:ef05cf1a-aa8e-41a7-89a3-07a1b4177652",
+  "issuer": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee",
+  "proof": [
+    {
+      "created": "2026-10-04T18:56:47Z",
+      "cryptosuite": "eddsa-jcs-2022",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z4Lv1fe9nfe98rSEL7BqiXhfczCy6WoQBek4wG94vrfMMdo3Q1YVNHiA1EkEGFw3D3Wze79akLkLyNKd7qfsvpfrg",
+      "type": "DataIntegrityProof",
+      "verificationMethod": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1"
+    }
+  ],
+  "receiptVersion": "2",
+  "type": [
+    "VerifiableCredential",
+    "ConsentReceipt",
+    "VerbalConsentReceipt"
+  ],
+  "validFrom": "2026-10-04T18:56:47Z",
+  "validUntil": "2027-10-05T03:59:59Z"
+}

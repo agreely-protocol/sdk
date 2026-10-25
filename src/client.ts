@@ -124,27 +124,30 @@ export class Agreely {
   }
 
   /**
-   * Verify a consent receipt OFFLINE-FIRST (the headline). Reports exactly what is
-   * PROVED vs merely trusted: a company-attested receipt is offline-sound; a citizen
-   * receipt is honestly PARTIAL offline, because its company half signed the OFFER,
-   * which the receipt omits for unlinkability. NO server endpoint re-checks that half;
-   * it travels only in the separate verification bundle Agreely issues with the
-   * receipt, which this verifier does not read. "Offline-first", not fully offline: the
-   * signature/assertion checks need the signing key from the DID document (one HTTPS
-   * resolution by default, or supply a local `resolver` for an air-gapped verify);
-   * the IPFS disclosure copy and on-chain anchor are the opt-in extra calls. When a
-   * DID cannot be resolved the check is "unavailable" (inconclusive), never "fail".
-   * Static, no API key needed.
+   * Verify a consent receipt or its verification bundle OFFLINE-FIRST (the headline). Reports
+   * exactly what is PROVED vs merely trusted. A recorded receipt (paper, telephone) verifies on its
+   * own. A passkey receipt verifies only from its BUNDLE (detected: { version, receipt, signedOffer,
+   * merkleRoot, ... }): the company signature over the signed offer, the receipt matched to that
+   * offer, and the passkey challenge recomputed from the receipt and the bundle. A bare passkey
+   * receipt reads "incomplete", its assertion "unbound". "Offline-first", not fully offline: the
+   * signature/assertion checks need the signing key from the DID document (one HTTPS resolution by
+   * default, or supply a local `resolver` for an air-gapped verify); the IPFS disclosure copy and the
+   * on-chain anchors are the opt-in extra calls. When a DID cannot be resolved the check is
+   * "unavailable" (inconclusive), never "fail". Static, no API key needed.
    *
-   * SECURITY: when verifying UNTRUSTED receipts, inject your own `resolver` (or
-   * supply DID documents locally), the default did:web resolver fetches a host
-   * taken from the receipt (HTTPS-only; it can never yield a false "verified").
+   * Always resolves, on any input: a file it cannot read (another bundle version, a non-object
+   * receipt or offer, a number, nesting past 64 levels) reads "malformed", never a throw.
+   *
+   * SECURITY: the default did:web resolver fetches whatever host the receipt names, so "verified"
+   * means signed by whoever controls that DID. For UNTRUSTED receipts, inject your own `resolver`
+   * (or supply DID documents locally) to pin the issuers you trust. The citizen half is checked
+   * only for a did:agreely:citizen: subject, whatever the resolver.
    */
   static async verifyReceipt(
-    receipt: unknown,
+    receiptOrBundle: unknown,
     opts: VerifyReceiptOptions = {},
   ): Promise<ReceiptVerification> {
-    return new ReceiptVerifier(opts).verify(receipt);
+    return new ReceiptVerifier(opts).verify(receiptOrBundle);
   }
 
   /**

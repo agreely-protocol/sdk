@@ -1,0 +1,287 @@
+{
+  "did:web:app.agreely.ca:c:showcase-assurance-boreale": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/data-integrity/v2"
+    ],
+    "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+    "alsoKnownAs": [
+      "did:web:assurance-boreale.example"
+    ],
+    "verificationMethod": [
+      {
+        "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1",
+        "type": "Multikey",
+        "controller": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+        "publicKeyMultibase": "z6MkiyEw5Q64vrEDKjq3PysCAftZGEmcyzjsDTSnufbq85YA"
+      },
+      {
+        "id": "did:web:app.agreely.ca:c:showcase-assurance-boreale#root-1",
+        "type": "WebAuthnAuthenticationKey2024",
+        "controller": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+        "publicKeyCose": "0xa5010203262001215820a876df4e3132b838f351e07be0ac755f18dc8898ed020dd7e6ba0540828404f522582058c288a2da23df8d9ba58f526974a17b143f3287e6316b7ccbf90fab34c8eb80",
+        "rpId": "localhost"
+      }
+    ],
+    "assertionMethod": [
+      "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+    ],
+    "authentication": [
+      "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+    ],
+    "capabilityDelegation": [
+      "#root-1"
+    ],
+    "delegation": {
+      "type": "agreely.keyDelegation.v1",
+      "body": {
+        "rpId": "localhost",
+        "type": "agreely.keyDelegation.v1",
+        "nonce": "0x031d6f920a0d125b9d03762049bc7716a218dd06e2acc23a3ec873ce18aab25f",
+        "chainId": "84532",
+        "registry": "0x3532a9dff3c910152543afca49de7c66113c5312",
+        "delegatee": {
+          "keyId": "0xa2a946771b18babb9008bb48691f8f429805626e1ce81e5c416d8a76004429a2"
+        },
+        "rootKeyId": "0x424da44937462aec54b575fc986476c6b398779d56ddc88872d138d962071774",
+        "validFrom": "2026-10-24T17:14:02Z",
+        "companyDid": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+        "validUntil": "2027-10-24T17:14:02Z"
+      },
+      "proof": {
+        "type": "WebAuthnDelegationProof2026",
+        "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#root-1",
+        "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiZDd1RTMxUm1sdk9kNnlHbG5KbTlrN1hhOFZ4cURfRHN5NUZzUGRiNEVWdyIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA5MCJ9",
+        "signature": "MEUCIQCweXnKaJkTq1fJV7MAVS160ib-oJVVdvFp3AvhsmXPjAIgWkWCHjj-Fi_F7EzyeKrfPUms9OOdLX8qRKTJbrf2aG0"
+      }
+    }
+  },
+  "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/data-integrity/v2"
+    ],
+    "id": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+    "alsoKnownAs": [
+      "did:web:qa1021b-boulangerie.ca"
+    ],
+    "verificationMethod": [
+      {
+        "id": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1",
+        "type": "Multikey",
+        "controller": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+        "publicKeyMultibase": "z6MkidMSt22QFskRn7m4CzsoA86qpM9LRDcz7FV79s3jCCKs"
+      },
+      {
+        "id": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#root-1",
+        "type": "WebAuthnAuthenticationKey2024",
+        "controller": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+        "publicKeyCose": "0xa50102032620012158205ce2cce19acb47f3eba7ad8768f7bfcdfa2e8dfded3f155b638e9f6e866a602a225820d18ea7c59aa10e827d649667d98350c44f72dd94dd8dcc72853f2ca0c26c2d1a",
+        "rpId": "localhost"
+      }
+    ],
+    "assertionMethod": [
+      "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1"
+    ],
+    "authentication": [
+      "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1"
+    ],
+    "capabilityDelegation": [
+      "#root-1"
+    ],
+    "delegation": {
+      "type": "agreely.keyDelegation.v1",
+      "body": {
+        "rpId": "localhost",
+        "type": "agreely.keyDelegation.v1",
+        "nonce": "0x3322f036179f28802974867cb22717499013116462d4a89e48790e0b31c453ca",
+        "chainId": "84532",
+        "registry": "0x3532a9dff3c910152543afca49de7c66113c5312",
+        "delegatee": {
+          "keyId": "0x48b694c4043b68070cf270f4bc9b3262b90e56f105a18aed36b0b19e5c9e5b2f"
+        },
+        "rootKeyId": "0x359fa983b9485d87a4c8d3e2fc74e34cb8e94dc8f3375d39600d0b75237eebe9",
+        "validFrom": "2026-10-21T01:11:02Z",
+        "companyDid": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc",
+        "validUntil": "2027-10-21T01:11:02Z"
+      },
+      "proof": {
+        "type": "WebAuthnDelegationProof2026",
+        "verificationMethod": "did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#root-1",
+        "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAg",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoieGZrdk9oeGpkcjhyNXpPTlVQcUJBSXVfeDJEUGxLYWlmQTY4b3p1ZUZXWSIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6MTgzODIiLCJjcm9zc09yaWdpbiI6ZmFsc2V9",
+        "signature": "MEQCIGDm7qhCrR6qo1uouPKvYdwrQdtF2OT7WxlrFWZgxq56AiActQDvAB2-rsFgOY5RKFhVxXC-mOVz6G_3VCDA0-k3cw"
+      }
+    }
+  },
+  "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/data-integrity/v2"
+    ],
+    "id": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee",
+    "alsoKnownAs": [
+      "did:web:cabriviereclaire.example"
+    ],
+    "verificationMethod": [
+      {
+        "id": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1",
+        "type": "Multikey",
+        "controller": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee",
+        "publicKeyMultibase": "z6MkrFv9bJTUCnMnawsRqeCGx8U7BQJsPSRf2rjmLWENoVz1"
+      },
+      {
+        "id": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#root-1",
+        "type": "WebAuthnAuthenticationKey2024",
+        "controller": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee",
+        "publicKeyCose": "0xa50102032620012158204b93e240a7c420adda43cc7093f890b9fa68b38c3deadc340faff766eb6dbe51225820dff75d0d24d7cce9b402ca14c1eb8dcf850cbc56f2acf8866d0170a21d84f373",
+        "rpId": "localhost"
+      }
+    ],
+    "assertionMethod": [
+      "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1"
+    ],
+    "authentication": [
+      "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1"
+    ],
+    "capabilityDelegation": [
+      "#root-1"
+    ],
+    "delegation": {
+      "type": "agreely.keyDelegation.v1",
+      "body": {
+        "rpId": "localhost",
+        "type": "agreely.keyDelegation.v1",
+        "nonce": "0x096766a84c8339e4b5239ac3fe29cf723f005bc2c35e94cf9000d3c8668b3255",
+        "chainId": "84532",
+        "registry": "0x3532a9dff3c910152543afca49de7c66113c5312",
+        "delegatee": {
+          "keyId": "0xa5113e6f8fade9fcd0bb9892b22b900e038a431c4c74f8e948c0db0cff212909"
+        },
+        "rootKeyId": "0xcd59744a5335c52b527ab0e9630a93347351bf1584bf148f7a9cbeed495a0750",
+        "validFrom": "2026-10-08T19:18:49Z",
+        "companyDid": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee",
+        "validUntil": "2027-10-08T19:18:49Z"
+      },
+      "proof": {
+        "type": "WebAuthnDelegationProof2026",
+        "verificationMethod": "did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#root-1",
+        "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiVGtEYno5ckZxVWI4WWV3M1pnMHJLNEdQNGFfMklFQ3g4QXRDYjQ5V2dTdyIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA5MCJ9",
+        "signature": "MEQCICcoi5iF2zotrvlBaaXBjfCJCoxzgES9XcgNj5AP7nFtAiBRS69miqhZ3qB-hTCXF16HBMGXktdopFGG5qx-0xVXNA"
+      }
+    }
+  },
+  "did:agreely:citizen:demo-91bf5c897c067cb69df0": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "id": "did:agreely:citizen:demo-91bf5c897c067cb69df0",
+    "verificationMethod": [
+      {
+        "id": "did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1",
+        "controller": "did:agreely:citizen:demo-91bf5c897c067cb69df0",
+        "validFrom": "2026-10-24T17:14:04Z",
+        "validUntil": null,
+        "type": "WebAuthnAuthenticationKey2024",
+        "publicKeyCose": "0xa5010203262001215820f53d0d5fb21714ed3e46fe020373cad320f285ad15fff8c450309aeb9d24ed90225820639ec7174ea340653740eecfd41387d3c137c972544bac6f4819f27df19d5b7f"
+      }
+    ],
+    "authentication": [
+      "#passkey-1"
+    ],
+    "capabilityInvocation": []
+  },
+  "did:agreely:citizen:demo-aa54903495611ea7491a": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "id": "did:agreely:citizen:demo-aa54903495611ea7491a",
+    "verificationMethod": [
+      {
+        "id": "did:agreely:citizen:demo-aa54903495611ea7491a#passkey-1",
+        "controller": "did:agreely:citizen:demo-aa54903495611ea7491a",
+        "validFrom": "2026-10-24T17:14:04Z",
+        "validUntil": null,
+        "type": "WebAuthnAuthenticationKey2024",
+        "publicKeyCose": "0xa50102032620012158207460ef0d90329caa7a7a17e4fe2766d0ff40775154edf8fb8c618c6fd80f7353225820c92c0a5305ab9935f8223ab541f07e7a7db96198c246dae5d0a44c3425990b0a"
+      }
+    ],
+    "authentication": [
+      "#passkey-1"
+    ],
+    "capabilityInvocation": []
+  },
+  "did:agreely:citizen:demo-a8eb17f57983a6e87870": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "id": "did:agreely:citizen:demo-a8eb17f57983a6e87870",
+    "verificationMethod": [
+      {
+        "id": "did:agreely:citizen:demo-a8eb17f57983a6e87870#passkey-1",
+        "controller": "did:agreely:citizen:demo-a8eb17f57983a6e87870",
+        "validFrom": "2026-10-24T17:14:04Z",
+        "validUntil": null,
+        "type": "WebAuthnAuthenticationKey2024",
+        "publicKeyCose": "0xa501020326200121582009a0de8537749c3cc7b16dde7cac96ff14143a8465adebccef995d642f254e23225820f21f0665765ffecabcad9efef464cf94120a96d7375bab663a60c9f9185e3de1"
+      }
+    ],
+    "authentication": [
+      "#passkey-1"
+    ],
+    "capabilityInvocation": []
+  },
+  "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "id": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W",
+    "verificationMethod": [
+      {
+        "id": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W#passkey-1",
+        "controller": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W",
+        "validFrom": "2026-10-21T01:19:55Z",
+        "validUntil": null,
+        "type": "WebAuthnAuthenticationKey2024",
+        "publicKeyCose": "0xa5010203262001215820dc75e1578cbe2bc1951cc509a7a398c91a621d1f580a4d24b03badedeb87728a225820f08c7a11d542f50ae9d5b199c52ee97980d5906d60c10723b539d43eb9df7c5f"
+      },
+      {
+        "id": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W#recovery-1",
+        "controller": "did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W",
+        "validFrom": "2026-10-21T01:19:55Z",
+        "validUntil": null,
+        "type": "Ed25519VerificationKey2020",
+        "publicKeyMultibase": "z6MkfR6kSH3oaKKewWhPCNLpCKYrcYCZ97tSY9Nnkx98MCGz"
+      }
+    ],
+    "authentication": [
+      "#passkey-1"
+    ],
+    "capabilityInvocation": [
+      "#recovery-1"
+    ]
+  },
+  "did:web:evil.example:clients:jean": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1"
+    ],
+    "id": "did:web:evil.example:clients:jean",
+    "verificationMethod": [
+      {
+        "id": "did:web:evil.example:clients:jean#passkey-1",
+        "type": "WebAuthnPasskey",
+        "controller": "did:web:evil.example:clients:jean",
+        "publicKeyCose": "0xa4010103272006215820789914b55ec2450811c643864065286aea4a92b1b9b7639fc56b913adb20e029"
+      }
+    ],
+    "authentication": [
+      "did:web:evil.example:clients:jean#passkey-1"
+    ]
+  }
+}

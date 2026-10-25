@@ -1,0 +1,110 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://agreely.ca/credentials/consent/v1"
+  ],
+  "credentialSubject": {
+    "consent": {
+      "action": "grant",
+      "declinedItems": [
+        {
+          "automatedDecision": false,
+          "category": "renseignements médicaux",
+          "itemId": "0x8e7f26463acd5ed0cd36dfdfa48f08804c71fca03d353da4f793e6386152f371",
+          "legalBasis": "consent",
+          "purpose": "évaluation des réclamations",
+          "sensitive": true
+        }
+      ],
+      "disclosureHash": "0xb8be94232d665b766fe61a37476413b436147d59782b7fac8f7f91e123375fea",
+      "disclosureVersion": "2",
+      "document": {
+        "code": "souscription",
+        "effectiveDate": "2026-02-01",
+        "name": "Consentement à la souscription et à la tarification",
+        "version": "1.0"
+      },
+      "grantedAt": "2026-10-24T17:14:04Z",
+      "items": [
+        {
+          "automatedDecision": false,
+          "category": "coordonnées",
+          "itemId": "0x73b495b51886c131fc914c802876ea248e6053c83ceb5ef49eceff1a68461b88",
+          "legalBasis": "necessary_for_service",
+          "purpose": "gestion du dossier client",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": true,
+          "category": "renseignements financiers",
+          "itemId": "0xee5cea7662452e7e4345ffc73c0f77afef9b8a01b2805e6649240c7fdde1db70",
+          "legalBasis": "consent",
+          "purpose": "souscription et tarification",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "renseignements financiers",
+          "itemId": "0xd26cc5406043ba1b9c0c856725f8076ae0d13fd5c58ab6f1ba553e30a16b5bba",
+          "legalBasis": "security_fraud",
+          "purpose": "prévention de la fraude",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "renseignements financiers",
+          "itemId": "0x7658ea8bbc056ec88e07b0f4f90aea90d0ace0bc72cfac9949f6eee85548afc5",
+          "legalBasis": "legal_obligation",
+          "purpose": "conservation des registres fiscaux",
+          "sensitive": false
+        }
+      ],
+      "legalBasis": {
+        "0x73b495b51886c131fc914c802876ea248e6053c83ceb5ef49eceff1a68461b88": {
+          "basis": "necessary_for_service",
+          "justificationEn": "Maintaining the client file is necessary to supply the insurance product and deliver the services requested by the policyholder (s. 12 para. 2 (4) of the Act respecting the protection of personal information in the private sector). Without this information, the contract cannot be administered.",
+          "justificationFr": "La tenue du dossier client est nécessaire à la fourniture du produit d'assurance et à la prestation des services demandés par le preneur (art. 12 al. 2 (4) de la Loi sur la protection des renseignements personnels dans le secteur privé). Sans ces renseignements, le contrat ne peut être administré."
+        },
+        "0x7658ea8bbc056ec88e07b0f4f90aea90d0ace0bc72cfac9949f6eee85548afc5": {
+          "basis": "legal_obligation",
+          "justificationEn": "The Tax Administration Act (CQLR, c. A-6.002, s. 35.6) and the Income Tax Act (R.S.C. 1985, c. 1, 5th Supp., s. 230) require the company to keep its books, records and supporting documents for six years after the end of the taxation year concerned. This retention period is set by law (P-39.1 s. 18 and s. 23).",
+          "justificationFr": "La Loi sur l'administration fiscale (RLRQ, c. A-6.002, art. 35.6) et la Loi de l'impôt sur le revenu (L.R.C. 1985, ch. 1, 5e suppl., art. 230) obligent l'entreprise à conserver ses registres et pièces justificatives pendant six ans après la fin de l'année d'imposition visée. Ce délai de conservation est prévu par la loi (P-39.1 art. 18 et art. 23)."
+        },
+        "0xd26cc5406043ba1b9c0c856725f8076ae0d13fd5c58ab6f1ba553e30a16b5bba": {
+          "basis": "security_fraud",
+          "justificationEn": "Using this information is necessary to prevent and detect insurance fraud and to assess and improve our protection and security measures (s. 12 para. 2 (3) of the Act respecting the protection of personal information in the private sector).",
+          "justificationFr": "L'utilisation de ces renseignements est nécessaire à la prévention et à la détection de la fraude à l'assurance ainsi qu'à l'évaluation et à l'amélioration de nos mesures de protection et de sécurité (art. 12 al. 2 (3) de la Loi sur la protection des renseignements personnels dans le secteur privé)."
+        }
+      },
+      "requestId": "0x0d25c288ae7acc694fc8fe87ccf6b66a835d616cc0cbe679fb4c6af4dc07b333"
+    },
+    "id": "did:agreely:citizen:demo-a8eb17f57983a6e87870"
+  },
+  "id": "urn:agreely:receipt:bb80ff94-9d37-4395-ab37-82e6e5a0d799",
+  "issuer": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+  "proof": [
+    {
+      "created": "2026-10-24T17:14:04Z",
+      "cryptosuite": "eddsa-jcs-2022",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z2BPFWJVk4bRMekiga67didXAekCMnrgyqZzbP91g2cG1TCKekzgC2WtP67GhXaqeCgUwdk5munzQ8TV7o8TukAbT",
+      "type": "DataIntegrityProof",
+      "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+    },
+    {
+      "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+      "challenge": "0xc842258def9b9536e5975de105ba767fed3ff1123656449816c6ce8625b8d1ab",
+      "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoieUVJbGplLWJsVGJsbDEzaEJicDJmLTBfOFJJMlZrU1lGc2JPaGlXNDBhcyIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA5MCJ9",
+      "nonce": "0xaf686942b0c01dbf124bf9038df4e38fe72c931cc1b08af50bb9e47695a79dcf",
+      "signature": "MEUCIQCeTIYpayqywHdqlgDi_-4uJs62llWynoDma0W_BeTbHwIgJiukm5U-EO22JQBG84Bn5nEDbh35wHelVOVn0jokhw8",
+      "type": "WebAuthnAssertion",
+      "verificationMethod": "did:agreely:citizen:demo-a8eb17f57983a6e87870#passkey-1"
+    }
+  ],
+  "type": [
+    "VerifiableCredential",
+    "ConsentReceipt"
+  ],
+  "validFrom": "2026-10-24T17:14:04Z",
+  "validUntil": "2029-10-25T03:59:59Z"
+}

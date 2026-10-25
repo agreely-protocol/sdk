@@ -1,0 +1,467 @@
+{
+  "issuer": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/data-integrity/v2"
+    ],
+    "id": "did:web:app.agreely.ca:c:demo-co-7d9d75",
+    "alsoKnownAs": [
+      "did:web:demo-7d9d75.example"
+    ],
+    "verificationMethod": [
+      {
+        "id": "did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1",
+        "type": "Multikey",
+        "controller": "did:web:app.agreely.ca:c:demo-co-7d9d75",
+        "publicKeyMultibase": "z6Mkutzwrh9Tp12SzRizq7qvBx8QJUJytatuizPqCaa8zmpq"
+      }
+    ],
+    "assertionMethod": [
+      "did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1"
+    ],
+    "authentication": [
+      "did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1"
+    ]
+  },
+  "citizen": {
+    "d01-positive": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d02-notauth": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": []
+    },
+    "d02b-recovery-only": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#recovery-9",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ],
+      "capabilityInvocation": [
+        "#recovery-9"
+      ]
+    },
+    "d03-idother": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:XTM52RJP8B7Y4GBQ97Q7N0T56G",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d04-idmatch-bytesdiff": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa5010203262001215820a6e35b198b888962d275686afdaf371d0ae74be83036b9738230e2a583adb6e422582037e16b7b1afcc4fd45f26658e564bf0a6a09d6f17129572662db518783fad5e4",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        },
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-7",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d05-from-eq": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:30:41Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d06-until-eq": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": "2026-10-25T15:30:41Z"
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d07-from-after": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:30:42Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d08-until-garbage": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": "garbage"
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d09-auth-object": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ]
+    },
+    "d10-otherbase": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:XTM52RJP8B7Y4GBQ97Q7N0T56G#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d15-vm-notarray": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": {
+        "x": 1
+      },
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d16-nofrom": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d17-fullid-auth": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1"
+      ]
+    },
+    "d18-rotated-before": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": "2026-10-25T15:10:00Z"
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d19-until-number": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": 0
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "d20-from-dateonly": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "b1-backdate": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa40101032720062158209d87a0430948f62b508938e3f13b941afbc4822101255e5a225c52d67d2b7d10",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": "2026-10-25T15:10:00Z"
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "w7-badgranted": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820ff1c92b58da5142dc8b57baabe7d9870c8433a1d729734293e8a498ebff9ffec",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "x01-auth-objmap": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": {
+        "0": "#passkey-1"
+      }
+    },
+    "x02-vm-objmap": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": {
+        "0": {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      },
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "x03-vm-emptyobj": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": {},
+      "authentication": [
+        "#passkey-1"
+      ]
+    },
+    "x11-auth-and-delegation": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "type": "WebAuthnAuthenticationKey2024",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610",
+          "validFrom": "2026-10-25T15:00:00Z",
+          "validUntil": null
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ],
+      "capabilityDelegation": [
+        "#passkey-1"
+      ]
+    }
+  }
+}

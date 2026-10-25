@@ -918,11 +918,32 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   `inventory` the host inventory; `withdraw` withdrawals recorded on a person's
   behalf; `holds` the holds feed. `attest_verbal`, `withdraw` and `holds` are never
   granted by default.
-- **Receipt verification.** `Agreely.verifyReceipt` recognises three receipt
-  types: `company_attested` (paper; `overall: "verified"` when sound), `citizen`
-  (at most `partial` offline) and `company_documented`, a verbal
-  `VerbalConsentReceipt`: its company signature is verified, but `overall` is at
-  most `partial`, because the organisation's word is all there is.
+- **Receipt verification.** `Agreely.verifyReceipt` takes the verification
+  bundle a passkey consent issues (`version "1"`: the receipt, its `signedOffer`
+  and its `merkleRoot`) or a receipt file. A passkey (`citizen`) consent is
+  `verified` only from its bundle, once every one of these holds: the company
+  signature over the offer; the receipt matched against that offer, with its
+  acceptance date (`grantedAt`) inside the offer's window, from `createdAt` to
+  `expiresAt`; the passkey assertion bound to its content; and the citizen's DID
+  document confirming that key, listed under `authentication` with a validity
+  window `[validFrom, validUntil)` that covers `grantedAt`. A document that does not
+  confirm the key reads `failed`, and one that cannot be read as that identity's
+  document reads `unavailable`. An acceptance date outside the offer's window
+  fails the receipt's integrity and leaves the passkey assertion `unavailable`:
+  the person's key is not evaluated at that date. With `rpcUrl`, the consent
+  anchor passes once every cell's on-chain record was read under the bundle's
+  Merkle root, and reads `unavailable` while a cell is not yet recorded. A bare
+  passkey receipt proves nothing on its own: its assertion reads `unbound`,
+  `overall` reads `incomplete`, and the notes say to verify the bundle.
+  A `company_attested` paper receipt is `verified` when sound, bare or wrapped. A
+  `company_documented` verbal `VerbalConsentReceipt` has its company signature
+  verified, but `overall` is at most `partial`, because the organisation's word is
+  all there is. The disclosure-copy check is opt-in (`verifyDisclosure: true`).
+  The citizen half is checked only for a `did:agreely:citizen:` subject, whatever
+  the resolver. A file the verifier cannot read (another bundle version, a
+  non-object receipt or offer, nesting past 64 levels) reads `malformed`, never a
+  throw. The on-chain checks (`rpcUrl`) share one deadline, `rpcDeadlineMs`
+  (default 30000), past which they read `unavailable`.
 
 ## Open and auditable
 

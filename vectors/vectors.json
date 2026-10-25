@@ -295,11 +295,14 @@
           ]
         },
         "expect": {
+          "input": "receipt",
           "receiptType": "company_attested",
           "companySignature": "pass",
+          "receiptIntegrity": "pass",
           "citizenAssertion": "unsupported",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
           "notes": [
@@ -308,7 +311,8 @@
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
-            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
           ]
         }
       },
@@ -370,11 +374,14 @@
           ]
         },
         "expect": {
+          "input": "receipt",
           "receiptType": "company_attested",
           "companySignature": "fail",
+          "receiptIntegrity": "fail",
           "citizenAssertion": "unsupported",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
           "notes": [
@@ -382,12 +389,13 @@
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
-            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
           ]
         }
       },
       {
-        "name": "citizen receipt is partial offline (passkey + disclosure verified, company sig unsupported)",
+        "name": "a bare citizen receipt is incomplete: its passkey assertion is unbound, its disclosure copy unsupported",
         "resolveDids": true,
         "ipfs": true,
         "receipt": {
@@ -447,20 +455,25 @@
           ]
         },
         "expect": {
+          "input": "receipt",
           "receiptType": "citizen",
           "companySignature": "unsupported",
-          "citizenAssertion": "pass",
-          "disclosureCopy": "pass",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
           "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
-          "overall": "partial",
+          "overall": "incomplete",
           "notes": [
-            "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. No server endpoint re-checks it. The company half can be checked only from the self-contained verification bundle issued with the receipt (it carries the signed offer and the DID documents); this verifier reads a bare receipt, so it reports UNSUPPORTED rather than a verdict it cannot support.",
-            "Citizen passkey assertion verified against did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1: the holder of the registered passkey signed over the committed challenge 0x1017fd21f146774730f8cdd2ad9e127d2531d283dcc2804e476f71f0dbb37b49.",
-            "This proves passkey POSSESSION over a committed challenge; it does NOT by itself prove the cell-level consent semantics.",
-            "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. Do NOT trust the displayed labels on this offline result alone. No server endpoint re-checks them: the labels are covered only by the company signature over the OFFER, which travels in the verification bundle issued with the receipt (and that proves a label was OFFERED, not which cells were accepted).",
-            "Disclosure copy verified: the IPFS document body matches the receipt disclosureHash 0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec.",
-            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
           ]
         }
       },
@@ -522,11 +535,14 @@
           ]
         },
         "expect": {
+          "input": "receipt",
           "receiptType": "company_attested",
           "companySignature": "unavailable",
+          "receiptIntegrity": "unavailable",
           "citizenAssertion": "unsupported",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
           "cellLabelBinding": "unavailable",
           "overall": "unavailable",
           "notes": [
@@ -534,12 +550,13 @@
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
             "Cell-label binding UNVERIFIABLE: the issuer DID could not be resolved, so the company signature that binds the category/purpose labels could not be checked.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
-            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
           ]
         }
       },
       {
-        "name": "unresolvable citizen DID reports citizen assertion unavailable, not failed",
+        "name": "an unresolvable citizen DID on a bare receipt reads unavailable, the overall incomplete, never failed",
         "resolveDids": "none",
         "ipfs": true,
         "receipt": {
@@ -599,19 +616,25 @@
           ]
         },
         "expect": {
+          "input": "receipt",
           "receiptType": "citizen",
           "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
           "citizenAssertion": "unavailable",
-          "disclosureCopy": "pass",
+          "disclosureCopy": "unsupported",
           "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
-          "overall": "unavailable",
+          "overall": "incomplete",
           "notes": [
-            "Company signature is UNSUPPORTED offline on a citizen receipt: the company signed the original offer (including the subject reference and full disclosure), which the receipt omits for unlinkability. No server endpoint re-checks it. The company half can be checked only from the self-contained verification bundle issued with the receipt (it carries the signed offer and the DID documents); this verifier reads a bare receipt, so it reports UNSUPPORTED rather than a verdict it cannot support.",
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
             "Citizen assertion UNVERIFIABLE: could not resolve the citizen DID did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08 (passkey did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08#passkey-1) (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
-            "Cell labels UNSUPPORTED offline: a citizen receipt omits the salted commitment and Merkle root that bind the category/purpose labels (unlinkability / crypto-shredding), so a mutated label cannot be detected offline. Do NOT trust the displayed labels on this offline result alone. No server endpoint re-checks them: the labels are covered only by the company signature over the OFFER, which travels in the verification bundle issued with the receipt (and that proves a label was OFFERED, not which cells were accepted).",
-            "Disclosure copy verified: the IPFS document body matches the receipt disclosureHash 0x6412d364baf9e7834360f9dfaecbe22548a8622fc2f83a13c058d1fad65c15ec.",
-            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor."
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
           ]
         }
       }
@@ -684,6 +707,1739 @@
         "includeItems": false,
         "expect": {
           "error": "config"
+        }
+      }
+    ]
+  },
+  "bundleVerification": {
+    "description": "Receipt AND verification-bundle golden vectors from GENUINE dev artefacts and the forgeries of QA pass qa-ver1 (vectors/receipts/). Both SDKs assert these byte-identically. A case reads `file` (relative to vectors/), resolves DIDs from receipts/did-documents.json (resolveDids true) or from nothing (\"none\"), and with `ipfsBody` turns verifyDisclosure on and serves that body for any CID. f7-issuer.bundle.json and f11-basis.bundle.json are the genuine A1 v1 and A1 v2 bundles with their receipt replaced by the forged receipt of the same name.",
+    "didDocuments": "receipts/did-documents.json",
+    "cases": [
+      {
+        "name": "a genuine A1 v1 passkey bundle verifies",
+        "file": "receipts/a1v1.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "a genuine A1 v2 passkey bundle (three legalBasis cells) verifies",
+        "file": "receipts/a1v2.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-a8eb17f57983a6e87870#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "a genuine v1 bundle with a CID verifies, and its opt-in disclosure copy passes",
+        "file": "receipts/cidv1.bundle.json",
+        "resolveDids": true,
+        "ipfsBody": {
+          "disclosure": {
+            "categories": {
+              "en": "The categories of personal information covered by this document are: Telephone number, Email.",
+              "fr": "Les catégories de renseignements personnels visées par le présent document sont : Numéro de téléphone, Courriel."
+            },
+            "means": {
+              "en": "We collect your personal information directly from you, in particular through our forms and your dashboard (P-39.1 s. 8, para. 1, subpara. 2).",
+              "fr": "Nous recueillons vos renseignements personnels directement auprès de vous, notamment au moyen de nos formulaires et de votre tableau de bord (P-39.1 art. 8, par. 2°)."
+            },
+            "purpose": {
+              "en": "We collect your personal information for the following specific purposes: Satisfaction survey, Monthly newsletter. This information is used only for those specific purposes and your consent is requested for each of them (P-39.1 s. 8 and 14).",
+              "fr": "Nous recueillons vos renseignements personnels aux fins spécifiques suivantes : Sondage de satisfaction, Infolettre mensuelle. Ces renseignements ne sont utilisés que pour ces fins spécifiques et votre consentement est demandé pour chacune d'elles (P-39.1 art. 8 et 14)."
+            },
+            "recipients": {
+              "en": "People in our organization whose duties require it may access your personal information (P-39.1 s. 20). It is not communicated to any third party without your consent, except in the cases provided for by law (P-39.1 ss. 13, 18 and 18.3).",
+              "fr": "Les personnes de notre organisation dont les fonctions le justifient peuvent accéder à vos renseignements personnels (P-39.1 art. 20). Ceux-ci ne sont communiqués à aucun tiers sans votre consentement, sauf dans les cas prévus par la loi (P-39.1 art. 13, 18 et 18.3)."
+            },
+            "responsable": {
+              "contact": "vie-privee@qa1021b-boulangerie.ca",
+              "name": "Ève-Hélène Côté"
+            },
+            "retention": {
+              "en": "Your personal information is kept only as long as necessary to fulfil the purposes, then destroyed or anonymized in accordance with the law (P-39.1 s. 23). Email - newsletter: kept for 24 months after the purposes are achieved, then destroyed.",
+              "fr": "Vos renseignements personnels sont conservés le temps nécessaire à la réalisation des fins, puis détruits ou anonymisés conformément à la loi (P-39.1 art. 23). Courriel - infolettre : conservation de 24 mois après l'accomplissement des fins, puis destruction."
+            },
+            "rights": {
+              "en": "You have a right of access and rectification, the right to obtain your information in a structured, commonly used technological format, and the right to require that its dissemination cease or that it be de-indexed (P-39.1 s. 27, 28 and 28.1). To exercise these rights, contact the person in charge of the protection of personal information below.",
+              "fr": "Vous disposez d'un droit d'accès et de rectification, du droit d'obtenir vos renseignements dans un format technologique structuré et couramment utilisé, ainsi que du droit d'exiger la cessation de la diffusion ou la désindexation (P-39.1 art. 27, 28 et 28.1). Pour les exercer, communiquez avec le responsable de la protection des renseignements personnels ci-dessous."
+            },
+            "withdrawal": {
+              "en": "You may withdraw your consent to the communication or use of your personal information (P-39.1 s. 8, para. 1, subpara. 4). You may do so at any time, as easily as you gave it, from your Agreely dashboard or by contacting the person in charge of the protection of personal information. Withdrawal applies going forward and has no retroactive effect.",
+              "fr": "Vous pouvez retirer votre consentement à la communication ou à l'utilisation de vos renseignements personnels (P-39.1 art. 8, par. 4°). Vous pouvez le faire à tout moment, aussi simplement que vous l'avez donné, depuis votre tableau de bord Agreely ou en communiquant avec le responsable de la protection des renseignements personnels. Le retrait du consentement vaut pour l'avenir et n'a pas d'effet rétroactif."
+            }
+          }
+        },
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "pass",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc (key did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "Disclosure copy verified: the IPFS document body matches the signed disclosureHash 0x8f026745aa816b932bf0d8cc5255acb4fe3dda0d36523d9c9793f06e4077257a.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "a genuine bundle whose DIDs cannot be resolved is unavailable, never failed",
+        "file": "receipts/a1v1.bundle.json",
+        "resolveDids": "none",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "unavailable",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unavailable",
+          "overall": "unavailable",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature UNVERIFIABLE: could not resolve the issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1) to an Ed25519 key (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer.",
+            "Citizen assertion UNVERIFIABLE: could not resolve the citizen DID did:agreely:citizen:demo-91bf5c897c067cb69df0 (passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1) (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "Cell-label binding UNVERIFIABLE: the issuer DID could not be resolved, so the offer that binds the labels could not be checked.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "a genuine bare A1 v1 passkey receipt is incomplete, its assertion unbound",
+        "file": "receipts/a1v1.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "a genuine bare A1 v2 passkey receipt is incomplete, its assertion unbound",
+        "file": "receipts/a1v2.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-a8eb17f57983a6e87870#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "a genuine bare A3 v3 paper receipt verifies",
+        "file": "receipts/a3v3.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_attested",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "This proves the company ATTESTED to a hand-signed PDF (hash 0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27); it does NOT prove a human signed.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "a genuine A3 v3 paper receipt in a bundle verifies",
+        "file": "receipts/a3v3.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "company_attested",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "This proves the company ATTESTED to a hand-signed PDF (hash 0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27); it does NOT prove a human signed.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "a genuine bare A3 v2 paper receipt verifies",
+        "file": "receipts/a3v2.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_attested",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Company signature verified against issuer DID did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee (key did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1).",
+            "This proves the company ATTESTED to a hand-signed PDF (hash 0xdf257009b71f175a22e3023f79908078345cdef341f1b4fe58811dcc8ebb8c0c); it does NOT prove a human signed.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "a genuine bare A4 v3 telephone receipt is partial",
+        "file": "receipts/a4v3.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_documented",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "partial",
+          "notes": [
+            "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "This proves the ORGANISATION documented a consent given by telephone under script version accueil-2026.2. It does NOT prove the call happened, and there is no signed document: this is the weakest of the three tiers, so overall is at most PARTIAL.",
+            "A verbal (company-documented) receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "a genuine A4 v3 telephone receipt in a bundle is partial",
+        "file": "receipts/a4v3.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "company_documented",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "partial",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "This proves the ORGANISATION documented a consent given by telephone under script version accueil-2026.2. It does NOT prove the call happened, and there is no signed document: this is the weakest of the three tiers, so overall is at most PARTIAL.",
+            "A verbal (company-documented) receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "a genuine bare A4 v2 telephone receipt is partial",
+        "file": "receipts/a4v2.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_documented",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "partial",
+          "notes": [
+            "Company signature verified against issuer DID did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee (key did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1).",
+            "This proves the ORGANISATION documented a consent given by telephone under script version corvee-admission-1-fr. It does NOT prove the call happened, and there is no signed document: this is the weakest of the three tiers, so overall is at most PARTIAL.",
+            "A verbal (company-documented) receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "F1 a bundle whose purpose was rewritten fails",
+        "file": "receipts/f1-purpose.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity FAILED: an accepted cell is not an exact item of the signed offer.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "F2 a bundle whose grantedAt and validFrom were moved fails",
+        "file": "receipts/f2-granted.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity FAILED (granted-outside-offer-window): grantedAt 2020-01-01T00:00:00Z lies outside the signed offer's window, from its createdAt 2026-10-24T17:14:04Z to its expiresAt 2026-11-23T17:14:04Z.",
+            "Citizen assertion FAILED: the passkey signature verifies, but the challenge it signed does not recompute from this receipt's issuer, subject, requestId, action and grantedAt with the bundle's Merkle root and nonce. The assertion belongs to another consent.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "F3 a bundle with an added cell fails",
+        "file": "receipts/f3-cell.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity FAILED: an accepted cell is not an exact item of the signed offer.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "F4 a bundle carrying another person's assertion fails",
+        "file": "receipts/f4-graft-keepsubj.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the WebAuthn signature did not verify against the resolved passkey.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "F5 a bundle carrying another person's assertion under that person's DID fails",
+        "file": "receipts/f5-graft-subjX.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the passkey signature verifies, but the challenge it signed does not recompute from this receipt's issuer, subject, requestId, action and grantedAt with the bundle's Merkle root and nonce. The assertion belongs to another consent.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "F6 a bundle whose document was changed fails",
+        "file": "receipts/f6-doc.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity FAILED: the document differs from the signed offer's.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "F7 a bundle whose issuer was swapped fails",
+        "file": "receipts/f7-issuer.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "fail",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature check FAILED: proof[0] names the key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1, which does not belong to the issuer did:web:app.agreely.ca:c:showcase-studio-pixel-boreal.",
+            "Receipt integrity FAILED: the issuer differs from the signed offer's.",
+            "Citizen assertion FAILED: the passkey signature verifies, but the challenge it signed does not recompute from this receipt's issuer, subject, requestId, action and grantedAt with the bundle's Merkle root and nonce. The assertion belongs to another consent.",
+            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "F11 a v2 bundle whose legalBasis was rewritten with a recomputed hash fails",
+        "file": "receipts/f11-basis.bundle.json",
+        "resolveDids": true,
+        "ipfsBody": {
+          "disclosure": {
+            "automatedDecision": {
+              "en": "The initial premium is set by a fully automated processing based on your risk profile. You will be informed of any decision so rendered and may submit observations to an advisor.",
+              "fr": "La prime initiale est établie par un traitement entièrement automatisé fondé sur votre profil de risque. Vous serez informé de toute décision ainsi rendue et pouvez présenter vos observations à un conseiller."
+            },
+            "categories": {
+              "en": "Contact details, financial information, claim history and, for disability or life claims, medical information.",
+              "fr": "Coordonnées, renseignements financiers, antécédents de réclamation et, pour les réclamations invalidité ou vie, renseignements médicaux."
+            },
+            "crossBorder": {
+              "en": "Some information is hosted by Nordlys Cloud Services in Ireland (European Union). A privacy impact assessment (s. 17) concludes the protection is adequate.",
+              "fr": "Certains renseignements sont hébergés par Nordlys Cloud Services en Irlande (Union européenne). Une évaluation des facteurs relatifs à la vie privée (art. 17) conclut à une protection adéquate."
+            },
+            "means": {
+              "en": "Information collected directly from you at quotation time, supplemented, with your authorization, by the credit file and industry claim databases.",
+              "fr": "Renseignements recueillis directement auprès de vous au moment de la soumission, complétés, avec votre autorisation, par le dossier de crédit et les bases sectorielles de réclamation."
+            },
+            "purpose": {
+              "en": "Assess your eligibility, set your insurance premium, manage your client file, assess your claims, prevent fraud and keep the records required by tax laws.",
+              "fr": "Évaluer votre admissibilité, établir votre prime d'assurance, gérer votre dossier client, évaluer vos réclamations, prévenir la fraude et tenir les registres exigés par les lois fiscales."
+            },
+            "recipients": {
+              "en": "Our reinsurers, our industry antifraud platform and our cloud host, all bound by confidentiality agreements.",
+              "fr": "Nos réassureurs, notre plateforme antifraude sectorielle et notre hébergeur infonuagique, tous liés par des ententes de confidentialité."
+            },
+            "responsable": {
+              "contact": "protection@assurance-boreale.example",
+              "name": "Marie-Claude Gagnon"
+            },
+            "retention": {
+              "en": "Kept 7 years after the end of the contract, then destroyed; claim files with a medical assessment are kept 10 years after the decision (s. 23 and s. 11 para. 2). Tax records are kept six years after the end of the taxation year, a period set by law.",
+              "fr": "Conservés 7 ans après la fin du contrat, puis détruits; les dossiers de réclamation avec évaluation médicale sont conservés 10 ans après la décision (art. 23 et art. 11 al. 2). Les registres fiscaux sont conservés six ans après la fin de l'année d'imposition, un délai prévu par la loi."
+            },
+            "rights": {
+              "en": "You have the rights of access (s. 27), rectification (s. 28), withdrawal and portability (s. 27 para. 3). Any decision based exclusively on automated processing may be reviewed by an advisor (s. 12.1).",
+              "fr": "Vous disposez des droits d'accès (art. 27), de rectification (art. 28), de retrait et de portabilité (art. 27 al. 3). Toute décision fondée exclusivement sur un traitement automatisé peut être révisée par un conseiller (art. 12.1)."
+            },
+            "withdrawal": {
+              "en": "You may withdraw your consent at any time. Withdrawing information necessary to the contract may however prevent it from continuing; we will explain the consequences before acting.",
+              "fr": "Vous pouvez retirer votre consentement en tout temps. Le retrait des renseignements nécessaires au contrat peut toutefois empêcher son maintien; nous vous informerons des conséquences avant d'agir."
+            }
+          }
+        },
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity FAILED: the document differs from the signed offer's.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-a8eb17f57983a6e87870#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "F10 a paper receipt re-signed with a key the bundle carries under the issuer's DID fails",
+        "file": "receipts/f10-selfsigned-paper.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "company_attested",
+          "companySignature": "fail",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature check FAILED against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1): the canonical receipt body does not match the signature. The receipt was altered after signing or the wrong key was resolved.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "F1 a bare receipt whose purpose was rewritten is incomplete, never verified",
+        "file": "receipts/f1-purpose.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "F2 a bare receipt whose grantedAt was moved is incomplete, never verified",
+        "file": "receipts/f2-granted.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "F3 a bare receipt with an added cell is incomplete, never verified",
+        "file": "receipts/f3-cell.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "F4 a bare receipt carrying another person's assertion fails",
+        "file": "receipts/f4-graft-keepsubj.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "failed",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion FAILED: the WebAuthn signature did not verify against the resolved passkey.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "F5 a bare receipt carrying another person's assertion under that person's DID is incomplete, never verified",
+        "file": "receipts/f5-graft-subjX.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "F6 a bare receipt whose document was changed is incomplete, never verified",
+        "file": "receipts/f6-doc.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "F7 a bare receipt whose issuer was swapped is incomplete, never verified",
+        "file": "receipts/f7-issuer.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "F11 a bare v2 receipt whose legalBasis was rewritten never passes its disclosure copy",
+        "file": "receipts/f11-basis.receipt.json",
+        "resolveDids": true,
+        "ipfsBody": {
+          "disclosure": {
+            "automatedDecision": {
+              "en": "The initial premium is set by a fully automated processing based on your risk profile. You will be informed of any decision so rendered and may submit observations to an advisor.",
+              "fr": "La prime initiale est établie par un traitement entièrement automatisé fondé sur votre profil de risque. Vous serez informé de toute décision ainsi rendue et pouvez présenter vos observations à un conseiller."
+            },
+            "categories": {
+              "en": "Contact details, financial information, claim history and, for disability or life claims, medical information.",
+              "fr": "Coordonnées, renseignements financiers, antécédents de réclamation et, pour les réclamations invalidité ou vie, renseignements médicaux."
+            },
+            "crossBorder": {
+              "en": "Some information is hosted by Nordlys Cloud Services in Ireland (European Union). A privacy impact assessment (s. 17) concludes the protection is adequate.",
+              "fr": "Certains renseignements sont hébergés par Nordlys Cloud Services en Irlande (Union européenne). Une évaluation des facteurs relatifs à la vie privée (art. 17) conclut à une protection adéquate."
+            },
+            "means": {
+              "en": "Information collected directly from you at quotation time, supplemented, with your authorization, by the credit file and industry claim databases.",
+              "fr": "Renseignements recueillis directement auprès de vous au moment de la soumission, complétés, avec votre autorisation, par le dossier de crédit et les bases sectorielles de réclamation."
+            },
+            "purpose": {
+              "en": "Assess your eligibility, set your insurance premium, manage your client file, assess your claims, prevent fraud and keep the records required by tax laws.",
+              "fr": "Évaluer votre admissibilité, établir votre prime d'assurance, gérer votre dossier client, évaluer vos réclamations, prévenir la fraude et tenir les registres exigés par les lois fiscales."
+            },
+            "recipients": {
+              "en": "Our reinsurers, our industry antifraud platform and our cloud host, all bound by confidentiality agreements.",
+              "fr": "Nos réassureurs, notre plateforme antifraude sectorielle et notre hébergeur infonuagique, tous liés par des ententes de confidentialité."
+            },
+            "responsable": {
+              "contact": "protection@assurance-boreale.example",
+              "name": "Marie-Claude Gagnon"
+            },
+            "retention": {
+              "en": "Kept 7 years after the end of the contract, then destroyed; claim files with a medical assessment are kept 10 years after the decision (s. 23 and s. 11 para. 2). Tax records are kept six years after the end of the taxation year, a period set by law.",
+              "fr": "Conservés 7 ans après la fin du contrat, puis détruits; les dossiers de réclamation avec évaluation médicale sont conservés 10 ans après la décision (art. 23 et art. 11 al. 2). Les registres fiscaux sont conservés six ans après la fin de l'année d'imposition, un délai prévu par la loi."
+            },
+            "rights": {
+              "en": "You have the rights of access (s. 27), rectification (s. 28), withdrawal and portability (s. 27 para. 3). Any decision based exclusively on automated processing may be reviewed by an advisor (s. 12.1).",
+              "fr": "Vous disposez des droits d'accès (art. 27), de rectification (art. 28), de retrait et de portabilité (art. 27 al. 3). Toute décision fondée exclusivement sur un traitement automatisé peut être révisée par un conseiller (art. 12.1)."
+            },
+            "withdrawal": {
+              "en": "You may withdraw your consent at any time. Withdrawing information necessary to the contract may however prevent it from continuing; we will explain the consequences before acting.",
+              "fr": "Vous pouvez retirer votre consentement en tout temps. Le retrait des renseignements nécessaires au contrat peut toutefois empêcher son maintien; nous vous informerons des conséquences avant d'agir."
+            }
+          }
+        },
+        "expect": {
+          "input": "receipt",
+          "receiptType": "citizen",
+          "companySignature": "unsupported",
+          "receiptIntegrity": "unsupported",
+          "citizenAssertion": "unbound",
+          "disclosureCopy": "unsupported",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "unsupported",
+          "overall": "incomplete",
+          "notes": [
+            "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
+            "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
+            "Citizen assertion UNBOUND: the passkey signature verifies against did:agreely:citizen:demo-a8eb17f57983a6e87870#passkey-1, but its challenge is computed from a requestId, a Merkle root and a nonce the bare receipt does not carry, so nothing ties it to this receipt's content. A receipt rewritten around a genuine assertion reads the same.",
+            "Cell labels UNSUPPORTED on a bare passkey receipt: the category/purpose labels are covered only by the company signature over the offer, which travels in the verification bundle. Do NOT trust the displayed labels.",
+            "disclosureCopy UNSUPPORTED on a bare passkey receipt: its disclosureHash (and a v2 legalBasis) is signed by nobody, so no copy can be checked against it.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.",
+            "INCOMPLETE: a passkey receipt cannot be verified on its own. Verify the verification bundle issued with it (the file that carries receipt, signedOffer and merkleRoot)."
+          ]
+        }
+      },
+      {
+        "name": "F8 a paper receipt whose purpose was changed fails",
+        "file": "receipts/f8-paper.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_attested",
+          "companySignature": "fail",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Company signature check FAILED against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1): the canonical receipt body does not match the signature. The receipt was altered after signing or the wrong key was resolved.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "F9 a telephone receipt whose grantedAt was changed fails",
+        "file": "receipts/f9-phone.receipt.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_documented",
+          "companySignature": "fail",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Company signature check FAILED against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1): the canonical receipt body does not match the signature. The receipt was altered after signing or the wrong key was resolved.",
+            "A verbal (company-documented) receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "c6 a passkey bundle whose subject is a did:web the forger hosts is unavailable, never verified, even when the resolver serves that host's document",
+        "file": "receipts/c6-web-subject.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "unavailable",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion UNVERIFIABLE: the subject did:web:evil.example:clients:jean is not an Agreely citizen DID (did:agreely:citizen:...), so no passkey key can be confirmed for it. Its key was not looked up; the assertion proves nothing.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "s1 a bundle of another version is malformed",
+        "file": "receipts/s1-version-99.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "skipped",
+          "receiptIntegrity": "skipped",
+          "citizenAssertion": "skipped",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "skipped",
+          "overall": "malformed",
+          "notes": [
+            "MALFORMED: the bundle version is not the string \"1\". No check ran: this is a file this verifier cannot read, not evidence that it was altered. A file Agreely issued is a version \"1\" bundle or a receipt object."
+          ]
+        }
+      },
+      {
+        "name": "s2 a bundle whose receipt is an array is malformed, never worded as a tamper",
+        "file": "receipts/s2-receipt-array.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "skipped",
+          "receiptIntegrity": "skipped",
+          "citizenAssertion": "skipped",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "skipped",
+          "overall": "malformed",
+          "notes": [
+            "MALFORMED: the bundle's receipt is missing or not an object. No check ran: this is a file this verifier cannot read, not evidence that it was altered. A file Agreely issued is a version \"1\" bundle or a receipt object."
+          ]
+        }
+      },
+      {
+        "name": "s3 a genuine bundle with an extra top-level type is still a bundle, and verifies",
+        "file": "receipts/s3-bundle-with-type.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "s4 a passkey receipt with a top-level key outside the receipt format fails integrity",
+        "file": "receipts/s4-extra-top-key.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity FAILED: the receipt carries a top-level field outside the receipt format (extraTop).",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      }
+    ]
+  },
+  "citizenKey": {
+    "description": "The citizen-key rule both SDKs share with the web verifier: the citizen DID document resolved for the subject must carry that id, list the key the assertion verified with under authentication (a method of the same DID, exact COSE bytes), and open its window [validFrom, validUntil) over grantedAt; a bound grantedAt must also lie inside the company-signed offer, from createdAt to expiresAt in whole seconds. One bundle (receipts/ck-thz.bundle.json) is read against each citizen document of receipts/ck-did-documents.json: the resolver answers `issuer` for the issuer DID and `citizen[citizenDocument]` for the subject (null when citizenDocument is null). Both SDKs assert these byte-identically.",
+    "didDocuments": "receipts/ck-did-documents.json",
+    "cases": [
+      {
+        "name": "ck d01 the key listed under authentication, its window open at grantedAt, verifies",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d01-positive",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d02 a key absent from authentication fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d02-notauth",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document does not list the key the assertion verified with under authentication (with the same DID), so it is not proven to be the person's passkey.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d02b a key held only by a method outside authentication fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d02b-recovery-only",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document does not list the key the assertion verified with under authentication (with the same DID), so it is not proven to be the person's passkey.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d03 a document whose id is another identity is unavailable, never verified",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d03-idother",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "unavailable",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion UNVERIFIABLE: what the resolver answered for did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8 is not that identity's DID document (another id, or no verificationMethod list). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d04 a document whose named key holds other bytes fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d04-idmatch-bytesdiff",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the WebAuthn signature did not verify against the resolved passkey.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d05 a window that opens exactly at grantedAt verifies",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d05-from-eq",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d06 a window that closes exactly at grantedAt fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d06-until-eq",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document lists the key the assertion verified with, but its validity window [validFrom, validUntil) does not cover the receipt's grantedAt: the key did not belong to the person at that date.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d07 a window that opens after grantedAt fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d07-from-after",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document lists the key the assertion verified with, but its validity window [validFrom, validUntil) does not cover the receipt's grantedAt: the key did not belong to the person at that date.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d08 an unreadable validUntil fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d08-until-garbage",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document lists the key the assertion verified with, but its validity window [validFrom, validUntil) does not cover the receipt's grantedAt: the key did not belong to the person at that date.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d09 an authentication entry that is an object, not a reference, fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d09-auth-object",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document does not list the key the assertion verified with under authentication (with the same DID), so it is not proven to be the person's passkey.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d10 a method of another DID carrying the key fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d10-otherbase",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document does not list the key the assertion verified with under authentication (with the same DID), so it is not proven to be the person's passkey.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d15 a document without a verificationMethod list is unavailable, never verified",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d15-vm-notarray",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "unavailable",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion UNVERIFIABLE: what the resolver answered for did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8 is not that identity's DID document (another id, or no verificationMethod list). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d16 a key without validFrom fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d16-nofrom",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document lists the key the assertion verified with, but its validity window [validFrom, validUntil) does not cover the receipt's grantedAt: the key did not belong to the person at that date.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d17 authentication by full method id verifies",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d17-fullid-auth",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d18 a key retired before grantedAt fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d18-rotated-before",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document lists the key the assertion verified with, but its validity window [validFrom, validUntil) does not cover the receipt's grantedAt: the key did not belong to the person at that date.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d19 a validUntil that is not a string fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d19-until-number",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document lists the key the assertion verified with, but its validity window [validFrom, validUntil) does not cover the receipt's grantedAt: the key did not belong to the person at that date.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck d20 a date-only validFrom before grantedAt verifies",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "d20-from-dateonly",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck x01 an authentication that is an object keyed \"0\", not a list, fails",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "x01-auth-objmap",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "fail",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion FAILED: the citizen's DID document does not list the key the assertion verified with under authentication (with the same DID), so it is not proven to be the person's passkey.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck x02 a verificationMethod that is an object keyed \"0\", not a list, is unavailable, never verified",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "x02-vm-objmap",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "unavailable",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion UNVERIFIABLE: what the resolver answered for did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8 is not that identity's DID document (another id, or no verificationMethod list). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck x03 a verificationMethod that is an empty object is unavailable, never verified",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "x03-vm-emptyobj",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "unavailable",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion UNVERIFIABLE: what the resolver answered for did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8 is not that identity's DID document (another id, or no verificationMethod list). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck x11 a key listed under both authentication and capabilityDelegation verifies",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": "x11-auth-and-delegation",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck an unresolvable citizen DID is unavailable, never failed",
+        "file": "receipts/ck-thz.bundle.json",
+        "citizenDocument": null,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "unavailable",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion UNVERIFIABLE: could not resolve the citizen DID did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8 (passkey did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1) (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck b1 a grantedAt before the signed offer was created fails, its key confirmed in its window",
+        "file": "receipts/ck-b1-backdate.bundle.json",
+        "citizenDocument": "b1-backdate",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity FAILED (granted-outside-offer-window): grantedAt 2026-10-25T15:05:00Z lies outside the signed offer's window, from its createdAt 2026-10-25T15:27:20Z to its expiresAt 2026-11-24T15:27:20Z.",
+            "Citizen assertion NOT EVALUATED: the acceptance date (grantedAt) cannot be placed inside the company-signed offer's window, so the person's key is not evaluated at that date.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
+        }
+      },
+      {
+        "name": "ck w7 a passkey-signed grantedAt that is not a date never confirms the key",
+        "file": "receipts/ck-w7-badgranted.bundle.json",
+        "citizenDocument": "w7-badgranted",
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "unavailable",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
+            "Receipt integrity FAILED (offer-window-unreadable): the signed offer's createdAt or expiresAt, or the receipt's grantedAt, is not a readable date.",
+            "Citizen assertion NOT EVALUATED: the acceptance date (grantedAt) cannot be placed inside the company-signed offer's window, so the person's key is not evaluated at that date.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+          ]
         }
       }
     ]

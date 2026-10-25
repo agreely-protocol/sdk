@@ -1,0 +1,74 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://agreely.ca/credentials/consent/v1"
+  ],
+  "credentialSubject": {
+    "consent": {
+      "action": "grant",
+      "disclosureHash": "0xe2ae8164087badb271be62a492a2d7b6a65a6a091b4bdfd5f6e0d5bc0d0fe3fd",
+      "document": {
+        "code": "communications",
+        "effectiveDate": "2026-05-01",
+        "name": "Consentement aux communications",
+        "version": "1.1"
+      },
+      "grantedAt": "2026-10-24T17:14:04Z",
+      "items": [
+        {
+          "automatedDecision": false,
+          "category": "coordonnées",
+          "itemId": "0x9b19fdde59a85e5092aa11301dc6eb48119f2ea7ad60e62c3e81eb8199c175db",
+          "legalBasis": "consent",
+          "purpose": "communications marketing",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "coordonnées",
+          "itemId": "0x8e06594a4b0103ea1a045b73899fd26cec5642adf4713ed15b8134ae86def209",
+          "legalBasis": "consent",
+          "purpose": "sondages et amélioration des services",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "historique de conduite",
+          "itemId": "0x2e576522496355465358d7637d2818febab935328eb8da2f8718007769679d39",
+          "legalBasis": "consent",
+          "purpose": "programme de conduite préventive",
+          "sensitive": false
+        }
+      ],
+      "requestId": "0x56d2852683bcbdcbdc7f900c19150af617e10823053a70b15be8e551fdea9886"
+    },
+    "id": "did:agreely:citizen:demo-91bf5c897c067cb69df0"
+  },
+  "id": "urn:agreely:receipt:95c2718f-c8c0-4369-b444-7e670502ca10",
+  "issuer": "did:web:app.agreely.ca:c:showcase-studio-pixel-boreal",
+  "proof": [
+    {
+      "created": "2026-10-24T17:14:04Z",
+      "cryptosuite": "eddsa-jcs-2022",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z5T8ALdiVxr57Mh3p9NQo1fmjyu9JGcybbERvYDuwPRiA72RdCSv85ugyZrwxH5KVEDX1zvZUaRgfZ7yhGHeinD1R",
+      "type": "DataIntegrityProof",
+      "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+    },
+    {
+      "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+      "challenge": "0xc3e2fab98b50b62356a2e159215072578eccab9cc5e982c5ccfdfd7dc3ed5d49",
+      "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoidy1MNnVZdFF0aU5Xb3VGWklWQnlWNDdNcTV6RjZZTEZ6UDM5ZmNQdFhVayIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODA5MCJ9",
+      "nonce": "0x4f6003e0ae046facb1d62399f0f401ec019d86e25768575268bb9c9b6aed6317",
+      "signature": "MEUCICqMcUgeUnAFJHI1VegfxuvYLXz82A_3AQT5qTWxupIrAiEAxLIZm8UZHjAY7f80ZikK_mdQn0icnA76xmE9TqvCPXI",
+      "type": "WebAuthnAssertion",
+      "verificationMethod": "did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1"
+    }
+  ],
+  "type": [
+    "VerifiableCredential",
+    "ConsentReceipt"
+  ],
+  "validFrom": "2026-10-24T17:14:04Z",
+  "validUntil": "2028-10-25T03:59:59Z"
+}

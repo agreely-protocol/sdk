@@ -1,0 +1,189 @@
+{
+  "version": "1",
+  "receipt": {
+    "@context": [
+      "https://www.w3.org/ns/credentials/v2",
+      "https://agreely.ca/credentials/consent/v1"
+    ],
+    "type": [
+      "VerifiableCredential",
+      "ConsentReceipt"
+    ],
+    "id": "urn:agreely:receipt:9b6121aa-370a-4abf-a7be-23d728c74ba3",
+    "issuer": "did:web:app.agreely.ca:c:demo-co-7d9d75",
+    "validFrom": "2026-10-25T15:30:41Z",
+    "validUntil": "2031-01-02T04:59:59Z",
+    "credentialSubject": {
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "consent": {
+        "action": "grant",
+        "items": [
+          {
+            "automatedDecision": false,
+            "category": "email address",
+            "itemId": "0x328c3bb70c60006dd73d225ab30def735742f576d09f78fc370e85318b2ee813",
+            "legalBasis": "consent",
+            "purpose": "product updates",
+            "sensitive": false
+          },
+          {
+            "automatedDecision": false,
+            "category": "phone number",
+            "itemId": "0x0387ffb9e628fea6cafe18dbb73ee78f590810e5ce2f10b36e8bf3fef44fe467",
+            "legalBasis": "consent",
+            "purpose": "account security",
+            "sensitive": false
+          }
+        ],
+        "requestId": "0x82988d8b355275bb8232ceb61ab564e19ee08b0648af74df6e6b6d6cb552544d",
+        "grantedAt": "2026-10-25T15:30:41Z",
+        "document": {
+          "code": "conditions-de-consentement",
+          "effectiveDate": "2026-10-25",
+          "name": "Conditions de consentement",
+          "version": "1.0"
+        },
+        "disclosureHash": "0x267ac6c43693a77b504f1d4ab653e6523ab90be4b05aae73a76236dd2a3c97bc"
+      }
+    },
+    "proof": [
+      {
+        "created": "2026-10-25T15:27:20Z",
+        "cryptosuite": "eddsa-jcs-2022",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5ka4LRLvDYwRKsQFXJkHy41SCmHD2XRsdFJNc1PXfiyVSy7sWqohjLVrJJdzpFCKKSgfURPAX7dtRQbCEAYMmZw9",
+        "type": "DataIntegrityProof",
+        "verificationMethod": "did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1"
+      },
+      {
+        "type": "WebAuthnAssertion",
+        "verificationMethod": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+        "nonce": "0x193ff4aadb2d92211747924167164cad7016c602ec06cf7713cbce3be3310e1f",
+        "challenge": "0xdc12d3ad2cf24da01d75ddf5d0447de85d8ac8baef6d94e90821d1ab08a57511",
+        "authenticatorData": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAg",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiM0JMVHJTenlUYUFkZGQzMTBFUjk2RjJLeUxydmJaVHBDQ0hScXdpbGRSRSIsIm9yaWdpbiI6Imh0dHBzOi8vbXkuYWdyZWVseS5jYSIsImNyb3NzT3JpZ2luIjpmYWxzZX0",
+        "signature": "4ulUJZHnQUgKQ5WgEVL9OLqzOtflxLNZeCYXD_fpKBlN8comKpTkO068JHEQnlxS61Q_AYtkvlaHPpizldMpBA"
+      }
+    ]
+  },
+  "signedOffer": {
+    "consent": {
+      "action": "grant",
+      "items": [
+        {
+          "automatedDecision": false,
+          "category": "email address",
+          "itemId": "0x328c3bb70c60006dd73d225ab30def735742f576d09f78fc370e85318b2ee813",
+          "legalBasis": "consent",
+          "purpose": "product updates",
+          "sensitive": false
+        },
+        {
+          "automatedDecision": false,
+          "category": "phone number",
+          "itemId": "0x0387ffb9e628fea6cafe18dbb73ee78f590810e5ce2f10b36e8bf3fef44fe467",
+          "legalBasis": "consent",
+          "purpose": "account security",
+          "sensitive": false
+        }
+      ]
+    },
+    "createdAt": "2026-10-25T15:27:20Z",
+    "disclosure": {
+      "categories": {
+        "en": "Email address; phone number.",
+        "fr": "Adresse courriel; numéro de téléphone."
+      },
+      "means": {
+        "en": "Collected directly from you at account creation.",
+        "fr": "Collecte directe auprès de vous lors de la création du compte."
+      },
+      "purpose": {
+        "en": "Keep you informed of product updates and secure your account.",
+        "fr": "Vous informer des nouveautés du produit et sécuriser votre compte."
+      },
+      "recipients": {
+        "en": "Our email delivery provider.",
+        "fr": "Notre fournisseur d'envoi de courriels."
+      },
+      "responsable": {
+        "contact": "privacy@demo-7d9d75.example",
+        "name": "Responsable Démo"
+      },
+      "retention": {
+        "en": "Kept for the life of the account, then destroyed (s. 23).",
+        "fr": "Conservés pendant la durée du compte, puis détruits (art. 23)."
+      },
+      "rights": {
+        "en": "Rights of access, rectification and withdrawal.",
+        "fr": "Droits d'accès, de rectification et de retrait."
+      },
+      "withdrawal": {
+        "en": "You can withdraw your consent at any time from your citizen space.",
+        "fr": "Vous pouvez retirer votre consentement en tout temps depuis votre espace citoyen."
+      }
+    },
+    "disclosureHash": "0x267ac6c43693a77b504f1d4ab653e6523ab90be4b05aae73a76236dd2a3c97bc",
+    "disclosureVersion": "1",
+    "document": {
+      "code": "conditions-de-consentement",
+      "effectiveDate": "2026-10-25",
+      "name": "Conditions de consentement",
+      "version": "1.0"
+    },
+    "expiresAt": "2026-11-24T15:27:20Z",
+    "issuer": "did:web:app.agreely.ca:c:demo-co-7d9d75",
+    "nonce": "0x193ff4aadb2d92211747924167164cad7016c602ec06cf7713cbce3be3310e1f",
+    "requestId": "0x82988d8b355275bb8232ceb61ab564e19ee08b0648af74df6e6b6d6cb552544d",
+    "validUntil": "2031-01-02T04:59:59Z"
+  },
+  "merkleRoot": "0x1ded8064c9d1188e60bdf3737f7e1eb76c363922121bb5037073399b9dc0f677",
+  "consentRef": "0xb34464b6b3d34a7d72dcb8a7c79251f29a686949727d8895e0c88b76d19eddcf",
+  "consentRefs": [
+    "0xb34464b6b3d34a7d72dcb8a7c79251f29a686949727d8895e0c88b76d19eddcf",
+    "0xe3cc5422ce3d2a312d6375f17fed5c55cf207e18bcbf99ea56e7f4107ecb3be2"
+  ],
+  "didDocuments": {
+    "issuer": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/data-integrity/v2"
+      ],
+      "id": "did:web:app.agreely.ca:c:demo-co-7d9d75",
+      "alsoKnownAs": [
+        "did:web:demo-7d9d75.example"
+      ],
+      "verificationMethod": [
+        {
+          "id": "did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1",
+          "type": "Multikey",
+          "controller": "did:web:app.agreely.ca:c:demo-co-7d9d75",
+          "publicKeyMultibase": "z6Mkutzwrh9Tp12SzRizq7qvBx8QJUJytatuizPqCaa8zmpq"
+        }
+      ],
+      "assertionMethod": [
+        "did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1"
+      ],
+      "authentication": [
+        "did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1"
+      ]
+    },
+    "citizen": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+      "verificationMethod": [
+        {
+          "id": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8#passkey-1",
+          "type": "WebAuthnAuthenticationKey2024",
+          "controller": "did:agreely:citizen:THZ94JA2XRB7HP0ZDGAKVC7FN8",
+          "publicKeyCose": "0xa4010103272006215820cf238d41cc544fddd7da7c041e2a52008816f661f0750755462141525fdb0610"
+        }
+      ],
+      "authentication": [
+        "#passkey-1"
+      ]
+    }
+  }
+}
