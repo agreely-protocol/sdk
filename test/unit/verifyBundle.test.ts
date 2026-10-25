@@ -154,11 +154,11 @@ describe("the document anchor is one eth_call rootOf(keccak256(cid)) (N6)", () =
     expect(rpc.calls.filter((c) => c.method !== "eth_call")).toHaveLength(0);
   });
 
-  it("an absent record FAILS", async () => {
+  it("an absent record is UNAVAILABLE, not fail, and leaves a verified bundle verified (R13)", async () => {
     const rpc = rpcFetch((m, params) => (m === "eth_call" && (params[0] as { data: string }).data.startsWith("0x6d6f398e") ? rootWord(0) : null));
     const result = await verify(cidBundle(), { ...SEPOLIA, fetch: rpc.fetch });
-    expect(result.documentAnchor).toBe("fail");
-    expect(result.overall).toBe("failed");
+    expect(result.documentAnchor).toBe("unavailable");
+    expect(result.overall).toBe("verified");
   });
 });
 
@@ -255,7 +255,7 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
     const rpc = rpcFetch((m, params) => {
       if (m !== "eth_call") return null;
       const data = (params[0] as { data: string }).data;
-      return data.startsWith("0x6d6f398e") ? rootWord(0) : anchorWord(cidRoot, 1760000000, 1760000600, 2);
+      return data.startsWith("0x6d6f398e") ? rootWord(1) : anchorWord(cidRoot, 1760000000, 1760000600, 2);
     });
     const result = await verify(bundleWithCid, { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.documentAnchor).toBe("fail");

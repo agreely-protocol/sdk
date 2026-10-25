@@ -6,7 +6,7 @@ import { decodeAnchorRecord, decodeRootRecord } from "../../src/verify/receipt.j
 import type { DidDocument } from "../../src/verify/types.js";
 import { SEPOLIA_REGISTRY, rootWord } from "./registry.js";
 
-// test/fixtures/registry-reads.json is agreely-contracts vectors/registry-reads.json at 1cbdfa8: the exact eth_call
+// test/fixtures/registry-reads.json is agreely-contracts vectors/registry-reads.json at bf122fb: the exact eth_call
 // answers of AgreelyRegistry, asserted on the contract side by test/RegistryReadVectors.t.sol.
 const VECTORS = JSON.parse(
   readFileSync(fileURLToPath(new URL("../fixtures/registry-reads.json", import.meta.url)), "utf8"),

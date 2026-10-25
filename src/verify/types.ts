@@ -86,7 +86,9 @@ export type ReceiptType = "company_attested" | "company_documented" | "citizen";
  *                       passkey receipt, whose hash is signed by nobody.
  *   - documentAnchor    OPT-IN (rpcUrl): the document CID's on-chain anchor, read with
  *                       rootOf(keccak256(cid)). "pass" only in the consent-document lane;
- *                       "fail" when absent or in another lane; "unavailable" when no registry is
+ *                       "unavailable" when no record yet: the document is published first and anchored
+ *                       asynchronously, so an absent record is not a contradiction. "fail" when another
+ *                       lane holds the CID or the record is tagged. "unavailable" also when no registry is
  *                       known for the chain, or the bundle names another registry (nothing is read).
  *   - consentAnchor     OPT-IN (rpcUrl), bundle only: the consent's on-chain record,
  *                       read with registry(consentRef) and tied by the bound Merkle root.

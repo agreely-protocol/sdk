@@ -185,8 +185,21 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     expect(call.data).toBe(keccak256Hex("rootOf(bytes32)").slice(0, 10) + keccak256Hex(cid).slice(2));
   });
 
+  it("documentAnchor is UNAVAILABLE, not fail, while no record exists yet: a document is anchored after it is published", async () => {
+    const citizenCase = cases.find((c) => c.ipfs)!;
+    const result = await Agreely.verifyReceipt(citizenCase.receipt, {
+      resolver: (did) => fixtures.didDocuments[did] ?? null,
+      fetch: chainFetch(rootWord(0)).fetch,
+      rpcUrl: "https://rpc.test",
+      chainId: 84532,
+    });
+    expect(result.documentAnchor).toBe("unavailable");
+    expect(result.documentAnchorRecord).toBeUndefined();
+    expect(result.overall).not.toBe("failed");
+    expect(result.notes.join("\n")).toContain("not anchored yet");
+  });
+
   it.each([
-    [0, "holds no anchor for CID"],
     [1, "as an audit-family root, not as a consent document"],
     [2, "as a cookie consent root, not as a consent document"],
     [7, "as a root of lane 7, not as a consent document"],

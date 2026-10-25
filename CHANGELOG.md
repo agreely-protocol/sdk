@@ -37,11 +37,12 @@ to [Semantic Versioning](https://semver.org/).
   `anchoredBlock`.
 - **The on-chain checks read the registry by `eth_call` only.** The document anchor
   is one `rootOf(keccak256(cid))`: a record in the consent-document lane (3) passes
-  and fills `documentAnchorRecord` (`anchoredAt`, `anchoredBlock`); no record, or a
-  record in another lane, reads `fail`. `registry(consentRef)` is read as five words,
+  and fills `documentAnchorRecord` (`anchoredAt`, `anchoredBlock`); no record yet reads
+  `unavailable` (the document is anchored after it is published), and a record in another
+  lane or with a tag reads `fail`. `registry(consentRef)` is read as five words,
   the fifth being `anchoredBlock`. No log query is made.
 - The known registry per chain: Base Sepolia (84532)
-  `0xAf170eA0F66279104D5CF25d7938bBe7A4173e61`. Base mainnet (8453) has none until
+  `0xf25D3F8E73648C797Be2CCCD428061f357567b9A`, deployed at block 50213158. Base mainnet (8453) has none until
   its registry is deployed: there, pass `registryAddress`, or the anchor checks read
   `unavailable` with « no known registry for this chain ». An explicit `registryAddress`
   is read by `eth_call`.
