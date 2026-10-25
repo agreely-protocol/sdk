@@ -6,7 +6,7 @@ import { decodeAnchorRecord, decodeRootRecord } from "../../src/verify/receipt.j
 import type { DidDocument } from "../../src/verify/types.js";
 import { SEPOLIA_REGISTRY, rootWord } from "./registry.js";
 
-// test/fixtures/registry-reads.json is agreely-contracts vectors/registry-reads.json at 6ccda66: the exact eth_call
+// test/fixtures/registry-reads.json is agreely-contracts vectors/registry-reads.json at 1cbdfa8: the exact eth_call
 // answers of AgreelyRegistry, asserted on the contract side by test/RegistryReadVectors.t.sol.
 const VECTORS = JSON.parse(
   readFileSync(fileURLToPath(new URL("../fixtures/registry-reads.json", import.meta.url)), "utf8"),
@@ -67,7 +67,9 @@ describe("the registry the SDK reads, per chain", () => {
   });
 
   it.each([undefined, 8453, 84532])("chainId %s never reads an emit-only registry", async (chainId) => {
-    for (const body of await sentTo(chainId)) {
+    const sent = await sentTo(chainId);
+    expect(sent).toHaveLength(chainId === 84532 ? 1 : 0);
+    for (const body of sent) {
       for (const address of EMIT_ONLY) expect(body).not.toContain(address);
       expect(body).not.toContain("eth_getlogs");
     }
