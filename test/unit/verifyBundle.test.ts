@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Agreely, isVerificationBundle } from "../../src/index.js";
 import type { DidDocument, ReceiptVerification, VerifyReceiptOptions } from "../../src/verify/types.js";
+import { SEPOLIA_REGISTRY, anchorWord, onReadableRegistry, rootWord } from "./registry.js";
 
 // Real artefacts issued by the app (qa-ver1): genuine A1 passkey bundles, recorded A3 paper and A4 phone
 // receipts, and the forgeries F1 to F11 that SDK 0.5.0 called "verified".
@@ -123,11 +124,10 @@ function rpcFetch(answer: (method: string, params: unknown[]) => unknown): { fet
   return { fetch: impl, calls };
 }
 
-const HEAD = 48889369 + 25000;
-const hexBlock = (n: number) => "0x" + n.toString(16);
+const SEPOLIA = { rpcUrl: "https://rpc.test", chainId: 84532 };
 
-describe("the document anchor is bounded and best-effort (N6)", () => {
-  const cidBundle = () => artefact("cidv1.bundle");
+describe("the document anchor is one eth_call rootOf(keccak256(cid)) (N6)", () => {
+  const cidBundle = () => onReadableRegistry(artefact("cidv1.bundle"));
 
   it.each([
     ["a JSON-RPC error", () => new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32000, message: "boom" } }))],
@@ -135,74 +135,106 @@ describe("the document anchor is bounded and best-effort (N6)", () => {
     ["a network failure", () => {
       throw new TypeError("fetch failed");
     }],
+    ["a short answer", () => "0x" + "00".repeat(96)],
   ])("%s reads unavailable, never failed", async (_label, fail) => {
-    const rpc = rpcFetch(() => fail());
-    const result = await verify(cidBundle(), { rpcUrl: "https://rpc.test", fetch: rpc.fetch });
+    const rpc = rpcFetch((m) => (m === "eth_call" ? fail() : null));
+    const result = await verify(cidBundle(), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.documentAnchor).toBe("unavailable");
     expect(result.overall).not.toBe("failed");
   });
 
-  it("queries from the deploy block, never from block 0", async () => {
-    const rpc = rpcFetch((m) => (m === "eth_blockNumber" ? hexBlock(HEAD) : [{ blockNumber: "0x1" }]));
-    const result = await verify(cidBundle(), { rpcUrl: "https://rpc.test", fetch: rpc.fetch });
+  it("a lane-3 record passes, in one call and with no log query", async () => {
+    const rpc = rpcFetch((m, params) => {
+      const data = (params[0] as { data: string }).data;
+      return m === "eth_call" && data.startsWith("0x6d6f398e") ? rootWord(3) : null;
+    });
+    const result = await verify(cidBundle(), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.documentAnchor).toBe("pass");
-    const logs = rpc.calls.filter((c) => c.method === "eth_getLogs");
-    expect((logs[0]!.params[0] as { fromBlock: string }).fromBlock).toBe(hexBlock(48889369));
+    expect(result.documentAnchorRecord).toEqual({ anchoredAt: 1790816400, anchoredBlock: 53000000 });
+    expect(rpc.calls.filter((c) => c.method !== "eth_call")).toHaveLength(0);
   });
 
-  it("a refused full range pages backwards within the limit, and an empty answer over the whole range FAILS", async () => {
-    const rpc = rpcFetch((m, params) => {
-      if (m === "eth_blockNumber") return hexBlock(HEAD);
-      const { fromBlock, toBlock } = params[0] as { fromBlock: string; toBlock: string };
-      if (parseInt(toBlock, 16) - parseInt(fromBlock, 16) + 1 > 10000) {
-        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32005, message: "range too large" } }));
-      }
-      return [];
-    });
-    const result = await verify(cidBundle(), { rpcUrl: "https://rpc.test", fetch: rpc.fetch });
+  it("an absent record FAILS", async () => {
+    const rpc = rpcFetch((m, params) => (m === "eth_call" && (params[0] as { data: string }).data.startsWith("0x6d6f398e") ? rootWord(0) : null));
+    const result = await verify(cidBundle(), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.documentAnchor).toBe("fail");
-    expect(rpc.calls.filter((c) => c.method === "eth_getLogs")).toHaveLength(1 + 3);
-  });
-
-  it("a range larger than the query budget is unavailable, not a missing anchor", async () => {
-    const rpc = rpcFetch((m, params) => {
-      if (m === "eth_blockNumber") return hexBlock(HEAD);
-      const { fromBlock, toBlock } = params[0] as { fromBlock: string; toBlock: string };
-      if (parseInt(toBlock, 16) - parseInt(fromBlock, 16) + 1 > 10000) {
-        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32005, message: "range too large" } }));
-      }
-      return [];
-    });
-    const result = await verify(cidBundle(), { rpcUrl: "https://rpc.test", fetch: rpc.fetch, maxLogQueries: 2 });
-    expect(result.documentAnchor).toBe("unavailable");
-    expect(result.overall).not.toBe("failed");
+    expect(result.overall).toBe("failed");
   });
 });
 
-/** The packed `struct Anchor` (merkleRoot, anchoredAt, revokedAt, state) as eth_call returns it. */
-function anchorWord(root: string, anchoredAt: number, revokedAt = 0, state = 1): string {
-  const w = (n: number) => n.toString(16).padStart(64, "0");
-  return "0x" + root.replace(/^0x/, "") + w(anchoredAt) + w(revokedAt) + w(state);
-}
+describe("a bundle naming a registry the SDK does not read is refused, with no RPC", () => {
+  // The vectors were issued on the emit-only Base Sepolia registry, named in their signed issuer delegation.
+  const EMIT_ONLY = ["0x3532a9DfF3C910152543afCa49De7c66113C5312", "0x23577fafFa306375028D33a559D0F95Ced9424DB"];
+
+  it.each(EMIT_ONLY)("a bundle naming %s fails both anchor checks as an unknown registry", async (address) => {
+    const named = structuredClone(artefact("a1v1.bundle")) as { didDocuments: { issuer: { delegation: { body: Record<string, unknown> } } } };
+    named.didDocuments.issuer.delegation.body["registry"] = address.toLowerCase();
+    const rpc = rpcFetch(() => rootWord(3));
+    const result = await verify(named, { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.consentAnchor).toBe("fail");
+    expect(result.notes.join("\n")).toContain(`the bundle names the registry ${address.toLowerCase()} on chainId 84532, which is not a known registry for chainId 84532`);
+    expect(rpc.calls).toHaveLength(0);
+  });
+
+  it("the issued vectors keep their signatures and structure, and their anchor step refuses the registry they name", async () => {
+    for (const name of ["a1v1.bundle", "cidv1.bundle"]) {
+      const rpc = rpcFetch(() => rootWord(3));
+      const result = await verify(artefact(name), { ...SEPOLIA, fetch: rpc.fetch });
+      expect([result.companySignature, result.receiptIntegrity, result.citizenAssertion]).toEqual(["pass", "pass", "pass"]);
+      expect(result.consentAnchor).toBe("fail");
+      expect(result.documentAnchor).not.toBe("pass");
+      expect(rpc.calls).toHaveLength(0);
+    }
+  });
+
+  it("a bundle naming the registry it is read on, but another chain, is refused", async () => {
+    const named = onReadableRegistry(artefact("a1v1.bundle")) as { didDocuments: { issuer: { delegation: { body: Record<string, unknown> } } } };
+    named.didDocuments.issuer.delegation.body["chainId"] = "8453";
+    const rpc = rpcFetch(() => rootWord(3));
+    const result = await verify(named, { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.consentAnchor).toBe("fail");
+    expect(rpc.calls).toHaveLength(0);
+  });
+});
 
 describe("the consent anchor is read with eth_call registry(consentRef) (N6)", () => {
-  const bundle = () => artefact("a1v1.bundle");
+  const bundle = () => onReadableRegistry(artefact("a1v1.bundle"));
   const root = () => String(bundle()["merkleRoot"]);
 
-  it("a record under the bundle's Merkle root passes, read with the registry(bytes32) selector", async () => {
+  it("a record under the bundle's Merkle root passes, read with the registry(bytes32) selector, its block exposed", async () => {
     const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000) : null));
-    const result = await verify(bundle(), { rpcUrl: "https://rpc.test", fetch: rpc.fetch });
+    const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.consentAnchor).toBe("pass");
     expect(result.overall).toBe("verified");
     const call = rpc.calls.find((c) => c.method === "eth_call")!;
     const refs = bundle()["consentRefs"] as string[];
-    expect((call.params[0] as { data: string }).data).toBe("0x7ef50298" + refs[0]!.slice(2));
-    expect(rpc.calls.some((c) => c.method === "eth_getLogs")).toBe(false);
+    expect((call.params[0] as { data: string; to: string }).data).toBe("0x7ef50298" + refs[0]!.slice(2));
+    expect((call.params[0] as { to: string }).to).toBe(SEPOLIA_REGISTRY);
+    expect(result.consentAnchorRecords).toHaveLength(refs.length);
+    expect(result.consentAnchorRecords![0]).toEqual({
+      consentRef: refs[0], state: "active", anchoredAt: 1760000000, revokedAt: 0, anchoredBlock: 53000000,
+    });
+    expect(result.notes.join("\n")).toContain("anchored in block 53000000");
+  });
+
+  it("a withdrawn record (state 2) is never a pass", async () => {
+    const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000, 1760000600, 2) : null));
+    const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.consentAnchor).toBe("fail");
+    expect(result.consentAnchorRecords![0]!.state).toBe("withdrawn");
+    expect(result.consentAnchorRecords![0]!.revokedAt).toBe(1760000600);
+    expect(result.notes.join("\n")).toContain("WITHDRAWN");
+  });
+
+  it("a four-word answer is unreadable, never a record", async () => {
+    const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000).slice(0, 2 + 256) : null));
+    const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.consentAnchor).toBe("unavailable");
   });
 
   it("a record under another Merkle root FAILS", async () => {
     const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord("0x" + "99".repeat(32), 1760000000) : null));
-    const result = await verify(bundle(), { rpcUrl: "https://rpc.test", fetch: rpc.fetch });
+    const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.consentAnchor).toBe("fail");
     expect(result.overall).toBe("failed");
   });
@@ -211,7 +243,7 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
     const down = rpcFetch(() => new Response("down", { status: 502 }));
     const pending = rpcFetch((m) => (m === "eth_call" ? anchorWord("0x" + "00".repeat(32), 0, 0, 0) : null));
     for (const rpc of [down, pending]) {
-      const result = await verify(bundle(), { rpcUrl: "https://rpc.test", fetch: rpc.fetch });
+      const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
       expect(result.consentAnchor).toBe("unavailable");
       expect(result.overall).not.toBe("failed");
     }

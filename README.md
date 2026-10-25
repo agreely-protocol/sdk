@@ -930,9 +930,12 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   confirm the key reads `failed`, and one that cannot be read as that identity's
   document reads `unavailable`. An acceptance date outside the offer's window
   fails the receipt's integrity and leaves the passkey assertion `unavailable`:
-  the person's key is not evaluated at that date. With `rpcUrl`, the consent
-  anchor passes once every cell's on-chain record was read under the bundle's
-  Merkle root, and reads `unavailable` while a cell is not yet recorded. A bare
+  the person's key is not evaluated at that date. With `rpcUrl`, the on-chain
+  checks read the AgreelyRegistry by `eth_call`: the document anchor passes on a
+  `rootOf` record in the consent-document lane, and the consent anchor passes once
+  every cell's record was read under the bundle's Merkle root and is in force. A
+  withdrawn cell reads `fail`, and a cell not yet recorded reads `unavailable`. On
+  Base mainnet, pass `registryAddress` until its registry is known. A bare
   passkey receipt proves nothing on its own: its assertion reads `unbound`,
   `overall` reads `incomplete`, and the notes say to verify the bundle.
   A `company_attested` paper receipt is `verified` when sound, bare or wrapped. A

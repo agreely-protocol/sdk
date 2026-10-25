@@ -79,11 +79,13 @@ export type ReceiptType = "company_attested" | "company_documented" | "citizen";
  *   - disclosureCopy    OPT-IN (verifyDisclosure): the IPFS copy against the SIGNED
  *                       disclosureHash (and v2 legalBasis). "unsupported" on a bare
  *                       passkey receipt, whose hash is signed by nobody.
- *   - documentAnchor    OPT-IN (rpcUrl): the document CID's on-chain anchor, a bounded
- *                       best-effort log query.
+ *   - documentAnchor    OPT-IN (rpcUrl): the document CID's on-chain anchor, read with
+ *                       rootOf(keccak256(cid)). "pass" only in the consent-document lane;
+ *                       "fail" when absent, in another lane, or when no registry is known.
  *   - consentAnchor     OPT-IN (rpcUrl), bundle only: the consent's on-chain record,
  *                       read with registry(consentRef) and tied by the bound Merkle root.
- *                       "pass" only when every cell's record was read.
+ *                       "pass" only when every cell's record was read and is in force; a
+ *                       withdrawn cell is "fail".
  *   - cellLabelBinding  whether the human-readable cell labels (category/purpose) are
  *                       CRYPTOGRAPHICALLY bound, the one field to read before trusting
  *                       a displayed label.
@@ -99,8 +101,27 @@ export interface ReceiptVerification {
   consentAnchor: CheckStatus;
   cellLabelBinding: CheckStatus;
   overall: OverallStatus;
+  /** Present when documentAnchor passed: when, and in which block, the document CID was anchored. */
+  documentAnchorRecord?: DocumentAnchorRecord;
+  /** Present when consentAnchor read a cell under the bundle's Merkle root: one record per such cell. */
+  consentAnchorRecords?: ConsentAnchorRecord[];
   /** Plain-language notes stating what each result proves vs trusts. */
   notes: string[];
+}
+
+/** A document CID's on-chain anchor (rootOf, lane 3). Times are unix seconds. */
+export interface DocumentAnchorRecord {
+  anchoredAt: number;
+  anchoredBlock: number;
+}
+
+/** One consent cell's on-chain record (registry(consentRef)). Times are unix seconds; revokedAt is 0 while in force. */
+export interface ConsentAnchorRecord {
+  consentRef: string;
+  state: "active" | "withdrawn";
+  anchoredAt: number;
+  revokedAt: number;
+  anchoredBlock: number;
 }
 
 /** A resolved W3C DID document (only the fields the verifier reads are typed). */
@@ -174,16 +195,14 @@ export interface VerifyReceiptOptions {
   ipfsGateway?: (cid: string) => string;
   /** JSON-RPC URL for the opt-in on-chain checks (documentAnchor, consentAnchor). Omit to skip them. */
   rpcUrl?: string;
-  /** AgreelyRegistry address. Defaults per chainId (Base mainnet 8453). */
+  /**
+   * AgreelyRegistry address, read by eth_call (`rootOf`, `registry`) whatever it is. Default: the known registry
+   * of chainId. Base mainnet (8453) has none yet: pass it explicitly there, or the anchor checks fail with
+   * « no known registry for this chain ».
+   */
   registryAddress?: string;
   /** Chain id for the anchor checks. Default 8453 (Base mainnet); pass 84532 to test on Base Sepolia. */
   chainId?: number;
-  /** First block of the document-anchor log query. Default: the registry's deploy block (48889369 on 8453), else 0. */
-  registryDeployBlock?: number;
-  /** Blocks per paged log query when the RPC refuses the full range. Default 10000. */
-  logRangeLimit?: number;
-  /** At most this many paged log queries; past it, documentAnchor is "unavailable", never "fail". Default 10. */
-  maxLogQueries?: number;
   /** Timeout of each RPC, IPFS and DID call, in milliseconds. Default 10000. */
   timeoutMs?: number;
   /**

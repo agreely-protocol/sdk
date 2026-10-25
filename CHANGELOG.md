@@ -29,13 +29,24 @@ to [Semantic Versioning](https://semver.org/).
 - **`consentAnchor`**: with an `rpcUrl`, `verifyReceipt` reads each cell's on-chain
   record from a bundle with `eth_call registry(consentRef)`, tied to the receipt by
   the Merkle root the passkey assertion binds. It reads `pass` once every cell's
-  record was read under that root, `fail` when the chain records a cell under
-  another root, and `unavailable` otherwise, a cell not yet recorded included.
-- Options that bound the on-chain checks: `registryDeployBlock`, `logRangeLimit`
-  (default 10000), `maxLogQueries` (default 10), `timeoutMs`, and `rpcDeadlineMs`
-  (default 30000) over the whole on-chain sequence. The document-anchor log query
-  starts at the registry's deploy block (Base mainnet 48889369, Base Sepolia
-  43698609) and pages within the provider's range limit.
+  record was read under that root and is in force, `fail` when the chain records a
+  cell under another root or records its withdrawal (state 2), and `unavailable`
+  otherwise, a cell not yet recorded included. `consentAnchorRecords` gives each
+  cell read under that root: its state, `anchoredAt`, `revokedAt` and
+  `anchoredBlock`.
+- **The on-chain checks read the registry by `eth_call` only.** The document anchor
+  is one `rootOf(keccak256(cid))`: a record in the consent-document lane (3) passes
+  and fills `documentAnchorRecord` (`anchoredAt`, `anchoredBlock`); no record, or a
+  record in another lane, reads `fail`. `registry(consentRef)` is read as five words,
+  the fifth being `anchoredBlock`. No log query is made.
+- The known registry per chain: Base Sepolia (84532)
+  `0xAf170eA0F66279104D5CF25d7938bBe7A4173e61`. Base mainnet (8453) has none until
+  its registry is deployed: there, pass `registryAddress`, or the anchor checks read
+  `fail` with « no known registry for this chain ». An explicit `registryAddress` is
+  read by `eth_call`.
+- A bundle whose issuer key delegation names another registry or chain than the one
+  read fails both anchor checks as an unknown registry, and no RPC call is made.
+- `timeoutMs`, and `rpcDeadlineMs` (default 30000) over the whole on-chain sequence.
 - `identity().company` carries `slug`, the tenant's public identifier (the one its
   public policy URL carries). Additive: existing fields are unchanged.
 - `withdrawals.record` returns `stillInForce`: the refs of the other consents of the
@@ -75,6 +86,14 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Breaking
 
+- With an `rpcUrl` and no `registryAddress`, Base mainnet (the default chain) no
+  longer resolves `0x23577fafFa306375028D33a559D0F95Ced9424DB`: the anchor checks
+  read `fail` with « no known registry for this chain » until the mainnet registry
+  read by `eth_call` is known. Base Sepolia no longer resolves
+  `0x3532a9DfF3C910152543afCa49De7c66113C5312`. Neither address is read by any check.
+- The document anchor is no longer an `IdentityAnchored` log query, and
+  `VerifyReceiptOptions` no longer has `registryDeployBlock`, `logRangeLimit` or
+  `maxLogQueries`.
 - `verifyReceipt` takes a verification bundle or a receipt. A bare passkey receipt
   reads `incomplete` (it read `partial`), its `citizenAssertion` `unbound` and its
   `disclosureCopy` `unsupported`: pass the bundle issued with it.

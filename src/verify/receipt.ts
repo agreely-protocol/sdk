@@ -48,7 +48,9 @@ import { parseCoseKey, verifyEd25519, verifyWebAuthnAssertion } from "../crypto/
 import { createHash } from "node:crypto";
 import type {
   CheckStatus,
+  ConsentAnchorRecord,
   DidDocument,
+  DocumentAnchorRecord,
   DidVerificationMethod,
   ReceiptType,
   ReceiptVerification,
@@ -70,39 +72,26 @@ const DEFAULT_COMPANY_HOST = "app.agreely.ca";
 // resolve to "unavailable" by default.
 const DEFAULT_CITIZEN_BASE = "https://my.agreely.ca";
 const DEFAULT_IPFS_GATEWAY = "https://gateway.lighthouse.storage/ipfs/";
-// The LIVE Base mainnet AgreelyRegistry, deployed at block 48889369 (the 2026-07-19
-// redeploy that carries the DID-tagged anchor events). EIP-55 checksummed.
+// The AgreelyRegistry each chain is read from, by eth_call. EIP-55 checksummed.
 //
-// KEEP THIS IN SYNC WITH THE DEPLOYMENT. It is pinned BY HAND here (the SDK has no
-// config to read), and the app resolves its own address from config/anchor-network.json,
-// so a redeploy does NOT propagate here on its own. A stale address is SILENT and WORSE
-// than a missing one: the superseded contract still exists on chain and still answers,
-// it just holds no anchors, so every anchor check would contradict a valid receipt.
-// The predecessor 0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B did exactly that in v0.2.0.
-// verifyReceipt.test.ts pins this value so a silent edit fails a test.
+// KEEP THIS IN SYNC WITH THE DEPLOYMENTS. It is pinned BY HAND (the SDK reads no config), so a
+// redeploy does NOT propagate here on its own. A stale address is SILENT and WORSE than a missing
+// one: a superseded contract still exists and still answers, it just holds no anchors.
+// registryReads.test.ts pins this map, and refuses every address that is not on it.
 //
-// Setting it back to null reports the on-chain checks as "skipped" for mainnet (never a
-// false result), which is the correct fallback if it is ever unknown.
-const MAINNET_REGISTRY_ADDRESS: string | null = "0x23577fafFa306375028D33a559D0F95Ced9424DB";
-const MAINNET_DEPLOY_BLOCK = 48889369;
-// Base mainnet (chainId 8453) is the default. Base Sepolia (84532) remains available as an
-// explicit opt-in for integrators testing against the testnet registry (pass chainId 84532).
-const DEFAULT_CHAIN_ID = 8453;
-const REGISTRY_BY_CHAIN: Record<number, string | null> = {
-  8453: MAINNET_REGISTRY_ADDRESS, // Base mainnet (default)
-  84532: "0x3532a9DfF3C910152543afCa49De7c66113C5312", // Base Sepolia (optional testing)
+// Base mainnet (8453) has no entry until its registry is deployed: the address is added here at
+// that cutover, never guessed. Until then, the on-chain checks on 8453 need an explicit registryAddress.
+const REGISTRY_BY_CHAIN: Readonly<Record<number, string>> = {
+  84532: "0xAf170eA0F66279104D5CF25d7938bBe7A4173e61", // Base Sepolia, deployed at block 50179535
 };
-const DEPLOY_BLOCK_BY_CHAIN: Record<number, number> = { 8453: MAINNET_DEPLOY_BLOCK, 84532: 43698609 };
-// `registry(bytes32)` answers the deployed `struct Anchor` as four words whose ORDER changed
-// between deployments: Sepolia still runs the pre-repack layout (chain.js carries the history).
-const LEGACY_LAYOUT_CHAINS = new Set([84532]);
-// keccak256("IdentityAnchored(bytes32,uint64)"), the document CID is anchored via
-// anchorIdentity(commitment = keccak256(utf8(cid))). Emit-only: there is no view to read it,
-// so the document anchor is a log query, bounded and best-effort.
-const IDENTITY_ANCHORED_TOPIC = keccak256Hex("IdentityAnchored(bytes32,uint64)");
+// Base mainnet (chainId 8453) is the default chain. Base Sepolia (84532) is an explicit opt-in for testing.
+const DEFAULT_CHAIN_ID = 8453;
 const REGISTRY_SELECTOR = keccak256Hex("registry(bytes32)").slice(0, 10);
-const DEFAULT_LOG_RANGE_LIMIT = 10_000;
-const DEFAULT_MAX_LOG_QUERIES = 10;
+// rootOf(bytes32) -> (tag, anchoredAt, anchoredBlock, lane). A consent document is keyed keccak256(bytes(cid)),
+// lane 3, always untagged.
+const ROOT_OF_SELECTOR = keccak256Hex("rootOf(bytes32)").slice(0, 10);
+const DOCUMENT_LANE = 3;
+const ROOT_LANES: Readonly<Record<number, string>> = { 1: "an audit-family root", 2: "a cookie consent root" };
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_RPC_DEADLINE_MS = 30_000;
 // A malformed bundle must not spray unbounded RPC calls.
@@ -140,7 +129,17 @@ const ALLOWED_CONSENT_KEYS = new Set([
 
 type RpcOutcome = { ok: true; result: unknown } | { ok: false; reason: string };
 /** The deadline of one verification's RPC sequence, set by its first call. */
-type RpcClock = { deadline: number | null };
+/**
+ * One verification's on-chain session: the RPC deadline, the registry a bundle names (read only to refuse a
+ * mismatch, never to choose what is read), and the records the anchor checks read, for the result.
+ */
+type ChainSession = {
+  deadline: number | null;
+  namedRegistry: NamedRegistry | null;
+  documentRecord?: DocumentAnchorRecord;
+  consentRecords?: ConsentAnchorRecord[];
+};
+type NamedRegistry = { chainId: string; registry: string };
 
 /** Thrown inside a verification to end it as "malformed"; never escapes verify(). */
 class MalformedInput extends Error {}
@@ -192,7 +191,7 @@ export class ReceiptVerifier {
   private async verifyShaped(input: Record<string, unknown>, isBundle: boolean): Promise<ReceiptVerification> {
     const bundle = isBundle ? input : null;
     const r = bundle ? asObject(bundle["receipt"]) : input;
-    const clock: RpcClock = { deadline: null };
+    const session: ChainSession = { deadline: null, namedRegistry: bundle ? namedRegistryOf(bundle) : null };
     const type = receiptType(r);
     const notes: string[] = [];
     if (bundle) {
@@ -203,9 +202,9 @@ export class ReceiptVerifier {
     }
 
     if (type !== "citizen") {
-      return this.verifyRecorded(r, type, bundle !== null, notes, clock);
+      return this.verifyRecorded(r, type, bundle !== null, notes, session);
     }
-    if (!bundle) return this.verifyBarePasskey(r, notes, clock);
+    if (!bundle) return this.verifyBarePasskey(r, notes, session);
     const offer = bundle["signedOffer"];
     const merkleRoot = bundle["merkleRoot"];
     if (!isPlainObject(offer) || Object.keys(offer).length === 0) {
@@ -214,7 +213,7 @@ export class ReceiptVerifier {
     if (typeof merkleRoot !== "string" || merkleRoot === "") {
       throw new MalformedInput("the bundle carries a passkey receipt but no merkleRoot string");
     }
-    return this.verifyPasskeyBundle(r, bundle, offer, merkleRoot, notes, clock);
+    return this.verifyPasskeyBundle(r, bundle, offer, merkleRoot, notes, session);
   }
 
   /** A paper (company_attested) or telephone (company_documented) receipt: the company signed the body itself. */
@@ -223,7 +222,7 @@ export class ReceiptVerifier {
     type: "company_attested" | "company_documented",
     fromBundle: boolean,
     notes: string[],
-    clock: RpcClock,
+    session: ChainSession,
   ): Promise<ReceiptVerification> {
     const companySignature = await this.verifyCompanySignature(r, notes, type);
     notes.push(
@@ -235,7 +234,7 @@ export class ReceiptVerifier {
     const receiptIntegrity = companySignature;
     const cellLabelBinding = assessRecordedCellLabels(companySignature, notes);
     const disclosureCopy = await this.verifyRecordedDisclosureCopy(r, notes);
-    const documentAnchor = await this.verifyDocumentAnchor(r, notes, clock);
+    const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
     notes.push("consentAnchor skipped: a recorded receipt carries no consentRef to read on chain.");
     const consentAnchor: CheckStatus = "skipped";
 
@@ -256,12 +255,13 @@ export class ReceiptVerifier {
       consentAnchor,
       cellLabelBinding,
       overall,
+      ...anchorRecords(session),
       notes,
     };
   }
 
   /** A passkey receipt WITHOUT its signed offer and Merkle root: nothing binds the assertion to the content. */
-  private async verifyBarePasskey(r: Record<string, unknown>, notes: string[], clock: RpcClock): Promise<ReceiptVerification> {
+  private async verifyBarePasskey(r: Record<string, unknown>, notes: string[], session: ChainSession): Promise<ReceiptVerification> {
     notes.push(
       "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in " +
         "the verification bundle.",
@@ -290,7 +290,7 @@ export class ReceiptVerifier {
         "nobody, so no copy can be checked against it.",
     );
     const disclosureCopy: CheckStatus = "unsupported";
-    const documentAnchor = await this.verifyDocumentAnchor(r, notes, clock);
+    const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
     notes.push("consentAnchor skipped: without the bundle there is no consentRef and no bound Merkle root to read on chain.");
 
     const overall: ReceiptVerification["overall"] =
@@ -311,6 +311,7 @@ export class ReceiptVerifier {
       consentAnchor: "skipped",
       cellLabelBinding,
       overall,
+      ...anchorRecords(session),
       notes,
     };
   }
@@ -322,7 +323,7 @@ export class ReceiptVerifier {
     offer: Record<string, unknown>,
     merkleRoot: string,
     notes: string[],
-    clock: RpcClock,
+    session: ChainSession,
   ): Promise<ReceiptVerification> {
     const companySignature = await this.verifyOfferSignature(r, offer, notes);
     const fieldFailure = integrityFailure(r, offer);
@@ -384,8 +385,8 @@ export class ReceiptVerifier {
     }
 
     const disclosureCopy = await this.verifyOfferDisclosureCopy(offer, companySignature, notes);
-    const documentAnchor = await this.verifyDocumentAnchor(r, notes, clock);
-    const consentAnchor = await this.verifyConsentAnchor(bundle, merkleRoot, citizenAssertion, notes, clock);
+    const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
+    const consentAnchor = await this.verifyConsentAnchor(bundle, merkleRoot, citizenAssertion, notes, session);
 
     let overall: ReceiptVerification["overall"];
     const checks = [companySignature, receiptIntegrity, citizenAssertion, disclosureCopy, documentAnchor, consentAnchor];
@@ -404,6 +405,7 @@ export class ReceiptVerifier {
       consentAnchor,
       cellLabelBinding,
       overall,
+      ...anchorRecords(session),
       notes,
     };
   }
@@ -730,11 +732,10 @@ export class ReceiptVerifier {
   }
 
   /**
-   * OPT-IN (rpcUrl): is the document CID anchored (IdentityAnchored)? The event is emit-only, so this is
-   * a log query from the registry's deploy block, paged under a provider's range limit. "fail" only when
-   * the chain answered for EVERY block of that range; any refusal, error or budget exhaustion is "unavailable".
+   * OPT-IN (rpcUrl): is the document CID anchored? One eth_call `rootOf(keccak256(cid))`: lane 3 (a consent
+   * document, untagged) passes, an empty record fails, a record in another lane fails with its own reason.
    */
-  private async verifyDocumentAnchor(r: Record<string, unknown>, notes: string[], clock: RpcClock): Promise<CheckStatus> {
+  private async verifyDocumentAnchor(r: Record<string, unknown>, notes: string[], session: ChainSession): Promise<CheckStatus> {
     const rpcUrl = this.opts.rpcUrl;
     if (!rpcUrl) {
       notes.push("documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.");
@@ -747,81 +748,52 @@ export class ReceiptVerifier {
       return "skipped";
     }
     const chainId = this.chainId();
-    const registry = this.registry();
-    if (!registry) {
-      notes.push(`documentAnchor skipped: no AgreelyRegistry address is known for chainId ${String(chainId)}.`);
-      return "skipped";
+    const target = this.registryToRead(session);
+    if (!target.ok) {
+      notes.push(`documentAnchor FAILED: ${target.reason}`);
+      return "fail";
     }
 
-    const head = await this.rpc(rpcUrl, "eth_blockNumber", [], clock);
-    const latest = head.ok ? parseQuantity(head.result) : null;
-    if (!head.ok || latest === null) {
+    const call = await this.rpc(rpcUrl, "eth_call", [{ to: target.address, data: ROOT_OF_SELECTOR + stripHex(keccak256Hex(cid)) }, "latest"], session);
+    const rec = call.ok ? decodeRootRecord(call.result) : null;
+    if (!rec) {
       notes.push(
-        `documentAnchor UNAVAILABLE: ${head.ok ? "the RPC answered an unreadable block number" : head.reason}. This is NOT a missing anchor.`,
+        `documentAnchor UNAVAILABLE: ${call.ok ? "the registry answered rootOf with an unreadable record" : call.reason}. ` +
+          "This is NOT a missing anchor.",
       );
       return "unavailable";
     }
-    const from = Math.min(this.opts.registryDeployBlock ?? DEPLOY_BLOCK_BY_CHAIN[chainId] ?? 0, latest);
-    const topics = [IDENTITY_ANCHORED_TOPIC, keccak256Hex(cid)];
-    const found = `Document anchor FOUND on chainId ${String(chainId)}: CID ${cid} existed at anchor time. ` +
-      "This proves the DOCUMENT existed, NOT that any consent was given.";
-    const absent = `documentAnchor FAILED: the chain answered for every block from ${String(from)} to ${String(latest)} ` +
-      `and holds no anchor for CID ${cid} on chainId ${String(chainId)}.`;
-
-    // One full-range query first: a provider without a range limit answers it outright.
-    const full = await this.getLogs(rpcUrl, registry, from, latest, topics, clock);
-    if (full.ok) {
-      if (!Array.isArray(full.result)) {
-        notes.push("documentAnchor UNAVAILABLE: the RPC answered the log query with something other than a list. This is NOT a missing anchor.");
-        return "unavailable";
-      }
-      notes.push(full.result.length > 0 ? found : absent);
-      return full.result.length > 0 ? "pass" : "fail";
-    }
-
-    // Refused (range limit, archive token): page backwards from the head, newest first.
-    const range = positiveInt(this.opts.logRangeLimit, DEFAULT_LOG_RANGE_LIMIT);
-    const budget = positiveInt(this.opts.maxLogQueries, DEFAULT_MAX_LOG_QUERIES);
-    let hi = latest;
-    for (let q = 0; q < budget && hi >= from; q++) {
-      const lo = Math.max(from, hi - range + 1);
-      const page = await this.getLogs(rpcUrl, registry, lo, hi, topics, clock);
-      if (!page.ok || !Array.isArray(page.result)) {
-        notes.push(
-          `documentAnchor UNAVAILABLE: the RPC refused the full-range log query (${full.reason}) and a paged query ` +
-            `(${page.ok ? "an answer that is not a list" : page.reason}). This is NOT a missing anchor.`,
-        );
-        return "unavailable";
-      }
-      if (page.result.length > 0) {
-        notes.push(found);
-        return "pass";
-      }
-      hi = lo - 1;
-    }
-    if (hi < from) {
-      notes.push(absent);
+    if (rec.lane === 0) {
+      notes.push(`documentAnchor FAILED: the registry on chainId ${String(chainId)} holds no anchor for CID ${cid}.`);
       return "fail";
     }
+    if (rec.lane !== DOCUMENT_LANE || !/^0x0{64}$/.test(rec.tag)) {
+      const as = rec.lane === DOCUMENT_LANE ? "a tagged document, which a consent document never is" : ROOT_LANES[rec.lane] ?? `a root of lane ${String(rec.lane)}`;
+      notes.push(
+        `documentAnchor FAILED: keccak256 of CID ${cid} is anchored on chainId ${String(chainId)} as ${as}, not as a ` +
+          "consent document.",
+      );
+      return "fail";
+    }
+    session.documentRecord = { anchoredAt: rec.anchoredAt, anchoredBlock: rec.anchoredBlock };
     notes.push(
-      `documentAnchor UNAVAILABLE: no anchor for CID ${cid} in blocks ${String(hi + 1)} to ${String(latest)}, the ` +
-        `${String(budget)} paged queries this RPC allows (${full.reason}); blocks ${String(from)} to ${String(hi)} were ` +
-        "not read. This is NOT a missing anchor: use an RPC that serves the full range, or raise maxLogQueries.",
+      `Document anchor FOUND on chainId ${String(chainId)}: CID ${cid} was anchored at ${String(rec.anchoredAt)} in block ` +
+        `${String(rec.anchoredBlock)}. This proves the DOCUMENT existed, NOT that any consent was given.`,
     );
-    return "unavailable";
+    return "pass";
   }
 
   /**
-   * OPT-IN (rpcUrl), BUNDLE ONLY: eth_call registry(consentRef) for each cell's consentRef, as the app's
-   * chain.js reads it. The record is tied to this receipt only through the Merkle root, which is trusted
-   * only once the passkey assertion is bound to it.
+   * OPT-IN (rpcUrl), BUNDLE ONLY: eth_call registry(consentRef) for each cell's consentRef. The record is tied to
+   * this receipt only through the Merkle root, which is trusted only once the passkey assertion is bound to it.
+   * A withdrawn cell (state 2) is never a pass: the consent is no longer in force, however authentic.
    */
   private async verifyConsentAnchor(
     bundle: Record<string, unknown>,
     merkleRoot: string,
     citizenAssertion: CheckStatus,
     notes: string[],
-    clock: RpcClock,
+    session: ChainSession,
   ): Promise<CheckStatus> {
     const rpcUrl = this.opts.rpcUrl;
     if (!rpcUrl) {
@@ -841,22 +813,22 @@ export class ReceiptVerifier {
       return "skipped";
     }
     const chainId = this.chainId();
-    const registry = this.registry();
-    if (!registry) {
-      notes.push(`consentAnchor skipped: no AgreelyRegistry address is known for chainId ${String(chainId)}.`);
-      return "skipped";
+    const target = this.registryToRead(session);
+    if (!target.ok) {
+      notes.push(`consentAnchor FAILED: ${target.reason}`);
+      return "fail";
     }
 
     const root = stripHex(merkleRoot).toLowerCase();
-    const legacy = LEGACY_LAYOUT_CHAINS.has(chainId);
+    const records: ConsentAnchorRecord[] = [];
     let active = 0;
     let withdrawn = 0;
     let pending = 0;
     let unread = 0;
     const foreign: string[] = [];
     for (const ref of refs) {
-      const call = await this.rpc(rpcUrl, "eth_call", [{ to: registry, data: REGISTRY_SELECTOR + stripHex(ref) }, "latest"], clock);
-      const rec = call.ok ? decodeAnchorRecord(call.result, legacy) : null;
+      const call = await this.rpc(rpcUrl, "eth_call", [{ to: target.address, data: REGISTRY_SELECTOR + stripHex(ref) }, "latest"], session);
+      const rec = call.ok ? decodeAnchorRecord(call.result) : null;
       const revoked = rec !== null && (rec.state === 2 || rec.revokedAt > 0);
       // An anchoredAt with neither state Active nor Revoked is a garbage record, not a pending anchor.
       if (!rec || (rec.anchoredAt > 0 && !revoked && rec.state !== 1)) {
@@ -865,12 +837,13 @@ export class ReceiptVerifier {
         pending++;
       } else if (stripHex(rec.merkleRoot).toLowerCase() !== root) {
         foreign.push(ref);
-      } else if (revoked) {
-        withdrawn++;
       } else {
-        active++;
+        if (revoked) withdrawn++;
+        else active++;
+        records.push({ consentRef: ref, state: revoked ? "withdrawn" : "active", anchoredAt: rec.anchoredAt, revokedAt: rec.revokedAt, anchoredBlock: rec.anchoredBlock });
       }
     }
+    if (records.length > 0) session.consentRecords = records;
 
     if (foreign.length > 0) {
       notes.push(
@@ -881,7 +854,15 @@ export class ReceiptVerifier {
     }
     const counts = `${String(refs.length)} cell(s): ${String(active)} active, ${String(withdrawn)} withdrawn, ` +
       `${String(pending)} not anchored yet, ${String(unread)} unreadable`;
-    if (active + withdrawn !== refs.length) {
+    const blocks = [...new Set(records.map((rec) => rec.anchoredBlock))].join(", ");
+    if (withdrawn > 0) {
+      notes.push(
+        `consentAnchor FAILED: WITHDRAWN on chainId ${String(chainId)} (${counts}). The chain records the consent under ` +
+          `this bundle's Merkle root, anchored in block ${blocks}, and records its withdrawal: it is no longer in force.`,
+      );
+      return "fail";
+    }
+    if (active !== refs.length) {
       notes.push(
         `consentAnchor UNAVAILABLE on chainId ${String(chainId)} (${counts}). Anchoring is asynchronous and an RPC can ` +
           "fail: this is NOT a contradiction.",
@@ -889,8 +870,8 @@ export class ReceiptVerifier {
       return "unavailable";
     }
     notes.push(
-      `Consent anchor FOUND on chainId ${String(chainId)} under this bundle's Merkle root (${counts}). A withdrawn ` +
-        "cell is still authentic: check it before relying on the consent as current.",
+      `Consent anchor FOUND on chainId ${String(chainId)} under this bundle's Merkle root (${counts}), anchored in ` +
+        `block ${blocks}.`,
     );
     return "pass";
   }
@@ -906,35 +887,39 @@ export class ReceiptVerifier {
     return this.opts.chainId ?? DEFAULT_CHAIN_ID;
   }
 
-  private registry(): string | null {
-    return this.opts.registryAddress ?? REGISTRY_BY_CHAIN[this.chainId()] ?? null;
+  /**
+   * The registry the anchor checks read: the explicit registryAddress, else the chain's known one. A bundle that
+   * names another registry or chain is refused, with no RPC: what it names can narrow the read, never redirect it.
+   */
+  private registryToRead(session: ChainSession): { ok: true; address: string } | { ok: false; reason: string } {
+    const chainId = this.chainId();
+    const address = this.opts.registryAddress ?? REGISTRY_BY_CHAIN[chainId];
+    if (!address) {
+      return { ok: false, reason: `no known registry for this chain (chainId ${String(chainId)}): pass its registryAddress.` };
+    }
+    const named = session.namedRegistry;
+    if (named && (named.registry.toLowerCase() !== address.toLowerCase() || (named.chainId !== "" && named.chainId !== String(chainId)))) {
+      return {
+        ok: false,
+        reason: `the bundle names the registry ${named.registry}${named.chainId ? ` on chainId ${named.chainId}` : ""}, which is ` +
+          `not a known registry for chainId ${String(chainId)}. Nothing was read on chain.`,
+      };
+    }
+    return { ok: true, address };
   }
 
   private timeoutMs(): number {
     return positiveInt(this.opts.timeoutMs, DEFAULT_TIMEOUT_MS);
   }
 
-  private getLogs(
-    rpcUrl: string,
-    registry: string,
-    from: number,
-    to: number,
-    topics: string[],
-    clock: RpcClock,
-  ): Promise<RpcOutcome> {
-    return this.rpc(rpcUrl, "eth_getLogs", [
-      { address: registry, fromBlock: toQuantity(from), toBlock: toQuantity(to), topics },
-    ], clock);
-  }
-
   /**
    * One JSON-RPC round trip, inside the verification's overall deadline. Every transport, HTTP or
    * JSON-RPC failure, and a passed deadline, is an outcome, never a throw.
    */
-  private async rpc(rpcUrl: string, method: string, params: unknown[], clock: RpcClock): Promise<RpcOutcome> {
+  private async rpc(rpcUrl: string, method: string, params: unknown[], session: ChainSession): Promise<RpcOutcome> {
     const fetchImpl = this.opts.fetch ?? globalThis.fetch;
-    clock.deadline ??= Date.now() + positiveInt(this.opts.rpcDeadlineMs, DEFAULT_RPC_DEADLINE_MS);
-    const remaining = clock.deadline - Date.now();
+    session.deadline ??= Date.now() + positiveInt(this.opts.rpcDeadlineMs, DEFAULT_RPC_DEADLINE_MS);
+    const remaining = session.deadline - Date.now();
     if (remaining <= 0) {
       return { ok: false, reason: "the overall RPC deadline passed before this call (rpcDeadlineMs)" };
     }
@@ -1339,25 +1324,66 @@ function collectConsentRefs(bundle: Record<string, unknown>): string[] {
 }
 
 /**
- * Decode `struct Anchor` from registry(bytes32). PACKED (mainnet): merkleRoot, anchoredAt, revokedAt,
- * state. LEGACY (Sepolia): state, merkleRoot, anchoredAt, revokedAt. Null on anything that is not that
- * struct in that layout, so a wrong layout reads as unreadable, never as a contradiction.
+ * Decode registry(bytes32): merkleRoot, anchoredAt, revokedAt, state, anchoredBlock. A prefix read: trailing data
+ * is ignored, a shorter answer or a word out of its type's range is null, so it reads as unreadable, never as a
+ * contradiction.
  */
-function decodeAnchorRecord(
+export function decodeAnchorRecord(
   result: unknown,
-  legacy: boolean,
-): { state: number; merkleRoot: string; anchoredAt: number; revokedAt: number } | null {
+): { state: number; merkleRoot: string; anchoredAt: number; revokedAt: number; anchoredBlock: number } | null {
+  const h = stripHex(asString(result)).toLowerCase();
+  if (!/^[0-9a-f]{320}/.test(h)) return null;
+  const word = (i: number): string => h.slice(i * 64, i * 64 + 64);
+  const anchoredAt = uint64Word(word(1));
+  const revokedAt = uint64Word(word(2));
+  const anchoredBlock = uint64Word(word(4));
+  if (!/^0{62}[0-9a-f]{2}$/.test(word(3)) || anchoredAt === null || revokedAt === null || anchoredBlock === null) return null;
+  return { state: parseInt(word(3), 16), merkleRoot: "0x" + word(0), anchoredAt, revokedAt, anchoredBlock };
+}
+
+/**
+ * Decode rootOf(bytes32): tag, anchoredAt, anchoredBlock, lane. Null on anything else, and on a record that
+ * contradicts itself (a lane without an anchor time, or an anchor time without a lane).
+ */
+export function decodeRootRecord(
+  result: unknown,
+): { tag: string; anchoredAt: number; anchoredBlock: number; lane: number } | null {
   const h = stripHex(asString(result)).toLowerCase();
   if (!/^[0-9a-f]{256}/.test(h)) return null;
   const word = (i: number): string => h.slice(i * 64, i * 64 + 64);
-  const [rootW, anchoredW, revokedW, stateW] = legacy ? [word(1), word(2), word(3), word(0)] : [word(0), word(1), word(2), word(3)];
-  if (!/^0{62}[0-9a-f]{2}$/.test(stateW) || !/^0{48}[0-9a-f]{16}$/.test(anchoredW) || !/^0{48}[0-9a-f]{16}$/.test(revokedW)) {
-    return null;
-  }
-  const anchoredAt = parseInt(anchoredW, 16);
-  const revokedAt = parseInt(revokedW, 16);
-  if (!Number.isSafeInteger(anchoredAt) || !Number.isSafeInteger(revokedAt)) return null;
-  return { state: parseInt(stateW, 16), merkleRoot: "0x" + rootW, anchoredAt, revokedAt };
+  const anchoredAt = uint64Word(word(1));
+  const anchoredBlock = uint64Word(word(2));
+  if (anchoredAt === null || anchoredBlock === null || !/^0{62}[0-9a-f]{2}$/.test(word(3))) return null;
+  const lane = parseInt(word(3), 16);
+  if ((lane === 0) !== (anchoredAt === 0)) return null;
+  return { tag: "0x" + word(0), anchoredAt, anchoredBlock, lane };
+}
+
+/** A uint64 ABI word as a safe integer, null when it is not one. */
+function uint64Word(w: string): number | null {
+  if (!/^0{48}[0-9a-f]{16}$/.test(w)) return null;
+  const n = parseInt(w, 16);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
+/**
+ * The registry a bundle names: its issuer's key delegation is bound to one chain and one registry. Null when
+ * the bundle names none. The delegation is not verified here, so this is only ever used to refuse a read.
+ */
+function namedRegistryOf(bundle: Record<string, unknown>): NamedRegistry | null {
+  const body = asObject(asObject(asObject(asObject(bundle["didDocuments"])["issuer"])["delegation"])["body"]);
+  const registry = asString(body["registry"]);
+  if (registry === "") return null;
+  const chainId = body["chainId"];
+  return { registry, chainId: typeof chainId === "string" || typeof chainId === "number" ? String(chainId) : "" };
+}
+
+/** The anchor records a verification read, for its result: absent when none was read. */
+function anchorRecords(session: ChainSession): Pick<ReceiptVerification, "documentAnchorRecord" | "consentAnchorRecords"> {
+  return {
+    ...(session.documentRecord ? { documentAnchorRecord: session.documentRecord } : {}),
+    ...(session.consentRecords ? { consentAnchorRecords: session.consentRecords } : {}),
+  };
 }
 
 /**
@@ -1445,16 +1471,6 @@ function disclosureHashOf(preimage: unknown): string {
 
 function timeoutSignal(ms: number): AbortSignal {
   return AbortSignal.timeout(ms);
-}
-
-function parseQuantity(v: unknown): number | null {
-  if (typeof v !== "string" || !/^0x[0-9a-fA-F]+$/.test(v)) return null;
-  const n = parseInt(v.slice(2), 16);
-  return Number.isSafeInteger(n) ? n : null;
-}
-
-function toQuantity(n: number): string {
-  return "0x" + n.toString(16);
 }
 
 function positiveInt(v: number | undefined, fallback: number): number {

@@ -164,6 +164,8 @@ export type {
 
 export type {
   ReceiptVerification,
+  DocumentAnchorRecord,
+  ConsentAnchorRecord,
   ReceiptType,
   CheckStatus,
   OverallStatus,

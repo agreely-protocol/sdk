@@ -6,16 +6,7 @@ import { Agreely, ReceiptVerifier } from "../../src/index.js";
 import { canonicalize } from "../../src/crypto/jcs.js";
 import type { DidDocument, VerifyReceiptOptions } from "../../src/verify/types.js";
 import { keccak256Hex } from "../../src/crypto/keccak.js";
-
-/**
- * The LIVE Base mainnet AgreelyRegistry (deploy block 48889369, the 2026-07-19 redeploy
- * carrying the DID-tagged anchor events), EIP-55 checksummed. Pinned here so a silent
- * edit of the SDK constant fails a test instead of shipping.
- */
-const LIVE_MAINNET_REGISTRY = "0x23577fafFa306375028D33a559D0F95Ced9424DB";
-
-/** Its predecessor. Still deployed, still answers, holds NO anchors. Never query it. */
-const SUPERSEDED_MAINNET_REGISTRY = "0x1E3121CFB5dfE1ac0b0265790D2bdA709725cF8B";
+import { SEPOLIA_REGISTRY, rootWord } from "./registry.js";
 
 /** EIP-55 mixed-case checksum of a hex address. */
 function eip55(address: string): string {
@@ -79,17 +70,17 @@ describe("Agreely.verifyReceipt (offline golden vectors, byte-identical across S
 });
 
 /**
- * A JSON-RPC endpoint stub that answers per method: eth_blockNumber with `head`, eth_getLogs with `logs`.
- * Every eth_getLogs request body is recorded in `sent`.
+ * A JSON-RPC endpoint stub that answers every eth_call with `answer`. Every eth_call request body is recorded in
+ * `sent`; any other POST is answered with an error.
  */
-function chainFetch(logs: unknown[], head = "0x3000000"): { fetch: typeof fetch; sent: string[] } {
+function chainFetch(answer: string): { fetch: typeof fetch; sent: string[] } {
   const sent: string[] = [];
   const impl = (async (_input: string | URL, init?: RequestInit) => {
     if (init?.method === "POST") {
       const req = JSON.parse(String(init.body)) as { method: string };
-      if (req.method === "eth_getLogs") sent.push(String(init.body));
-      const result = req.method === "eth_blockNumber" ? head : logs;
-      return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result }), {
+      if (req.method !== "eth_call") return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, error: { message: "no" } }));
+      sent.push(String(init.body));
+      return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: answer }), {
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -176,53 +167,83 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     expect(result.disclosureCopy).toBe("skipped");
   });
 
-  it("documentAnchor passes when a matching on-chain log is returned (opt-in rpcUrl, explicit Base Sepolia)", async () => {
+  it("documentAnchor passes on a consent-document record read by eth_call rootOf(keccak256(cid)) (explicit Base Sepolia)", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
+    const chain = chainFetch(rootWord(3));
     const result = await Agreely.verifyReceipt(citizenCase.receipt, {
       resolver: (did) => fixtures.didDocuments[did] ?? null,
-      fetch: chainFetch([{ blockNumber: "0x1" }]).fetch,
+      fetch: chain.fetch,
       rpcUrl: "https://rpc.test",
-      // Base Sepolia (84532) is no longer the default; passing it explicitly still
-      // resolves the known testnet registry, so an integrator can test on Sepolia.
       chainId: 84532,
     });
     expect(result.documentAnchor).toBe("pass");
+    expect(result.documentAnchorRecord).toEqual({ anchoredAt: 1790816400, anchoredBlock: 53000000 });
+    const receipt = citizenCase.receipt as { credentialSubject: { consent: { document: { ipfsCid: string } } } };
+    const cid = receipt.credentialSubject.consent.document.ipfsCid;
+    const call = (JSON.parse(chain.sent[0]!) as { params: Array<{ to: string; data: string }> }).params[0]!;
+    expect(call.to).toBe(SEPOLIA_REGISTRY);
+    expect(call.data).toBe(keccak256Hex("rootOf(bytes32)").slice(0, 10) + keccak256Hex(cid).slice(2));
   });
 
-  it("documentAnchor resolves the deployed Base mainnet registry by default and attempts the on-chain check", async () => {
+  it.each([
+    [0, "holds no anchor for CID"],
+    [1, "as an audit-family root, not as a consent document"],
+    [2, "as a cookie consent root, not as a consent document"],
+    [7, "as a root of lane 7, not as a consent document"],
+  ])("documentAnchor FAILS on a rootOf record in lane %i", async (lane, reason) => {
     const citizenCase = cases.find((c) => c.ipfs)!;
-    const chain = chainFetch([{ blockNumber: "0x1" }]);
+    const result = await Agreely.verifyReceipt(citizenCase.receipt, {
+      resolver: (did) => fixtures.didDocuments[did] ?? null,
+      fetch: chainFetch(rootWord(lane)).fetch,
+      rpcUrl: "https://rpc.test",
+      chainId: 84532,
+    });
+    expect(result.documentAnchor).toBe("fail");
+    expect(result.documentAnchorRecord).toBeUndefined();
+    expect(result.notes.join("\n")).toContain(reason);
+  });
 
-    // No chainId passed -> default is Base mainnet (8453). The registry is now DEPLOYED
-    // and VERIFIED, so the anchor check is no longer "skipped": the verifier resolves the
-    // live mainnet AgreelyRegistry and performs the on-chain documentAnchor lookup.
+  it("documentAnchor FAILS on a tagged document record, which a consent document never is", async () => {
+    const citizenCase = cases.find((c) => c.ipfs)!;
+    const result = await Agreely.verifyReceipt(citizenCase.receipt, {
+      resolver: (did) => fixtures.didDocuments[did] ?? null,
+      fetch: chainFetch(rootWord(3, 1790816400, 53000000, 9)).fetch,
+      rpcUrl: "https://rpc.test",
+      chainId: 84532,
+    });
+    expect(result.documentAnchor).toBe("fail");
+    expect(result.notes.join("\n")).toContain("a tagged document");
+  });
+
+  it("on Base mainnet, with no registry known yet, the anchor check FAILS with no known registry and reads nothing", async () => {
+    const citizenCase = cases.find((c) => c.ipfs)!;
+    const chain = chainFetch(rootWord(3));
     const result = await Agreely.verifyReceipt(citizenCase.receipt, {
       resolver: (did) => fixtures.didDocuments[did] ?? null,
       fetch: chain.fetch,
       rpcUrl: "https://rpc.test",
     });
-    expect(result.documentAnchor).toBe("pass");
-    const anchorRequestBody = chain.sent[0];
-    // Prove the check targeted the LIVE deployed Base mainnet registry address.
-    //
-    // This assertion is the whole guard against a silent, invisible correctness bug.
-    // The registry address is pinned BY HAND in receipt.ts (the SDK reads no config),
-    // and a SUPERSEDED registry still exists on chain and still answers eth_getLogs: it
-    // simply holds no anchors. Querying the wrong one therefore does not error, it
-    // returns zero logs, which the verifier reports as documentAnchor "fail", i.e. a
-    // confident FALSE ACCUSATION OF TAMPERING on a perfectly valid receipt. v0.2.0
-    // shipped exactly that, pinned to the predecessor 0x1E31...cF8B. If this fails, do
-    // not "fix" the test: confirm the live address against the deployment
-    // (agreely-contracts broadcast/DeployRegistry.s.sol/8453/run-latest.json, and the
-    // registryAddress that verify.agreely.ca publishes) and correct the constant.
-    expect(anchorRequestBody).toBeDefined();
-    expect(anchorRequestBody).toContain(LIVE_MAINNET_REGISTRY);
-    expect(anchorRequestBody).not.toContain(SUPERSEDED_MAINNET_REGISTRY);
-    expect(anchorRequestBody).toContain("eth_getLogs");
+    expect(result.documentAnchor).toBe("fail");
+    expect(result.notes.join("\n")).toContain("no known registry for this chain (chainId 8453)");
+    expect(chain.sent).toHaveLength(0);
   });
 
-  // The address the verifier ACTUALLY PUTS ON THE WIRE for mainnet must be EIP-55
-  // checksummed. Read back out of the composed eth_getLogs payload, not from the test's
+  it("an explicit registryAddress is read by eth_call, on any chain", async () => {
+    const citizenCase = cases.find((c) => c.ipfs)!;
+    const chain = chainFetch(rootWord(3));
+    const explicit = "0x00000000000000000000000000000000000000aa";
+    const result = await Agreely.verifyReceipt(citizenCase.receipt, {
+      resolver: (did) => fixtures.didDocuments[did] ?? null,
+      fetch: chain.fetch,
+      rpcUrl: "https://rpc.test",
+      registryAddress: explicit,
+    });
+    expect(result.documentAnchor).toBe("pass");
+    expect((JSON.parse(chain.sent[0]!) as { params: Array<{ to: string }> }).params[0]!.to).toBe(explicit);
+  });
+
+  // The address the verifier ACTUALLY PUTS ON THE WIRE must be EIP-55
+  // checksummed. Read back out of the composed eth_call payload, not from the test's
   // own copy of the constant, so this cannot pass tautologically. A mis-cased address
   // still works over JSON-RPC (addresses compare case-insensitively on chain), so bad
   // casing is invisible at runtime and only surfaces where a human or a
@@ -277,15 +298,16 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     }
   });
 
-  it("sends an EIP-55 checksummed mainnet registry address", async () => {
+  it("sends an EIP-55 checksummed registry address", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
-    const chain = chainFetch([]);
+    const chain = chainFetch(rootWord(0));
     await Agreely.verifyReceipt(citizenCase.receipt, {
       resolver: (did) => fixtures.didDocuments[did] ?? null,
       fetch: chain.fetch,
       rpcUrl: "https://rpc.test",
+      chainId: 84532,
     });
-    const sent = (JSON.parse(chain.sent[0]!) as { params: Array<{ address: string }> }).params[0]?.address;
+    const sent = (JSON.parse(chain.sent[0]!) as { params: Array<{ to: string }> }).params[0]?.to;
 
     expect(sent).toBeDefined();
     expect(sent).toBe(eip55(sent!));

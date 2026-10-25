@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Agreely, isVerificationBundle } from "../../src/index.js";
 import type { DidDocument, ReceiptVerification, VerifyReceiptOptions } from "../../src/verify/types.js";
+import { onReadableRegistry } from "./registry.js";
 
 // Hostile inputs from the re-QA of 0.6.0 (qa-ver1r2): a deep receipt, a forged did:web citizen (c6),
 // bundle shape errors, unchecked top-level receipt keys, and an RPC that never answers.
@@ -216,20 +217,13 @@ function rpcFetch(answer: (method: string) => unknown): { fetch: typeof fetch; c
   return { fetch: impl, calls };
 }
 
-describe("Base Sepolia's deploy block (R11)", () => {
-  it("the document-anchor log query on chain 84532 starts at block 43698609", async () => {
-    const rpc = rpcFetch((m) => (m === "eth_blockNumber" ? "0x" + (43698609 + 5000).toString(16) : [{ blockNumber: "0x1" }]));
-    await verify(artefact("cidv1.bundle"), { rpcUrl: "https://rpc.test", chainId: 84532, fetch: rpc.fetch });
-    const logs = rpc.calls.find((c) => c.method === "eth_getLogs")!;
-    expect((logs.params[0] as { fromBlock: string }).fromBlock).toBe("0x" + (43698609).toString(16));
-  });
-});
-
 describe("an overall deadline on the RPC sequence (R13)", () => {
   it("an RPC that never answers cannot hold a verification past rpcDeadlineMs", async () => {
     const rpc = rpcFetch(() => "hang");
     const started = Date.now();
-    const result = await verify(artefact("cidv1.bundle"), { rpcUrl: "https://rpc.test", fetch: rpc.fetch, rpcDeadlineMs: 300 });
+    const result = await verify(onReadableRegistry(artefact("cidv1.bundle")), {
+      rpcUrl: "https://rpc.test", chainId: 84532, fetch: rpc.fetch, rpcDeadlineMs: 300,
+    });
     const elapsed = Date.now() - started;
     expect(elapsed).toBeLessThan(2000);
     expect(result.documentAnchor).toBe("unavailable");
