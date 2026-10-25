@@ -12,13 +12,14 @@ export {
 } from "./resources/retention.js";
 export { INVENTORY_MAX_SETS, INVENTORY_MAX_FIELDS } from "./resources/inventory.js";
 export { DOCUMENT_TIMEOUT_MS } from "./resources/consentDocuments.js";
-export { WITHDRAWAL_CHANNELS, WITHDRAWAL_REASON_MAX } from "./resources/withdrawals.js";
+export { WITHDRAWAL_CHANNELS, WITHDRAWAL_REASON_MAX, WITHDRAWAL_SCOPE_MAX } from "./resources/withdrawals.js";
 export { CUSTOMER_REF_MAX } from "./util.js";
 
 export {
   AgreelyError,
   AgreelyAuthError,
   AgreelyValidationError,
+  AgreelyOtherConsentsRunningError,
   AgreelyNotFoundError,
   AgreelyBillingInactiveError,
   AgreelyRateLimitError,

@@ -1,6 +1,6 @@
 import { AgreelyConfigError } from "../errors.js";
 import type { Transport } from "../transport.js";
-import { assertOptions, recordIdempotencyKey, renderBudget, requireCustomerRef } from "../util.js";
+import { assertInput, assertOptions, recordIdempotencyKey, renderBudget, requireCustomerRef } from "../util.js";
 import type {
   ClaimLink,
   ConsentSheet,
@@ -155,13 +155,15 @@ export class ManualConsents {
    * ref whose paper already came back is a 409 `superseded_by_paper` (withdraw the
    * manual ref instead, see `verbalConsents.get`). A 409 `citizen_consent_at_gate` means
    * a consent the person signed with her passkey holds the purpose: this route never
-   * ends one, record her withdrawal with `withdrawals.record` instead.
+   * ends one, record her withdrawal with `withdrawals.record` instead. `otherConsents:
+   * "keep"` ends this record and leaves that consent in force (`stillInForce: true`);
+   * `"withdraw"` changes nothing on this route and is refused like no declaration.
    */
   async revoke(consentRef: string, input: ManualConsentMutationInput = {}): Promise<ManualConsentRevocation> {
     return this.transport.request<ManualConsentRevocation>({
       method: "POST",
       path: `/v1/manual-consents/${encodeURIComponent(consentRef)}/revoke`,
-      body: { ...(input.reason !== undefined ? { reason: input.reason } : {}) },
+      body: mutationBody(input, "manualConsents.revoke"),
       idempotentRetry: false,
     });
   }
@@ -171,16 +173,32 @@ export class ManualConsents {
    * (0x-hex). Scope 'attest' only: it cannot be undone. Idempotent server-side;
    * never auto-retried. Returns `gate` like `revoke`. A verbal ref whose paper already
    * came back is a 409 `superseded_by_paper`; a purpose held by a passkey consent is a
-   * 409 `citizen_consent_at_gate`.
+   * 409 `citizen_consent_at_gate`, unless `otherConsents: "keep"` leaves that consent in
+   * force (as on `revoke`).
    */
   async erase(consentRef: string, input: ManualConsentMutationInput = {}): Promise<ManualConsentErasure> {
     return this.transport.request<ManualConsentErasure>({
       method: "POST",
       path: `/v1/manual-consents/${encodeURIComponent(consentRef)}/erase`,
-      body: { ...(input.reason !== undefined ? { reason: input.reason } : {}) },
+      body: mutationBody(input, "manualConsents.erase"),
       idempotentRetry: false,
     });
   }
+}
+
+/** The members a revoke or erase input may carry: anything else is refused, never dropped. */
+const MUTATION_INPUT_MEMBERS = ["reason", "otherConsents"];
+
+/** The body of a revoke or an erase: the reason and the declared scope, nothing else. */
+function mutationBody(input: ManualConsentMutationInput, label: string): ManualConsentMutationInput {
+  assertInput(input, MUTATION_INPUT_MEMBERS, label);
+  if (input.otherConsents !== undefined && input.otherConsents !== "keep" && input.otherConsents !== "withdraw") {
+    throw new AgreelyConfigError(`${label}: otherConsents must be "keep" or "withdraw".`);
+  }
+  return {
+    ...(input.reason !== undefined ? { reason: input.reason } : {}),
+    ...(input.otherConsents !== undefined ? { otherConsents: input.otherConsents } : {}),
+  };
 }
 
 /** A strict JSON boolean member, sent only when given. Anything else is refused, never coerced. */

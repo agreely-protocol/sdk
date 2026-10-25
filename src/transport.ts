@@ -5,6 +5,7 @@ import {
   AgreelyDailyCapError,
   AgreelyError,
   AgreelyNotFoundError,
+  AgreelyOtherConsentsRunningError,
   AgreelyRateLimitError,
   AgreelySweepTooFrequentError,
   AgreelyUnavailableError,
@@ -231,8 +232,11 @@ export class Transport {
    */
   private async fail(res: Response): Promise<never> {
     const payload = await this.safeJson(res);
-    const wire = (payload as { error?: { code?: unknown; message?: unknown; field?: unknown; reason?: unknown } })
-      ?.error;
+    const wire = (
+      payload as {
+        error?: { code?: unknown; message?: unknown; field?: unknown; reason?: unknown; otherConsentRefs?: unknown };
+      }
+    )?.error;
     const message =
       typeof wire?.message === "string" ? wire.message : `Agreely request failed (HTTP ${res.status}).`;
     const code = typeof wire?.code === "string" ? (wire.code as AgreelyErrorCode) : undefined;
@@ -249,6 +253,16 @@ export class Transport {
       case 400:
       case 413:
       case 422:
+        if (detail.reason === "other_consents_running") {
+          const otherConsentRefs = Array.isArray(wire?.otherConsentRefs)
+            ? wire.otherConsentRefs.filter((ref): ref is string => typeof ref === "string")
+            : [];
+          throw new AgreelyOtherConsentsRunningError(message, {
+            ...detail,
+            code: code ?? "invalid_request",
+            otherConsentRefs,
+          });
+        }
         throw new AgreelyValidationError(message, { ...detail, code: code ?? "invalid_request" });
       case 404:
         throw new AgreelyNotFoundError(message, { ...detail, code: code ?? "not_found" });

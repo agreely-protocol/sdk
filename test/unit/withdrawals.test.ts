@@ -5,6 +5,7 @@ import {
   AgreelyConflictError,
   AgreelyDailyCapError,
   AgreelyNotFoundError,
+  AgreelyOtherConsentsRunningError,
   AgreelyRateLimitError,
   AgreelyValidationError,
   WITHDRAWAL_CHANNELS,
@@ -58,13 +59,24 @@ describe("withdrawals.record", () => {
     expect(r.alsoWithdrawn).toEqual([OTHER]);
   });
 
-  it("sends a Date requestedAt in UTC, omits absent optionals, and keeps nothing else from the input", async () => {
+  it("sends a Date requestedAt in UTC and omits absent optionals", async () => {
     const { agreely, calls } = client([{ json: withdrawn }, { json: withdrawn }]);
     await agreely.withdrawals.record("c1", REF, { ...input, requestedAt: new Date("2026-10-08T18:05:00Z") });
-    await agreely.withdrawals.record("c1", REF, { ...input, company: "other" } as never, { idempotencyKey: "w-1" });
+    await agreely.withdrawals.record("c1", REF, input, { idempotencyKey: "w-1" });
     expect(calls[0]!.body).toEqual({ ...input, requestedAt: "2026-10-08T18:05:00.000Z" });
     expect(calls[1]!.body).toEqual(input);
     expect(calls[1]!.headers["Idempotency-Key"]).toBe("w-1");
+  });
+
+  it("refuses an input member it does not name, before any call (never dropped silently)", async () => {
+    const { agreely, calls } = client([{ json: withdrawn }]);
+    await expect(agreely.withdrawals.record("c1", REF, { ...input, company: "other" } as never)).rejects.toThrow(
+      /unknown member "company"/,
+    );
+    await expect(agreely.withdrawals.record("c1", REF, { ...input, otherConsent: "keep" } as never)).rejects.toThrow(
+      AgreelyConfigError,
+    );
+    expect(calls).toHaveLength(0);
   });
 
   it("accepts every documented channel", async () => {
@@ -128,5 +140,115 @@ describe("withdrawals.record", () => {
     expect(err).toBeInstanceOf(AgreelyRateLimitError);
     expect(err).toMatchObject({ code: "withdrawal_daily_cap", reason: "daily_cap", retryAfterSeconds: undefined });
     expect(calls).toHaveLength(1);
+  });
+
+  it("the result is company_documented, never company_attested, and stillInForce is the list of refs left running", async () => {
+    const { agreely } = client([
+      { json: withdrawn },
+      { json: { ...withdrawn, alsoWithdrawn: [], stillInForce: [OTHER] } },
+    ]);
+    const kept = await agreely.withdrawals.record("c1", REF, { ...input, otherConsents: "keep" });
+    expect(kept.assurance).toBe("company_documented");
+    expect(kept.stillInForce).toEqual([]);
+    const after = await agreely.withdrawals.record("c1", REF, { ...input, otherConsents: "keep" });
+    expect(after.stillInForce).toEqual([OTHER]);
+  });
+});
+
+describe("withdrawals.record scope (otherConsents | alsoWithdraw)", () => {
+  it("sends otherConsents 'withdraw' or 'keep' verbatim, and nothing when none is declared", async () => {
+    const { agreely, calls } = client([{ json: withdrawn }, { json: withdrawn }, { json: withdrawn }]);
+    await agreely.withdrawals.record("c1", REF, { ...input, otherConsents: "withdraw" });
+    await agreely.withdrawals.record("c1", REF, { ...input, otherConsents: "keep" });
+    await agreely.withdrawals.record("c1", REF, input);
+    expect(calls.map((c) => c.body)).toEqual([
+      { ...input, otherConsents: "withdraw" },
+      { ...input, otherConsents: "keep" },
+      input,
+    ]);
+  });
+
+  it("sends alsoWithdraw as the trimmed list of refs, and [] as an empty list that declares nothing", async () => {
+    const { agreely, calls } = client([{ json: withdrawn }, { json: withdrawn }]);
+    await agreely.withdrawals.record("c1", REF, { ...input, alsoWithdraw: [` ${OTHER} `, REF] });
+    await agreely.withdrawals.record("c1", REF, { ...input, alsoWithdraw: [] });
+    expect(calls[0]!.body).toEqual({ ...input, alsoWithdraw: [OTHER, REF] });
+    expect(calls[1]!.body).toEqual({ ...input, alsoWithdraw: [] });
+  });
+
+  it("accepts exactly 50 alsoWithdraw refs and refuses 51, before any call", async () => {
+    const many = Array.from({ length: 50 }, (_, i) => "0x" + i.toString(16).padStart(64, "0"));
+    const { agreely, calls } = client([{ json: withdrawn }]);
+    await agreely.withdrawals.record("c1", REF, { ...input, alsoWithdraw: many });
+    expect(calls[0]!.body).toMatchObject({ alsoWithdraw: many });
+    await expect(
+      agreely.withdrawals.record("c1", REF, { ...input, alsoWithdraw: [...many, OTHER] }),
+    ).rejects.toThrow(AgreelyConfigError);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("refuses both otherConsents and alsoWithdraw together, even with an empty alsoWithdraw, before any call", async () => {
+    const { agreely, calls } = client([{ json: withdrawn }]);
+    await expect(
+      agreely.withdrawals.record("c1", REF, { ...input, otherConsents: "keep", alsoWithdraw: [OTHER] }),
+    ).rejects.toThrow(/never both/);
+    await expect(
+      agreely.withdrawals.record("c1", REF, { ...input, otherConsents: "withdraw", alsoWithdraw: [] }),
+    ).rejects.toThrow(AgreelyConfigError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses an otherConsents value other than 'withdraw' or 'keep', and an alsoWithdraw entry that is no consentRef", async () => {
+    const { agreely, calls } = client([{ json: withdrawn }]);
+    const bad: Array<Record<string, unknown>> = [
+      { otherConsents: "KEEP" },
+      { otherConsents: true },
+      { otherConsents: null },
+      { alsoWithdraw: "0x" + "c".repeat(64) },
+      { alsoWithdraw: [OTHER, "0xabc"] },
+      { alsoWithdraw: [42] },
+    ];
+    for (const scope of bad) {
+      await expect(agreely.withdrawals.record("c1", REF, { ...input, ...scope } as never)).rejects.toThrow(
+        AgreelyConfigError,
+      );
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("the 422 other_consents_running is an AgreelyOtherConsentsRunningError exposing otherConsentRefs", async () => {
+    const { agreely } = client([
+      {
+        status: 422,
+        json: {
+          error: {
+            code: "invalid_request",
+            message: "Other consents are in force for this purpose.",
+            field: "otherConsents",
+            reason: "other_consents_running",
+            otherConsentRefs: [OTHER, REF],
+          },
+        },
+      },
+    ]);
+    const err = await agreely.withdrawals.record("c1", REF, input).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AgreelyOtherConsentsRunningError);
+    expect(err).toBeInstanceOf(AgreelyValidationError);
+    expect(err).toMatchObject({
+      code: "invalid_request",
+      status: 422,
+      field: "otherConsents",
+      reason: "other_consents_running",
+      otherConsentRefs: [OTHER, REF],
+    });
+  });
+
+  it("other_consents_running without a list of refs still throws the class, with an empty otherConsentRefs", async () => {
+    const { agreely } = client([
+      { status: 422, json: { error: { code: "invalid_request", message: "x", reason: "other_consents_running" } } },
+    ]);
+    const err = await agreely.withdrawals.record("c1", REF, input).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AgreelyOtherConsentsRunningError);
+    expect((err as AgreelyOtherConsentsRunningError).otherConsentRefs).toEqual([]);
   });
 });

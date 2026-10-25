@@ -544,6 +544,14 @@ export interface ClaimLink {
 export interface ManualConsentMutationInput {
   /** An optional operator reason recorded with the mutation. */
   reason?: string;
+  /**
+   * Only for a purpose a consent the person signed ONLINE (with her passkey) still holds, which this route never ends:
+   *   "keep"     -> that online consent stays in force and this record ends (the result carries `stillInForce: true`);
+   *   "withdraw" -> the same as omitting it. This route does NOT end her online consent: the call is refused 409
+   *                 `citizen_consent_at_gate`. Record her withdrawal with `withdrawals.record` instead.
+   * Without a declaration, that 409 is the answer.
+   */
+  otherConsents?: "keep" | "withdraw";
 }
 
 /**
@@ -1445,6 +1453,19 @@ export interface RecordWithdrawalInput {
   requestedAt?: Instant;
   /** At most 1000 characters, no control characters. Encrypted, shredded on erasure, never on chain. */
   reason?: string;
+  /**
+   * What the withdrawal does to the OTHER consent of the same purpose that is in force, when there is one
+   * (the server answers 422 `other_consents_running`, see {@link AgreelyOtherConsentsRunningError}, until you say):
+   *   "withdraw" -> every other consent in force for the purpose is withdrawn with this one;
+   *   "keep"     -> this consent only is withdrawn, the others stay in force (`stillInForce`).
+   * Never together with `alsoWithdraw`.
+   */
+  otherConsents?: "withdraw" | "keep";
+  /**
+   * The consentRefs (0x-hex) of the other consents of the purpose this withdrawal covers too, at most 50. `[]` declares
+   * nothing. Never together with `otherConsents`.
+   */
+  alsoWithdraw?: string[];
 }
 
 /**
@@ -1463,13 +1484,16 @@ export interface ConsentWithdrawal {
   /** What /v1/check does NOW for the purpose. Read this before telling anyone the use stopped. */
   gate: RevocationGate;
   /**
-   * The other running consents of the same purpose the withdrawal was carried to at the
-   * same instant (a renewal and the paper it renewed, a verbal consent and its paper).
+   * The other consents of the purpose the withdrawal was carried to at the same instant:
+   * the records of this consent's own chain (a renewal and the paper it renewed, a verbal
+   * consent and its paper), plus the ones your scope named (`otherConsents: "withdraw"` or
+   * `alsoWithdraw`). Empty when the scope carried none.
    */
   alsoWithdrawn: string[];
   /**
    * The other consents of the purpose still in force after the act, which it did not
-   * reach, as consent refs. Empty when none is left standing.
+   * reach, as consent refs (a list, not a flag: name them to ask the person). Empty when
+   * none is left standing.
    */
   stillInForce: string[];
 }

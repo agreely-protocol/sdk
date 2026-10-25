@@ -211,6 +211,9 @@ const w = await agreely.manualConsents.revoke("0x…", { reason: "withdrawn" });
 // { consentRef, revoked: true, alreadyRevoked, gate: "denied" | "superseded" | "unchanged" }
 const e = await agreely.manualConsents.erase("0x…");
 // { consentRef, erased: true, alreadyErased, gate }
+// Keeping a consent the person signed online in force (see the refusal below):
+const k = await agreely.manualConsents.revoke("0x…", { otherConsents: "keep" });
+// { ..., gate: "superseded", stillInForce: true }
 ```
 
 `sensitiveExpressAttested` and `versionAttested` are the organisation's own
@@ -233,8 +236,11 @@ What gets refused, and how (compare `error.reason`, never the message):
   still awaiting its paper (`verbal_awaits_paper`). Nothing is recorded.
 - `revoke` and `erase`: **409** `citizen_consent_at_gate` when a consent the person
   signed with her passkey holds the purpose. These routes never end one: record her
-  withdrawal with `withdrawals.record` (below). **409** `superseded_by_paper` for a
-  verbal ref whose paper came back. **404** `unknown_consent`.
+  withdrawal with `withdrawals.record` (below). `otherConsents: "keep"` ends this
+  record and leaves that consent in force, answering `stillInForce: true`; absent
+  (or `"withdraw"`, which this route treats the same) the 409 stands. **409**
+  `superseded_by_paper` for a verbal ref whose paper came back. **404**
+  `unknown_consent`.
 - `createClaimLink`: **404** `unknown_customer` for a customer the company holds no
   record of (nothing written), **409** `relationship_ended` once the relationship
   has ended.
@@ -368,19 +374,27 @@ const w = await agreely.withdrawals.record("cust_8812", "0x…consentRef", {
   operator: "agent-042",   // YOUR opaque staff id, never an email address
   requestedAt: "2026-10-08T14:05:00-04:00", // optional: when she asked
   reason: "Asked on the phone", // optional, at most 1000 characters
+  otherConsents: "keep",   // see below: "withdraw" | "keep", or alsoWithdraw: ["0x…"]
 });
 // { consentRef, withdrawn: true, alreadyWithdrawn, recordedOnBehalf: true,
-//   assurance: "company_attested", gate: "denied" | "superseded" | "unchanged",
-//   alsoWithdrawn: ["0x…"] }
+//   assurance: "company_documented", gate: "denied" | "superseded" | "unchanged",
+//   alsoWithdrawn: ["0x…"], stillInForce: ["0x…"] }
 ```
 
 - **Honest by construction.** Every answer says `recordedOnBehalf: true` and
-  `assurance: "company_attested"`: Agreely records that your organisation says it
+  `assurance: "company_documented"`: Agreely records that your organisation says it
   received and actioned the request, never that she signed a revocation.
-- **A withdrawal attaches to the purpose.** The other running consents of the same
-  purpose (a renewal and the paper it renewed, a verbal consent and its paper) are
-  withdrawn at the same instant and listed in `alsoWithdrawn`. Read `gate` before
-  telling anyone the use stopped.
+- **A withdrawal attaches to the purpose, but you decide the other consents.** When
+  another consent of the same purpose is in force (a renewal and the paper it
+  renewed, a verbal consent and its paper, or a second person's consent), the call
+  must say what happens to it: `otherConsents: "withdraw"` withdraws all of them,
+  `alsoWithdraw: ["0x…"]` names the ones it covers (at most 50; `[]` declares
+  nothing), and `otherConsents: "keep"` withdraws this consent alone. Never two of
+  them together. Without a declaration the answer is 422 `other_consents_running`,
+  an `AgreelyOtherConsentsRunningError` whose `otherConsentRefs` lists those
+  consents: ask her which, then retry. Those carried at the same instant come back in
+  `alsoWithdrawn`; those still in force in `stillInForce`. Read `gate` before telling
+  anyone the use stopped.
 - **Its own scope**, never granted by default: a key holding it can switch off every
   consent of your company one call at a time. A **daily cap** applies (429
   `AgreelyDailyCapError`, code `withdrawal_daily_cap`, reason `daily_cap`, no
@@ -391,7 +405,8 @@ const w = await agreely.withdrawals.record("cust_8812", "0x…consentRef", {
   customer's reference: one answer), 409 `consent_lapsed` (it ended on its own
   date; another consent may be in force, check the purpose), 422 `not_revocable`
   (the cell was never a consent ask), `requested_at_in_future`,
-  `requested_at_before_grant`. Accepted after the relationship ended.
+  `requested_at_before_grant`, `not_running_for_purpose` (an `alsoWithdraw` entry that
+  is not another consent in force for the purpose). Accepted after the relationship ended.
 - Never auto-retried; an Idempotency-Key is attached per call, and a retry with the
   same key and body replays the first answer.
 
@@ -681,6 +696,7 @@ random key.
 | --------------------------- | ------------------------------------- |
 | `AgreelyAuthError`          | 401 unauthorized / 403 forbidden      |
 | `AgreelyValidationError`    | 400 / 422 (`.field` names the input)  |
+| `AgreelyOtherConsentsRunningError` | 422 `other_consents_running` on a withdrawal (an `AgreelyValidationError`): `.otherConsentRefs` lists the consents in force for the purpose |
 | `AgreelyNotFoundError`      | 404                                   |
 | `AgreelyBillingInactiveError` | 402 - the company's Agreely subscription lapsed |
 | `AgreelyRateLimitError`     | 429 (`.retryAfter` seconds). `code: "rate_limited"` is the per-minute window, the only 429 ever auto-retried; any other code keeps its own and is never retried |

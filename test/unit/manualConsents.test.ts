@@ -188,6 +188,43 @@ describe("manualConsents.revoke / erase", () => {
     expect(err).toBeInstanceOf(AgreelyConflictError);
     expect(err).toMatchObject({ code: "conflict", reason: "citizen_consent_at_gate", status: 409 });
   });
+
+  it("sends otherConsents 'keep' or 'withdraw' verbatim on revoke and erase, beside the reason", async () => {
+    const { agreely, calls } = client([
+      { json: { consentRef: REF, revoked: true, alreadyRevoked: false, gate: "superseded", stillInForce: true } },
+      { json: { consentRef: REF, revoked: true, alreadyRevoked: false, gate: "superseded", stillInForce: true } },
+      { json: { consentRef: REF, erased: true, alreadyErased: false, gate: "superseded", stillInForce: true } },
+      { json: { consentRef: REF, erased: true, alreadyErased: false, gate: "denied" } },
+    ]);
+    await agreely.manualConsents.revoke(REF, { reason: "asked", otherConsents: "keep" });
+    await agreely.manualConsents.revoke(REF, { otherConsents: "withdraw" });
+    await agreely.manualConsents.erase(REF, { otherConsents: "keep" });
+    await agreely.manualConsents.erase(REF);
+    expect(calls.map((c) => c.body)).toEqual([
+      { reason: "asked", otherConsents: "keep" },
+      { otherConsents: "withdraw" },
+      { otherConsents: "keep" },
+      {},
+    ]);
+  });
+
+  it("returns stillInForce true when kept, and omits it when nothing was kept (as the server does)", async () => {
+    const kept = { consentRef: REF, revoked: true, alreadyRevoked: false, gate: "superseded", stillInForce: true };
+    const plain = { consentRef: REF, revoked: true, alreadyRevoked: false, gate: "denied" };
+    const { agreely } = client([{ json: kept }, { json: plain }]);
+    const a = await agreely.manualConsents.revoke(REF, { otherConsents: "keep" });
+    const b = await agreely.manualConsents.revoke(REF);
+    expect(a.stillInForce).toBe(true);
+    expect(b).not.toHaveProperty("stillInForce");
+  });
+
+  it("refuses an otherConsents other than 'keep' or 'withdraw', and an input member it does not name, before any call", async () => {
+    const { agreely, calls } = client([{ json: { consentRef: REF, revoked: true, alreadyRevoked: false, gate: "denied" } }]);
+    await expect(agreely.manualConsents.revoke(REF, { otherConsents: "KEEP" } as never)).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.erase(REF, { otherConsents: true } as never)).rejects.toThrow(AgreelyConfigError);
+    await expect(agreely.manualConsents.revoke(REF, { otherConsent: "keep" } as never)).rejects.toThrow(/unknown member/);
+    expect(calls).toHaveLength(0);
+  });
 });
 
 describe("manualConsents.record (attestations)", () => {

@@ -150,6 +150,8 @@ export type AgreelyErrorReason =
   | "requested_at_in_future"
   | "requested_at_before_grant"
   | "invalid_reason"
+  | "other_consents_running"
+  | "not_running_for_purpose"
   // Caps and claims.
   | "daily_cap"
   | "claim_link_already_live"
@@ -199,6 +201,21 @@ export class AgreelyAuthError extends AgreelyError {}
 
 /** 400 / 422: malformed or invalid input. `field` names the offending input when known. */
 export class AgreelyValidationError extends AgreelyError {}
+
+/**
+ * 422 `other_consents_running` on a withdrawal: another consent of the purpose is in force, and the call did not say
+ * whether the withdrawal covers it. Nothing was recorded. `otherConsentRefs` lists those consents (0x-hex), so you can
+ * ask the person which of them she means and retry with `otherConsents` or `alsoWithdraw`.
+ */
+export class AgreelyOtherConsentsRunningError extends AgreelyValidationError {
+  /** The consentRefs of the other consents in force for the purpose (`error.otherConsentRefs`). */
+  readonly otherConsentRefs: string[];
+
+  constructor(message: string, init: AgreelyErrorInit & { otherConsentRefs?: string[] }) {
+    super(message, init);
+    this.otherConsentRefs = init.otherConsentRefs ?? [];
+  }
+}
 
 /** 404: no such resource. */
 export class AgreelyNotFoundError extends AgreelyError {}

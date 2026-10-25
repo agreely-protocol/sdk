@@ -14,6 +14,9 @@ to [Semantic Versioning](https://semver.org/).
   server ignores it. The purpose belongs to the processing, documented per catalogue
   cell. The retention disposition keeps its frozen `basis` and `hasBasisNote`, and the
   catalogue keeps `legalBasis` per cell.
+- `withdrawals.record`, `manualConsents.revoke` and `manualConsents.erase` refuse an input
+  member they do not name, before any call (`AgreelyConfigError`), where they used to drop
+  it silently. A stray or misspelt key, such as `otherConsent`, now fails loudly.
 
 ### Added
 
@@ -23,12 +26,23 @@ to [Semantic Versioning](https://semver.org/).
   purpose still in force after the act. `manualConsents.revoke` and `manualConsents.erase`
   return `stillInForce: true` only when another consent was kept in force, and omit it
   otherwise. Additive: no existing response field changes.
+- `withdrawals.record` takes the scope toward the other consents of its purpose:
+  `otherConsents: "withdraw" | "keep"`, or `alsoWithdraw` (a list of at most 50 consentRefs,
+  `[]` declares nothing). Both together are refused client-side. `manualConsents.revoke` and
+  `manualConsents.erase` take `otherConsents: "keep" | "withdraw"` (`"withdraw"` is treated
+  as no declaration by the route, which still refuses a passkey consent with 409).
+- A withdrawal refused 422 `other_consents_running` throws `AgreelyOtherConsentsRunningError`,
+  an `AgreelyValidationError` whose `otherConsentRefs` lists the other consents in force, so
+  the caller can ask the person and retry. `WITHDRAWAL_SCOPE_MAX` is exported (50).
 
 ### Fixed
 
 - `withdrawals.record` types `assurance` as `"company_documented"`, the only value the
   server sends (since 2026-10-20). It was typed `"company_attested"`, so code that compares
   against `"company_attested"` no longer compiles. Narrowing a literal type, not additive.
+- The withdrawal docs (README and docblocks) said the other consents of the purpose are always
+  withdrawn with it. They are withdrawn only when the scope names them; otherwise the call
+  is refused as above.
 - `verifyReceipt` recomputes a v2 `disclosureHash` over `{disclosure, legalBasis}` when the
   receipt declares `disclosureVersion: "2"`. Every authentic v2 receipt (a cell on a non-consent
   basis) used to report `disclosureCopy` as `fail`. A v2 receipt without its `legalBasis` now
