@@ -47,6 +47,9 @@ to [Semantic Versioning](https://semver.org/).
   receipt declares `disclosureVersion: "2"`. Every authentic v2 receipt (a cell on a non-consent
   basis) used to report `disclosureCopy` as `fail`. A v2 receipt without its `legalBasis` now
   fails rather than falling back to the v1 formula.
+- `verifyReceipt` returns a verdict where it used to throw on a receipt whose content the
+  canonicalizer refuses, such as a number in a v2 `legalBasis`. `disclosureCopy` reports `fail`,
+  and `companySignature` does too when the receipt body holds such a value. The note names the reason.
 
 ## 0.5.0 - 2026-10-09
 

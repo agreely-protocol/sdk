@@ -27,7 +27,7 @@
 // disclosureCopy (both types) and documentAnchor (opt-in) are the two additional
 // offline-sound / on-chain proofs.
 
-import { canonicalize } from "../crypto/jcs.js";
+import { canonicalize, JcsError } from "../crypto/jcs.js";
 import {
   base64urlDecode,
   bytesEqual,
@@ -163,7 +163,15 @@ export class ReceiptVerifier {
     // The exact bytes the signature was taken over: the receipt body with `proof` removed.
     const body: Record<string, unknown> = { ...r };
     delete body["proof"];
-    const canonical = new TextEncoder().encode(canonicalize(body));
+    let canonical: Uint8Array;
+    try {
+      canonical = new TextEncoder().encode(canonicalize(body));
+    } catch (err) {
+      // The receipt is untrusted input: a value the canonicalizer refuses (a number) is a verdict, never a throw.
+      if (!(err instanceof JcsError)) throw err;
+      notes.push(`Company signature check FAILED: the receipt body cannot be canonicalized (${err.message}), so its signature cannot be checked.`);
+      return "fail";
+    }
 
     let signature: Uint8Array;
     try {
@@ -329,14 +337,32 @@ export class ReceiptVerifier {
         );
         return "fail";
       }
-      const bodyBasis = asObject(body)["legalBasis"];
-      if (bodyBasis !== undefined && canonicalize(bodyBasis) !== canonicalize(receiptBasis)) {
+      try {
+        canonicalize(receiptBasis);
+      } catch (err) {
+        if (!(err instanceof JcsError)) throw err;
         notes.push(
-          "disclosureCopy FAILED (disclosureVersion 2): the IPFS document body carries a legalBasis that differs from the receipt's.",
+          `disclosureCopy FAILED (disclosureVersion 2): the receipt's legalBasis cannot be canonicalized (${err.message}), so its preimage cannot be rebuilt.`,
         );
         return "fail";
       }
-      const computedV2 = disclosureHashOf({ disclosure, legalBasis: receiptBasis });
+      let computedV2: string;
+      try {
+        const bodyBasis = asObject(body)["legalBasis"];
+        if (bodyBasis !== undefined && canonicalize(bodyBasis) !== canonicalize(receiptBasis)) {
+          notes.push(
+            "disclosureCopy FAILED (disclosureVersion 2): the IPFS document body carries a legalBasis that differs from the receipt's.",
+          );
+          return "fail";
+        }
+        computedV2 = disclosureHashOf({ disclosure, legalBasis: receiptBasis });
+      } catch (err) {
+        if (!(err instanceof JcsError)) throw err;
+        notes.push(
+          `disclosureCopy FAILED: the IPFS document body cannot be canonicalized (${err.message}), so its disclosure copy cannot be checked.`,
+        );
+        return "fail";
+      }
       if (computedV2 === disclosureHash) {
         notes.push(
           `Disclosure copy verified (disclosureVersion 2: {disclosure, legalBasis}): the IPFS document body and the receipt legalBasis match the receipt disclosureHash ${disclosureHash}.`,
@@ -350,7 +376,16 @@ export class ReceiptVerifier {
     }
 
     // v1 (or absent): the preimage is the disclosure map alone.
-    const computed = disclosureHashOf(disclosure);
+    let computed: string;
+    try {
+      computed = disclosureHashOf(disclosure);
+    } catch (err) {
+      if (!(err instanceof JcsError)) throw err;
+      notes.push(
+        `disclosureCopy FAILED: the IPFS document body cannot be canonicalized (${err.message}), so its disclosure copy cannot be checked.`,
+      );
+      return "fail";
+    }
     if (computed === disclosureHash) {
       notes.push(`Disclosure copy verified: the IPFS document body matches the receipt disclosureHash ${disclosureHash}.`);
       return "pass";

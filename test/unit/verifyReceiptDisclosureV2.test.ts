@@ -178,3 +178,41 @@ describe("disclosureCopy recomputes a v2 disclosureHash over {disclosure, legalB
     expect(result.disclosureCopy).toBe("pass");
   });
 });
+
+describe("a value the canonicalizer refuses is a verdict, never a throw out of verifyReceipt", () => {
+  // A number is the one value the JCS canonicalizer refuses here (numbers travel as strings).
+  it("a v2 legalBasis holding a number FAILS the disclosure check, with the reason, and does not throw", async () => {
+    const receipt = receiptWith((consent) => {
+      (consent["legalBasis"] as Record<string, Record<string, unknown>>)["0x01"]!["weight"] = 3;
+    });
+    const result = await disclosureCopyOf(receipt);
+    expect(result.disclosureCopy).toBe("fail");
+    expect(result.notes.join("\n")).toContain("the receipt's legalBasis cannot be canonicalized");
+  });
+
+  it("a v2 IPFS body carrying a legalBasis with a number FAILS the disclosure check, and does not throw", async () => {
+    const body = { ...IPFS_BODY, legalBasis: { "0x01": { basis: "consent", weight: 3 } } };
+    const result = await disclosureCopyOf(baseReceipt(), body);
+    expect(result.disclosureCopy).toBe("fail");
+    expect(result.notes.join("\n")).toContain("the IPFS document body cannot be canonicalized");
+  });
+
+  it("a v2 IPFS body whose disclosure holds a number FAILS the disclosure check, and does not throw", async () => {
+    const body = { ...IPFS_BODY, disclosure: { ...DISCLOSURE, copies: 3 } };
+    const result = await disclosureCopyOf(baseReceipt(), body);
+    expect(result.disclosureCopy).toBe("fail");
+    expect(result.notes.join("\n")).toContain("the IPFS document body cannot be canonicalized");
+  });
+
+  it("a v1 IPFS body whose disclosure holds a number FAILS the disclosure check, and does not throw", async () => {
+    const receipt = receiptWith((consent) => {
+      delete consent["legalBasis"];
+      delete consent["disclosureVersion"];
+      consent["disclosureHash"] = sha256Of(DISCLOSURE);
+    });
+    const body = { ...IPFS_BODY, disclosure: { ...DISCLOSURE, copies: 3 } };
+    const result = await disclosureCopyOf(receipt, body);
+    expect(result.disclosureCopy).toBe("fail");
+    expect(result.notes.join("\n")).toContain("the IPFS document body cannot be canonicalized");
+  });
+});

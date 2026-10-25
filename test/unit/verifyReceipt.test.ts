@@ -468,4 +468,12 @@ describe("a VERBAL receipt (VerbalConsentReceipt, company_documented) is never r
     expect(result.companySignature).toBe("unavailable");
     expect(result.overall).toBe("unavailable");
   });
+
+  it("a receipt body holding a number the canonicalizer refuses FAILS the company signature, and does not throw", async () => {
+    const receipt = signedVerbalReceipt();
+    (receipt.evidence as Record<string, unknown>).attempts = 2;
+    const result = await Agreely.verifyReceipt(receipt, { resolver });
+    expect(result.companySignature).toBe("fail");
+    expect(result.notes.join(" ")).toContain("the receipt body cannot be canonicalized");
+  });
 });
