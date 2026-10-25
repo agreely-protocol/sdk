@@ -50,6 +50,8 @@ export interface Identity {
   scopes: Scope[];
   company: {
     name: string;
+    /** The tenant's public identifier, the one its public policy URL carries. */
+    slug: string;
     sector: Regime["sector"];
     statute: Regime["statute"];
     /** The ABSOLUTE url of the tenant's public privacy page, or null when it would not resolve. */
@@ -562,6 +564,8 @@ export interface ManualConsentRevocation {
   alreadyRevoked: boolean;
   /** What the gate does now. Read this, not `revoked`, before telling anyone the use stopped. */
   gate: RevocationGate;
+  /** Present ONLY when another consent was kept in force past this one; absent otherwise. */
+  stillInForce?: true;
 }
 
 /** The 200 body from erasing a manual or verbal consent. */
@@ -572,6 +576,8 @@ export interface ManualConsentErasure {
   alreadyErased: boolean;
   /** What the gate does now for the purpose, as on a revoke ("unchanged" on a repeat). */
   gate: RevocationGate;
+  /** Present ONLY when another consent was kept in force past this one; absent otherwise. */
+  stillInForce?: true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1443,7 +1449,7 @@ export interface RecordWithdrawalInput {
 
 /**
  * The 200 body of a recorded withdrawal. ALWAYS `recordedOnBehalf: true` and
- * `assurance: "company_attested"`: Agreely records that the organisation says it
+ * `assurance: "company_documented"`: Agreely records that the organisation says it
  * received and actioned the request; it never presents it as the person's own signed
  * revocation, whatever the consent's tier.
  */
@@ -1453,7 +1459,7 @@ export interface ConsentWithdrawal {
   /** True on a repeat: the consent was already withdrawn. */
   alreadyWithdrawn: boolean;
   recordedOnBehalf: true;
-  assurance: "company_attested";
+  assurance: "company_documented";
   /** What /v1/check does NOW for the purpose. Read this before telling anyone the use stopped. */
   gate: RevocationGate;
   /**
@@ -1461,6 +1467,11 @@ export interface ConsentWithdrawal {
    * same instant (a renewal and the paper it renewed, a verbal consent and its paper).
    */
   alsoWithdrawn: string[];
+  /**
+   * The other consents of the purpose still in force after the act, which it did not
+   * reach, as consent refs. Empty when none is left standing.
+   */
+  stillInForce: string[];
 }
 
 // ---------------------------------------------------------------------------

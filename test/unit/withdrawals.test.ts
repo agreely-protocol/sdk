@@ -29,9 +29,10 @@ const withdrawn: ConsentWithdrawal = {
   withdrawn: true,
   alreadyWithdrawn: false,
   recordedOnBehalf: true,
-  assurance: "company_attested",
+  assurance: "company_documented",
   gate: "denied",
   alsoWithdrawn: [OTHER],
+  stillInForce: [],
 };
 
 const input = { channel: "phone", operator: "agent-042" } as const;

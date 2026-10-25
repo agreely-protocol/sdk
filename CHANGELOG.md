@@ -15,6 +15,21 @@ to [Semantic Versioning](https://semver.org/).
   cell. The retention disposition keeps its frozen `basis` and `hasBasisNote`, and the
   catalogue keeps `legalBasis` per cell.
 
+### Added
+
+- `identity().company` carries `slug`, the tenant's public identifier (the one its public
+  policy URL carries). Additive: existing fields are unchanged.
+- `withdrawals.record` returns `stillInForce`: the refs of the other consents of the
+  purpose still in force after the act. `manualConsents.revoke` and `manualConsents.erase`
+  return `stillInForce: true` only when another consent was kept in force, and omit it
+  otherwise. Additive: no existing response field changes.
+
+### Fixed
+
+- `withdrawals.record` types `assurance` as `"company_documented"`, the only value the
+  server sends (since 2026-10-20). It was typed `"company_attested"`, so code that compares
+  against `"company_attested"` no longer compiles. Narrowing a literal type, not additive.
+
 ## 0.5.0 - 2026-10-09
 
 Covers the whole /v1 API in production since 2026-10-09. **0.4.0 below was

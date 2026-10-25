@@ -199,6 +199,7 @@ suite("contract: @agreely/sdk vs the live /v1 API", () => {
       assertExactKeys(identity as unknown as Record<string, unknown>, ["scopes", "company"]);
       assertExactKeys(identity.company as unknown as Record<string, unknown>, [
         "name",
+        "slug",
         "sector",
         "statute",
         "publicPolicyUrl",
@@ -418,6 +419,22 @@ writeSuite("contract: the write routes, with refs holding a slash and %41", () =
     a = new Agreely({ apiKey: allKey!, baseUrl: fixture!.baseUrl, timeout: 15_000 });
   });
 
+  // Records a paper consent for the fixture's purpose and returns its consent ref.
+  async function recordManualConsent(customerRef: string): Promise<string> {
+    const recorded = await a.manualConsents.record({
+      customerId: customerRef,
+      documentVersionId: fixture!.issue.documentId,
+      effectiveDate: isoDay(-1),
+      validUntil: isoDay(365),
+      items: [fixture!.issue.catalogId],
+      evidence: { pdfSha256: Agreely.hashPdf(new TextEncoder().encode(`%PDF-1.7 contract ${run}`)) },
+      versionAttested: true,
+    });
+    const consentRef = recorded.consentRefs.find((ref) => !recorded.acknowledged.some((l) => l.consentRef === ref));
+    expect(consentRef).toMatch(CONSENT_REF);
+    return consentRef!;
+  }
+
   it("the stack hands an encoded slash to the API (it is not refused by the web server)", async () => {
     const res = await fetch(`${fixture!.baseUrl}/v1/customers/a%2Fb`);
     expect(res.headers.get("content-type") ?? "", "an HTML 404 means the web server refused %2F").toContain(
@@ -466,19 +483,22 @@ writeSuite("contract: the write routes, with refs holding a slash and %41", () =
     expect(replay).toMatchObject({ code: "already_minted", reason: "already_minted" });
   });
 
+  it("a manual revoke with no keep choice carries no stillInForce", async () => {
+    const consentRef = await recordManualConsent(`SDK/${run}/rv%41`);
+
+    const revoked = await a.manualConsents.revoke(consentRef);
+    assertExactKeys(
+      revoked as unknown as Record<string, unknown>,
+      ["consentRef", "revoked", "alreadyRevoked", "gate"],
+      ["stillInForce"],
+    );
+    expect(revoked).toMatchObject({ consentRef, revoked: true, alreadyRevoked: false, gate: "denied" });
+    expect(revoked).not.toHaveProperty("stillInForce");
+  });
+
   it("a withdrawal recorded on behalf, for a ref with a slash and %41, denies at once and replays on repeat", async () => {
     const customerRef = `SDK/${run}/wd%41`;
-    const recorded = await a.manualConsents.record({
-      customerId: customerRef,
-      documentVersionId: fixture!.issue.documentId,
-      effectiveDate: isoDay(-1),
-      validUntil: isoDay(365),
-      items: [fixture!.issue.catalogId],
-      evidence: { pdfSha256: Agreely.hashPdf(new TextEncoder().encode(`%PDF-1.7 contract ${run}`)) },
-      versionAttested: true,
-    });
-    const consentRef = recorded.consentRefs.find((ref) => !recorded.acknowledged.some((l) => l.consentRef === ref));
-    expect(consentRef).toMatch(CONSENT_REF);
+    const consentRef = await recordManualConsent(customerRef);
 
     const before = await a.checkDetailed(customerRef, fixture!.issue.category, fixture!.issue.purpose);
     expect(before.decision).toBe("allow");
@@ -492,8 +512,13 @@ writeSuite("contract: the write routes, with refs holding a slash and %41", () =
       "assurance",
       "gate",
       "alsoWithdrawn",
+      "stillInForce",
     ]);
-    expect(w).toMatchObject({ withdrawn: true, alreadyWithdrawn: false, recordedOnBehalf: true, assurance: "company_attested", gate: "denied" });
+    expect(w).toMatchObject({ withdrawn: true, alreadyWithdrawn: false, recordedOnBehalf: true, assurance: "company_documented", gate: "denied" });
+    // Refs of the other consents still in force, never the one withdrawn.
+    expect(Array.isArray(w.stillInForce)).toBe(true);
+    for (const ref of w.stillInForce) expect(ref).toMatch(CONSENT_REF);
+    expect(w.stillInForce).not.toContain(consentRef);
 
     const after = await a.checkDetailed(customerRef, fixture!.issue.category, fixture!.issue.purpose);
     expect(after).toMatchObject({ decision: "deny", status: "revoked" });
