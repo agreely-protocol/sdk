@@ -29,6 +29,10 @@ to [Semantic Versioning](https://semver.org/).
 - `withdrawals.record` types `assurance` as `"company_documented"`, the only value the
   server sends (since 2026-10-20). It was typed `"company_attested"`, so code that compares
   against `"company_attested"` no longer compiles. Narrowing a literal type, not additive.
+- `verifyReceipt` recomputes a v2 `disclosureHash` over `{disclosure, legalBasis}` when the
+  receipt declares `disclosureVersion: "2"`. Every authentic v2 receipt (a cell on a non-consent
+  basis) used to report `disclosureCopy` as `fail`. A v2 receipt without its `legalBasis` now
+  fails rather than falling back to the v1 formula.
 
 ## 0.5.0 - 2026-10-09
 

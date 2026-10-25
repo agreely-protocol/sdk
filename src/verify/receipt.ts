@@ -269,7 +269,11 @@ export class ReceiptVerifier {
     return "fail";
   }
 
-  /** BOTH types: fetch the IPFS document body and match its disclosure to disclosureHash. */
+  /**
+   * BOTH types: fetch the IPFS document body and match its disclosure to disclosureHash. The preimage is
+   * versioned by the receipt's disclosureVersion, exactly as ConsentRequestService seals it: v2 hashes
+   * {disclosure, legalBasis}; v1 (or absent) hashes the disclosure map alone.
+   */
   private async verifyDisclosureCopy(r: Record<string, unknown>, notes: string[]): Promise<CheckStatus> {
     const consent = asObject(asObject(r["credentialSubject"])["consent"]);
     const document = asObject(consent["document"]);
@@ -298,9 +302,55 @@ export class ReceiptVerifier {
       return "skipped";
     }
 
-    // disclosureHash = "0x" + sha256(JCS(disclosureMap)); the pinned IPFS body wraps that map under `disclosure`.
+    // The pinned IPFS body wraps the disclosure map under `disclosure`. It carries NO legalBasis today
+    // (IpfsDocumentService::canonicalPayload), so a v2 basis map comes from the receipt, under the company's
+    // signature, and is checked against the hash. If a body ever carries one, it must agree with the receipt.
     const disclosure = asObject(asObject(body)["disclosure"]);
-    const computed = "0x" + createHash("sha256").update(canonicalize(disclosure)).digest("hex");
+    const version = consent["disclosureVersion"];
+    const receiptBasis = consent["legalBasis"];
+    const hasBasis = receiptBasis !== undefined && receiptBasis !== null;
+
+    if (version !== undefined && version !== "1" && version !== "2") {
+      notes.push("disclosureCopy FAILED: the receipt declares an unknown disclosureVersion, so its preimage is not defined.");
+      return "fail";
+    }
+    if (version !== "2" && hasBasis) {
+      notes.push(
+        "disclosureCopy FAILED: the receipt carries a legalBasis but no disclosureVersion 2, so the preimage it hashes is ambiguous.",
+      );
+      return "fail";
+    }
+
+    if (version === "2") {
+      // A v2 receipt is never checked with the v1 formula: a missing basis fails here, it does not fall back.
+      if (typeof receiptBasis !== "object" || Array.isArray(receiptBasis)) {
+        notes.push(
+          "disclosureCopy FAILED (disclosureVersion 2): the receipt declares a v2 disclosureHash but carries no legalBasis map, so the preimage cannot be rebuilt.",
+        );
+        return "fail";
+      }
+      const bodyBasis = asObject(body)["legalBasis"];
+      if (bodyBasis !== undefined && canonicalize(bodyBasis) !== canonicalize(receiptBasis)) {
+        notes.push(
+          "disclosureCopy FAILED (disclosureVersion 2): the IPFS document body carries a legalBasis that differs from the receipt's.",
+        );
+        return "fail";
+      }
+      const computedV2 = disclosureHashOf({ disclosure, legalBasis: receiptBasis });
+      if (computedV2 === disclosureHash) {
+        notes.push(
+          `Disclosure copy verified (disclosureVersion 2: {disclosure, legalBasis}): the IPFS document body and the receipt legalBasis match the receipt disclosureHash ${disclosureHash}.`,
+        );
+        return "pass";
+      }
+      notes.push(
+        `disclosureCopy FAILED (disclosureVersion 2): the IPFS document body and the receipt legalBasis hash to ${computedV2}, not the receipt disclosureHash ${disclosureHash}.`,
+      );
+      return "fail";
+    }
+
+    // v1 (or absent): the preimage is the disclosure map alone.
+    const computed = disclosureHashOf(disclosure);
     if (computed === disclosureHash) {
       notes.push(`Disclosure copy verified: the IPFS document body matches the receipt disclosureHash ${disclosureHash}.`);
       return "pass";
@@ -544,6 +594,10 @@ function decideOverall(
   return "partial";
 }
 
+/** "0x" + sha256(JCS(preimage)): the disclosureHash formula the app seals (ConsentRequestService). */
+function disclosureHashOf(preimage: unknown): string {
+  return "0x" + createHash("sha256").update(canonicalize(preimage)).digest("hex");
+}
 function asObject(v: unknown): Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 }
