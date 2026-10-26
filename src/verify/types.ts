@@ -206,8 +206,8 @@ export interface VerifyReceiptOptions {
   rpcUrl?: string;
   /**
    * AgreelyRegistry address, read by eth_call (`rootOf`, `registry`) whatever it is. Default: the known registry
-   * of chainId. Base mainnet (8453) has none yet: pass it explicitly there, or the anchor checks fail with
-   * « no known registry for this chain ».
+   * of chainId (Base mainnet and Base Sepolia are known). On any other chain, pass it, or the anchor checks read
+   * `unavailable`.
    */
   registryAddress?: string;
   /** Chain id for the anchor checks. Default 8453 (Base mainnet); pass 84532 to test on Base Sepolia. */

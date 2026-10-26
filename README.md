@@ -936,8 +936,8 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   every cell's record was read under the bundle's Merkle root and is in force. A
   withdrawn cell reads `withdrawn`, with its `revokedAt`: the consent is authentic but
   no longer in force, so `overall` reads `withdrawn` (never a forgery). A cell not yet
-  recorded reads `unavailable`. On Base mainnet, pass `registryAddress` until its
-  registry is known: until then the anchor checks read `unavailable`. A bare
+  recorded reads `unavailable`. On a chain other than Base mainnet and Base Sepolia, pass
+  `registryAddress`, or the anchor checks read `unavailable`. A bare
   passkey receipt proves nothing on its own: its assertion reads `unbound`,
   `overall` reads `incomplete`, and the notes say to verify the bundle.
   A `company_attested` paper receipt is `verified` when sound, bare or wrapped. A
