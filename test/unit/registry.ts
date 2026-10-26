@@ -1,8 +1,11 @@
-// Shared by the anchor tests: the readable Base Sepolia registry, a bundle re-pointed at it, and the eth_call
-// answers of registry(bytes32) and rootOf(bytes32).
+// Shared by the anchor tests: the readable Base Sepolia and Base mainnet registries, a bundle re-pointed at Sepolia, and
+// the eth_call answers of registry(bytes32) and rootOf(bytes32).
 
 /** The AgreelyRegistry the SDK reads by default on Base Sepolia (84532), EIP-55 checksummed. */
 export const SEPOLIA_REGISTRY = "0xf25D3F8E73648C797Be2CCCD428061f357567b9A";
+
+/** The AgreelyRegistry the SDK reads by default on Base mainnet (8453), EIP-55 checksummed. */
+export const MAINNET_REGISTRY = "0x6F2cF94045cF0cbDD94338882c34D183575023E9";
 
 /**
  * The bundle with its issuer delegation naming the readable Sepolia registry instead of the emit-only one the

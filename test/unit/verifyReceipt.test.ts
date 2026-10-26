@@ -6,7 +6,7 @@ import { Agreely, ReceiptVerifier } from "../../src/index.js";
 import { canonicalize } from "../../src/crypto/jcs.js";
 import type { DidDocument, VerifyReceiptOptions } from "../../src/verify/types.js";
 import { keccak256Hex } from "../../src/crypto/keccak.js";
-import { SEPOLIA_REGISTRY, rootWord } from "./registry.js";
+import { MAINNET_REGISTRY, SEPOLIA_REGISTRY, rootWord } from "./registry.js";
 
 /** EIP-55 mixed-case checksum of a hex address. */
 function eip55(address: string): string {
@@ -228,7 +228,7 @@ describe("verifyReceipt honesty matrix edge cases", () => {
     expect(result.notes.join("\n")).toContain("a tagged document");
   });
 
-  it("on Base mainnet, with no registry known yet, the anchor check reads UNAVAILABLE with no known registry and reads nothing", async () => {
+  it("on Base mainnet, the default chain, the anchor check reads the mainnet registry by eth_call", async () => {
     const citizenCase = cases.find((c) => c.ipfs)!;
     const chain = chainFetch(rootWord(3));
     const result = await Agreely.verifyReceipt(citizenCase.receipt, {
@@ -236,9 +236,10 @@ describe("verifyReceipt honesty matrix edge cases", () => {
       fetch: chain.fetch,
       rpcUrl: "https://rpc.test",
     });
-    expect(result.documentAnchor).toBe("unavailable");
-    expect(result.notes.join("\n")).toContain("no known registry for this chain (chainId 8453)");
-    expect(chain.sent).toHaveLength(0);
+    expect(result.documentAnchor).toBe("pass");
+    expect(result.notes.join("\n")).not.toContain("no known registry");
+    const call = (JSON.parse(chain.sent[0]!) as { params: Array<{ to: string }> }).params[0]!;
+    expect(call.to).toBe(MAINNET_REGISTRY);
   });
 
   it("an explicit registryAddress is read by eth_call, on any chain", async () => {

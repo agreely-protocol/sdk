@@ -41,11 +41,10 @@ to [Semantic Versioning](https://semver.org/).
   `unavailable` (the document is anchored after it is published), and a record in another
   lane or with a tag reads `fail`. `registry(consentRef)` is read as five words,
   the fifth being `anchoredBlock`. No log query is made.
-- The known registry per chain: Base Sepolia (84532)
-  `0xf25D3F8E73648C797Be2CCCD428061f357567b9A`, deployed at block 50213158. Base mainnet (8453) has none until
-  its registry is deployed: there, pass `registryAddress`, or the anchor checks read
-  `unavailable` with « no known registry for this chain ». An explicit `registryAddress`
-  is read by `eth_call`.
+- The known registry per chain: Base mainnet (8453)
+  `0x6F2cF94045cF0cbDD94338882c34D183575023E9`, deployed at block 53113531, and Base Sepolia (84532)
+  `0xf25D3F8E73648C797Be2CCCD428061f357567b9A`, deployed at block 50213158. An explicit `registryAddress`
+  is read by `eth_call` on any chain.
 - A bundle whose issuer key delegation names another registry or chain than the one
   read reads both anchor checks `unavailable` as an unknown registry, is never
   `verified`, and no RPC call is made. A genuine receipt anchored on a registry this
@@ -93,10 +92,9 @@ to [Semantic Versioning](https://semver.org/).
 
 ### Breaking
 
-- With an `rpcUrl` and no `registryAddress`, Base mainnet (the default chain) no
-  longer resolves `0x23577fafFa306375028D33a559D0F95Ced9424DB`: the anchor checks
-  read `unavailable` with « no known registry for this chain » until the mainnet registry
-  read by `eth_call` is known. Base Sepolia no longer resolves
+- With an `rpcUrl` and no `registryAddress`, Base mainnet (the default chain) is read at
+  `0x6F2cF94045cF0cbDD94338882c34D183575023E9`, no longer at `0x23577fafFa306375028D33a559D0F95Ced9424DB`.
+  Base Sepolia no longer resolves
   `0x3532a9DfF3C910152543afCa49De7c66113C5312`. Neither address is read by any check.
 - The document anchor is no longer an `IdentityAnchored` log query, and
   `VerifyReceiptOptions` no longer has `registryDeployBlock`, `logRangeLimit` or

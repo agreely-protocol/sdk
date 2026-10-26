@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Agreely, isVerificationBundle } from "../../src/index.js";
 import type { DidDocument, ReceiptVerification, VerifyReceiptOptions } from "../../src/verify/types.js";
-import { SEPOLIA_REGISTRY, anchorWord, onReadableRegistry, rootWord } from "./registry.js";
+import { MAINNET_REGISTRY, SEPOLIA_REGISTRY, anchorWord, onReadableRegistry, rootWord } from "./registry.js";
 
 // Real artefacts issued by the app (qa-ver1): genuine A1 passkey bundles, recorded A3 paper and A4 phone
 // receipts, and the forgeries F1 to F11 that SDK 0.5.0 called "verified".
@@ -277,12 +277,16 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
     expect(result.overall).toBe("withdrawn");
   });
 
-  it("on Base mainnet with no registry known yet, the consent anchor reads unavailable with no RPC call", async () => {
-    const rpc = rpcFetch(() => anchorWord(root(), 1760000000));
-    const result = await verify(bundle(), { rpcUrl: "https://rpc.test", chainId: 8453, fetch: rpc.fetch });
-    expect(result.consentAnchor).toBe("unavailable");
-    expect(result.notes.join("\n")).toContain("no known registry for this chain (chainId 8453)");
-    expect(rpc.calls).toHaveLength(0);
+  it("on Base mainnet the consent anchor is read at the mainnet registry by eth_call", async () => {
+    const named = structuredClone(bundle()) as { didDocuments: { issuer: { delegation: { body: Record<string, unknown> } } } };
+    named.didDocuments.issuer.delegation.body["registry"] = MAINNET_REGISTRY.toLowerCase();
+    named.didDocuments.issuer.delegation.body["chainId"] = "8453";
+    const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000) : null));
+    const result = await verify(named, { rpcUrl: "https://rpc.test", chainId: 8453, fetch: rpc.fetch });
+    expect(result.consentAnchor).toBe("pass");
+    expect(result.overall).toBe("verified");
+    const call = rpc.calls.find((c) => c.method === "eth_call")!;
+    expect((call.params[0] as { to: string }).to).toBe(MAINNET_REGISTRY);
   });
 
   it("a four-word answer is unreadable, never a record", async () => {

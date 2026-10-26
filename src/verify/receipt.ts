@@ -79,9 +79,9 @@ const DEFAULT_IPFS_GATEWAY = "https://gateway.lighthouse.storage/ipfs/";
 // one: a superseded contract still exists and still answers, it just holds no anchors.
 // registryReads.test.ts pins this map, and refuses every address that is not on it.
 //
-// Base mainnet (8453) has no entry until its registry is deployed: the address is added here at
-// that cutover, never guessed. Until then, the on-chain checks on 8453 need an explicit registryAddress.
+// Each chain reads its one known registry. An explicit registryAddress overrides it on any chain.
 const REGISTRY_BY_CHAIN: Readonly<Record<number, string>> = {
+  8453: "0x6F2cF94045cF0cbDD94338882c34D183575023E9", // Base mainnet, deployed at block 53113531
   84532: "0xf25D3F8E73648C797Be2CCCD428061f357567b9A", // Base Sepolia, deployed at block 50213158
 };
 // Base mainnet (chainId 8453) is the default chain. Base Sepolia (84532) is an explicit opt-in for testing.

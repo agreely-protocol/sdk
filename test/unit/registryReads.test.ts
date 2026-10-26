@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Agreely } from "../../src/index.js";
 import { decodeAnchorRecord, decodeRootRecord } from "../../src/verify/receipt.js";
 import type { DidDocument } from "../../src/verify/types.js";
-import { SEPOLIA_REGISTRY, rootWord } from "./registry.js";
+import { MAINNET_REGISTRY, SEPOLIA_REGISTRY, rootWord } from "./registry.js";
 
 // test/fixtures/registry-reads.json is agreely-contracts vectors/registry-reads.json at bf122fb: the exact eth_call
 // answers of AgreelyRegistry, asserted on the contract side by test/RegistryReadVectors.t.sol.
@@ -66,9 +66,16 @@ describe("the registry the SDK reads, per chain", () => {
     expect(sent[0]).toContain(`"to":"${SEPOLIA_REGISTRY.toLowerCase()}"`);
   });
 
-  it.each([undefined, 8453, 84532])("chainId %s never reads an emit-only registry", async (chainId) => {
+  it("Base mainnet, the default chain, is read at the registry it serves by eth_call", async () => {
+    const sent = await sentTo(undefined);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toContain(`"to":"${MAINNET_REGISTRY.toLowerCase()}"`);
+    expect(await sentTo(8453)).toEqual(sent);
+  });
+
+  it.each([undefined, 8453, 84532])("chainId %s reads one registry by eth_call and never an emit-only one", async (chainId) => {
     const sent = await sentTo(chainId);
-    expect(sent).toHaveLength(chainId === 84532 ? 1 : 0);
+    expect(sent).toHaveLength(1);
     for (const body of sent) {
       for (const address of EMIT_ONLY) expect(body).not.toContain(address);
       expect(body).not.toContain("eth_getlogs");
