@@ -936,7 +936,8 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   every cell's record was read under the bundle's Merkle root and is in force. A
   withdrawn cell reads `withdrawn`, with its `revokedAt`: the consent is authentic but
   no longer in force, so `overall` reads `withdrawn` (never a forgery). A cell not yet
-  recorded reads `unavailable`. On a chain other than Base mainnet and Base Sepolia, pass
+  recorded reads `unavailable`, and so does a cell the receipt accepts whose ref the
+  bundle does not name (no one signs that list). On a chain other than Base mainnet and Base Sepolia, pass
   `registryAddress`, or the anchor checks read `unavailable`. With `rpcUrl`, a bundle whose
   issuer key delegation names a registry or chain other than the one read is refused before
   any RPC call when an anchor check would read the chain: a receipt with a `document.ipfsCid`
@@ -953,9 +954,25 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   all there is. The disclosure-copy check is opt-in (`verifyDisclosure: true`).
   The citizen half is checked only for a `did:agreely:citizen:` subject, whatever
   the resolver. A file the verifier cannot read (another bundle version, a
-  non-object receipt or offer, nesting past 64 levels) reads `malformed`, never a
-  throw. The on-chain checks (`rpcUrl`) share one deadline, `rpcDeadlineMs`
-  (default 30000), past which they read `unavailable`.
+  non-object receipt or offer, a passkey receipt carrying a field the issuer never
+  writes, nesting past 64 levels) reads `malformed`, never a throw. The on-chain
+  checks (`rpcUrl`) share one deadline, `rpcDeadlineMs` (default 30000), past which
+  they read `unavailable`.
+- **Withdrawal.** `overall` judges the receipt; `withdrawal` says whether the
+  consent is still in force. It reads `active` once every accepted cell was read on
+  chain under the bundle's Merkle root and none is withdrawn, `withdrawn` when the
+  chain records a cell's withdrawal (`withdrawnAt` gives the latest, in unix seconds,
+  when the record carries it), and `not_checked` otherwise. Without `rpcUrl` nothing
+  reads it: a withdrawn consent verified offline reads `overall: "verified"` and
+  `withdrawal: "not_checked"`. A paper or telephone receipt and a bare passkey receipt
+  always read `not_checked`, because this SDK reads the consent's on-chain record from
+  a passkey bundle only; the Agreely `/verify` page reads it for a version 4 paper or
+  telephone receipt. To accept a consent only while it is in force:
+
+  ```ts
+  const result = await Agreely.verifyReceipt(bundle, { rpcUrl: "https://base-rpc.publicnode.com" });
+  const inForce = result.overall === "verified" && result.withdrawal === "active";
+  ```
 
 ## Open and auditable
 

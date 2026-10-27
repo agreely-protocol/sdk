@@ -169,6 +169,7 @@ export type {
   ReceiptType,
   CheckStatus,
   OverallStatus,
+  WithdrawalStatus,
   DidDocument,
   DidVerificationMethod,
   DidResolver,

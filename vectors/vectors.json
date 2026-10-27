@@ -396,6 +396,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature verified against issuer DID did:web:api.agreely.ca:c:acme (key did:web:api.agreely.ca:c:acme#kms-1).",
             "This proves the company ATTESTED to a hand-signed PDF (hash 0xabababababababababababababababababababababababababababababababab); it does NOT prove a human signed.",
@@ -403,7 +404,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -475,13 +476,14 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature check FAILED against issuer DID did:web:api.agreely.ca:c:acme (key did:web:api.agreely.ca:c:acme#kms-1): the canonical receipt body does not match the signature. The receipt was altered after signing or the wrong key was resolved.",
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -556,6 +558,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -636,13 +639,14 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unavailable",
           "overall": "unavailable",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNVERIFIABLE: could not resolve the issuer DID did:web:api.agreely.ca:c:acme (key did:web:api.agreely.ca:c:acme#kms-1) to an Ed25519 key (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
             "Cell-label binding UNVERIFIABLE: the issuer DID could not be resolved, so the company signature that binds the category/purpose labels could not be checked.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -717,6 +721,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -800,13 +805,14 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature check FAILED: the issuer DID document of did:web:app.agreely.ca:c:showcase-assurance-boreale lists no Ed25519 key under assertionMethod for proof[0] (key did:web:app.agreely.ca:c:showcase-assurance-boreale#recovery-1), so no key of the company may check this signature.",
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -889,6 +895,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
             "This proves the company ATTESTED to a hand-signed PDF (hash 0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27); it does NOT prove a human signed.",
@@ -897,7 +904,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -972,6 +979,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
             "This proves the company ATTESTED to a hand-signed PDF (hash 0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27); it does NOT prove a human signed.",
@@ -980,7 +988,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -1055,6 +1063,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature check FAILED: the issuer DID document of did:web:app.agreely.ca:c:vector-foreign-method lists no Ed25519 key under assertionMethod for proof[0] (key did:web:evil.example#kms-1), so no key of the company may check this signature.",
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
@@ -1062,7 +1071,7 @@
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       }
@@ -1140,7 +1149,7 @@
     ]
   },
   "bundleVerification": {
-    "description": "Receipt AND verification-bundle golden vectors from GENUINE dev artefacts and the forgeries of QA pass qa-ver1 (vectors/receipts/). Both SDKs assert these byte-identically. A case reads `file` (relative to vectors/), resolves DIDs from receipts/did-documents.json (resolveDids true) or from nothing (\"none\"), and with `ipfsBody` turns verifyDisclosure on and serves that body for any CID. f7-issuer.bundle.json and f11-basis.bundle.json are the genuine A1 v1 and A1 v2 bundles with their receipt replaced by the forged receipt of the same name.",
+    "description": "Receipt AND verification-bundle golden vectors from GENUINE dev artefacts and the forgeries of QA pass qa-ver1 (vectors/receipts/). Both SDKs assert these byte-identically. A case reads `file` (relative to vectors/), resolves DIDs from receipts/did-documents.json (resolveDids true) or from nothing (\"none\"), and with `ipfsBody` turns verifyDisclosure on and serves that body for any CID. f7-issuer.bundle.json and f11-basis.bundle.json are the genuine A1 v1 and A1 v2 bundles with their receipt replaced by the forged receipt of the same name. A case with `chain` reads the consent anchor on that chainId and registryAddress through an rpcUrl whose every eth_call registry(bytes32) answers `registryAnswer` (any other call is refused): a1v1 names that registry in its delegation.",
     "didDocuments": "receipts/did-documents.json",
     "cases": [
       {
@@ -1158,6 +1167,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1185,6 +1195,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1248,6 +1259,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc (key did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1).",
@@ -1275,6 +1287,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unavailable",
           "overall": "unavailable",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature UNVERIFIABLE: could not resolve the issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1) to an Ed25519 key (network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
@@ -1302,6 +1315,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -1329,6 +1343,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -1356,6 +1371,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
             "This proves the company ATTESTED to a hand-signed PDF (hash 0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27); it does NOT prove a human signed.",
@@ -1363,7 +1379,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -1382,6 +1398,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1390,7 +1407,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -1409,6 +1426,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature verified against issuer DID did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee (key did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1).",
             "This proves the company ATTESTED to a hand-signed PDF (hash 0xdf257009b71f175a22e3023f79908078345cdef341f1b4fe58811dcc8ebb8c0c); it does NOT prove a human signed.",
@@ -1416,7 +1434,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -1435,6 +1453,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "partial",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
             "This proves the ORGANISATION documented a consent given by telephone under script version accueil-2026.2. It does NOT prove the call happened, and there is no signed document: this is the weakest of the three tiers, so overall is at most PARTIAL.",
@@ -1442,7 +1461,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -1461,6 +1480,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "partial",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1469,7 +1489,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -1488,6 +1508,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "partial",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature verified against issuer DID did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee (key did:web:app.agreely.ca:c:centre-d-action-benevole-de-riviere-claire-demo-la-corvee#kms-1).",
             "This proves the ORGANISATION documented a consent given by telephone under script version corvee-admission-1-fr. It does NOT prove the call happened, and there is no signed document: this is the weakest of the three tiers, so overall is at most PARTIAL.",
@@ -1495,7 +1516,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -1514,6 +1535,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1541,6 +1563,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1568,6 +1591,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1595,6 +1619,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1622,6 +1647,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1649,6 +1675,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1676,6 +1703,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature check FAILED: proof[0] names the key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1, which does not belong to the issuer did:web:app.agreely.ca:c:showcase-studio-pixel-boreal.",
@@ -1747,6 +1775,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -1774,6 +1803,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature check FAILED against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1): the canonical receipt body does not match the signature. The receipt was altered after signing or the wrong key was resolved.",
@@ -1781,7 +1811,7 @@
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -1800,6 +1830,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -1827,6 +1858,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -1854,6 +1886,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -1881,6 +1914,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -1908,6 +1942,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -1935,6 +1970,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -1962,6 +1998,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -2033,6 +2070,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "unsupported",
           "overall": "incomplete",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature UNSUPPORTED on a bare passkey receipt: the company signed the offer, which travels only in the verification bundle.",
             "Receipt integrity UNSUPPORTED on a bare passkey receipt: nothing on the receipt alone binds its purposes, cells, dates, document or issuer to a signature.",
@@ -2060,13 +2098,14 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature check FAILED against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1): the canonical receipt body does not match the signature. The receipt was altered after signing or the wrong key was resolved.",
             "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -2085,13 +2124,14 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "fail",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Company signature check FAILED against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1): the canonical receipt body does not match the signature. The receipt was altered after signing or the wrong key was resolved.",
             "A verbal (company-documented) receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
           ]
         }
       },
@@ -2110,6 +2150,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "unavailable",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -2137,6 +2178,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "skipped",
           "overall": "malformed",
+          "withdrawal": "not_checked",
           "notes": [
             "MALFORMED: the bundle version is not the string \"1\". No check ran: this is a file this verifier cannot read, not evidence that it was altered. A file Agreely issued is a version \"1\" bundle or a receipt object."
           ]
@@ -2157,6 +2199,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "skipped",
           "overall": "malformed",
+          "withdrawal": "not_checked",
           "notes": [
             "MALFORMED: the bundle's receipt is missing or not an object. No check ran: this is a file this verifier cannot read, not evidence that it was altered. A file Agreely issued is a version \"1\" bundle or a receipt object."
           ]
@@ -2177,6 +2220,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -2190,29 +2234,164 @@
         }
       },
       {
-        "name": "s4 a passkey receipt with a top-level key outside the receipt format fails integrity",
+        "name": "s4 a passkey receipt with a top-level key outside the receipt format is malformed, never a tamper",
         "file": "receipts/s4-extra-top-key.bundle.json",
         "resolveDids": true,
         "expect": {
           "input": "bundle",
           "receiptType": "citizen",
-          "companySignature": "pass",
-          "receiptIntegrity": "fail",
-          "citizenAssertion": "pass",
+          "companySignature": "skipped",
+          "receiptIntegrity": "skipped",
+          "citizenAssertion": "skipped",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
           "consentAnchor": "skipped",
-          "cellLabelBinding": "fail",
-          "overall": "failed",
+          "cellLabelBinding": "skipped",
+          "overall": "malformed",
+          "withdrawal": "not_checked",
+          "notes": [
+            "MALFORMED: the passkey receipt carries a top-level field the issuer never writes (extraTop). No check ran: this is a file this verifier cannot read, not evidence that it was altered. A file Agreely issued is a version \"1\" bundle or a receipt object."
+          ]
+        }
+      },
+      {
+        "name": "s20 a passkey receipt whose consent carries a field the issuer never writes is malformed, never a tamper",
+        "file": "receipts/s20-consent-field.bundle.json",
+        "resolveDids": true,
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "skipped",
+          "receiptIntegrity": "skipped",
+          "citizenAssertion": "skipped",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "skipped",
+          "overall": "malformed",
+          "withdrawal": "not_checked",
+          "notes": [
+            "MALFORMED: the passkey receipt's consent carries a field the issuer never writes (status). No check ran: this is a file this verifier cannot read, not evidence that it was altered. A file Agreely issued is a version \"1\" bundle or a receipt object."
+          ]
+        }
+      },
+      {
+        "name": "w1 a genuine bundle the chain records as withdrawn reads withdrawn, with its date, never verified",
+        "file": "receipts/a1v1.bundle.json",
+        "resolveDids": true,
+        "chain": {
+          "chainId": 84532,
+          "registryAddress": "0x3532a9dff3c910152543afca49de7c66113c5312",
+          "registryAnswer": "0x47f0c31bce13830b27277e6c13e48b7146cc1c7fbed4d19a1f0c75e04cacae36000000000000000000000000000000000000000000000000000000006adce8c0000000000000000000000000000000000000000000000000000000006ae088e000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000002349340"
+        },
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "withdrawn",
+          "cellLabelBinding": "pass",
+          "overall": "withdrawn",
+          "withdrawal": "withdrawn",
+          "withdrawnAt": 1793100000,
+          "consentAnchorRecords": [
+            {
+              "consentRef": "0x5db1ed5661505e696156e3c95342e36169419c98440725110493fe1a9915015f",
+              "state": "withdrawn",
+              "anchoredAt": 1792862400,
+              "revokedAt": 1793100000,
+              "anchoredBlock": 37000000
+            },
+            {
+              "consentRef": "0x2f8292de6570771476a737f33d3e8a051cc3f759da3b452c9026d34eebb774c7",
+              "state": "withdrawn",
+              "anchoredAt": 1792862400,
+              "revokedAt": 1793100000,
+              "anchoredBlock": 37000000
+            },
+            {
+              "consentRef": "0x34dddbd476a8a5627a25a1e7216b41c75762eaf624492c7e07cd4e262325992f",
+              "state": "withdrawn",
+              "anchoredAt": 1792862400,
+              "revokedAt": 1793100000,
+              "anchoredBlock": 37000000
+            }
+          ],
+          "consentAnchorCounts": {
+            "cells": 3,
+            "active": 0,
+            "withdrawn": 3,
+            "pending": 0,
+            "unreadable": 0
+          },
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
-            "Receipt integrity FAILED: the receipt carries a top-level field outside the receipt format (extraTop).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
             "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
-            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
             "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
-            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
+            "documentAnchor skipped: the receipt carries no document.ipfsCid to look up on-chain.",
+            "consentAnchor WITHDRAWN on chainId 84532 (3 cell(s): 0 active, 3 withdrawn, 0 not anchored yet, 0 unreadable). The chain records the consent under this bundle's Merkle root, anchored in block 37000000, and records its withdrawal: it is authentic, but it is no longer in force. This is NOT a forgery."
+          ]
+        }
+      },
+      {
+        "name": "w2 a bundle whose ref list drops one of its accepted cells is never read as in force",
+        "file": "receipts/w2-dropped-ref.bundle.json",
+        "resolveDids": true,
+        "chain": {
+          "chainId": 84532,
+          "registryAddress": "0x3532a9dff3c910152543afca49de7c66113c5312",
+          "registryAnswer": "0x47f0c31bce13830b27277e6c13e48b7146cc1c7fbed4d19a1f0c75e04cacae36000000000000000000000000000000000000000000000000000000006adce8c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000002349340"
+        },
+        "expect": {
+          "input": "bundle",
+          "receiptType": "citizen",
+          "companySignature": "pass",
+          "receiptIntegrity": "pass",
+          "citizenAssertion": "pass",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "unavailable",
+          "cellLabelBinding": "pass",
+          "overall": "verified",
+          "withdrawal": "not_checked",
+          "consentAnchorRecords": [
+            {
+              "consentRef": "0x5db1ed5661505e696156e3c95342e36169419c98440725110493fe1a9915015f",
+              "state": "active",
+              "anchoredAt": 1792862400,
+              "revokedAt": 0,
+              "anchoredBlock": 37000000
+            },
+            {
+              "consentRef": "0x2f8292de6570771476a737f33d3e8a051cc3f759da3b452c9026d34eebb774c7",
+              "state": "active",
+              "anchoredAt": 1792862400,
+              "revokedAt": 0,
+              "anchoredBlock": 37000000
+            }
+          ],
+          "consentAnchorCounts": {
+            "cells": 3,
+            "active": 2,
+            "withdrawn": 0,
+            "pending": 0,
+            "unreadable": 1
+          },
+          "notes": [
+            "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
+            "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Citizen assertion verified and bound: the passkey did:agreely:citizen:demo-91bf5c897c067cb69df0#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
+            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: the receipt carries no document.ipfsCid to look up on-chain.",
+            "consentAnchor UNAVAILABLE on chainId 84532 (3 cell(s): 2 active, 0 withdrawn, 0 not anchored yet, 1 unreadable). The bundle names a consentRef for 2 of the receipt's 3 accepted cells, and no one signs that list: an unnamed cell counts as unreadable. Anchoring is asynchronous and an RPC can fail: this is NOT a contradiction."
           ]
         }
       }
@@ -2237,6 +2416,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2264,6 +2444,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2291,6 +2472,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2318,6 +2500,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "unavailable",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2345,6 +2528,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2372,6 +2556,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2399,6 +2584,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2426,6 +2612,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2453,6 +2640,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2480,6 +2668,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2507,6 +2696,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2534,6 +2724,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "unavailable",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2561,6 +2752,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2588,6 +2780,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2615,6 +2808,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2642,6 +2836,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2669,6 +2864,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2696,6 +2892,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2723,6 +2920,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "unavailable",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2750,6 +2948,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "unavailable",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2777,6 +2976,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "verified",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2804,6 +3004,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "unavailable",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2831,6 +3032,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",
@@ -2858,6 +3060,7 @@
           "consentAnchor": "skipped",
           "cellLabelBinding": "pass",
           "overall": "failed",
+          "withdrawal": "not_checked",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:demo-co-7d9d75 (key did:web:app.agreely.ca:c:demo-co-7d9d75#kms-1).",

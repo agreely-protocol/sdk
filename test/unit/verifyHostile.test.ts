@@ -181,7 +181,19 @@ describe("the bundle shape (R7, R8, R9)", () => {
 
 describe("top-level receipt keys in a passkey bundle (R6)", () => {
   it.each([
-    ["an extra top-level key", (r: Record<string, unknown>) => (r["extraTop"] = { claim: "x" })],
+    ["an extra top-level key", "top-level", (r: Record<string, unknown>) => (r["extraTop"] = { claim: "x" })],
+    ["an extra credentialSubject key", "credentialSubject", (r: Record<string, unknown>) => ((r["credentialSubject"] as Record<string, unknown>)["status"] = "active")],
+    ["an extra consent key", "consent", (r: Record<string, unknown>) => (((r["credentialSubject"] as Record<string, unknown>)["consent"] as Record<string, unknown>)["status"] = "active")],
+  ])("%s is malformed: a field the issuer never writes, never a tamper", async (_label, where, mutate) => {
+    const bundle = artefact("a1v1.bundle");
+    mutate(receiptOf(bundle));
+    const result = await verify(bundle);
+    expect(result.overall).toBe("malformed");
+    expect([result.companySignature, result.receiptIntegrity, result.citizenAssertion]).toEqual(["skipped", "skipped", "skipped"]);
+    expect(result.notes.join("\n")).toContain(where === "top-level" ? "carries a top-level field the issuer never writes" : `${where} carries a field the issuer never writes`);
+  });
+
+  it.each([
     ["a changed type", (r: Record<string, unknown>) => (r["type"] = ["VerifiableCredential", "ConsentReceipt", "Extra"])],
     ["a changed @context", (r: Record<string, unknown>) => (r["@context"] = ["https://evil.example/ctx"])],
     ["an id that is not a receipt urn", (r: Record<string, unknown>) => (r["id"] = "https://evil.example/receipt")],

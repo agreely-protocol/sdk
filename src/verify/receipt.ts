@@ -32,8 +32,9 @@
 // Anyone can write a bundle that carries their own key under someone else's DID.
 //
 // The input is hostile: anything this verifier cannot read (a bundle of another version,
-// a non-object receipt or offer, a number, nesting past MAX_INPUT_DEPTH) reads "malformed",
-// and verify() resolves on every input, a deep one included.
+// a non-object receipt or offer, a passkey receipt carrying a field the issuer never writes,
+// a number, nesting past MAX_INPUT_DEPTH) reads "malformed", and verify() resolves on every
+// input, a deep one included.
 
 import { canonicalize } from "../crypto/jcs.js";
 import {
@@ -220,6 +221,8 @@ export class ReceiptVerifier {
     if (typeof merkleRoot !== "string" || merkleRoot === "") {
       throw new MalformedInput("the bundle carries a passkey receipt but no merkleRoot string");
     }
+    const outside = passkeyFieldOutsideFormat(r);
+    if (outside !== null) throw new MalformedInput(outside);
     return this.verifyPasskeyBundle(r, bundle, offer, merkleRoot, notes, session);
   }
 
@@ -248,7 +251,10 @@ export class ReceiptVerifier {
     const cellLabelBinding = assessRecordedCellLabels(companySignature, notes);
     const disclosureCopy = await this.verifyRecordedDisclosureCopy(r, notes);
     const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
-    notes.push("consentAnchor skipped: a recorded receipt carries no consentRef to read on chain.");
+    notes.push(
+      "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the " +
+        "withdrawal of a paper or telephone consent is not checked.",
+    );
     const consentAnchor: CheckStatus = "skipped";
 
     let overall: ReceiptVerification["overall"];
@@ -270,6 +276,7 @@ export class ReceiptVerifier {
       consentAnchor,
       cellLabelBinding,
       overall,
+      withdrawal: "not_checked",
       ...anchorRecords(session),
       notes,
     };
@@ -326,6 +333,7 @@ export class ReceiptVerifier {
       consentAnchor: "skipped",
       cellLabelBinding,
       overall,
+      withdrawal: "not_checked",
       ...anchorRecords(session),
       notes,
     };
@@ -401,7 +409,7 @@ export class ReceiptVerifier {
 
     const disclosureCopy = await this.verifyOfferDisclosureCopy(offer, companySignature, notes);
     const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
-    const consentAnchor = await this.verifyConsentAnchor(bundle, merkleRoot, citizenAssertion, notes, session);
+    const consentAnchor = await this.verifyConsentAnchor(r, bundle, merkleRoot, citizenAssertion, notes, session);
 
     let overall: ReceiptVerification["overall"];
     const checks = [companySignature, receiptIntegrity, citizenAssertion, disclosureCopy, documentAnchor, consentAnchor];
@@ -422,6 +430,7 @@ export class ReceiptVerifier {
       consentAnchor,
       cellLabelBinding,
       overall,
+      ...withdrawalOf(consentAnchor, session),
       ...anchorRecords(session),
       notes,
     };
@@ -798,8 +807,11 @@ export class ReceiptVerifier {
    * OPT-IN (rpcUrl), BUNDLE ONLY: eth_call registry(consentRef) for each cell's consentRef. The record is tied to
    * this receipt only through the Merkle root, which is trusted only once the passkey assertion is bound to it.
    * A withdrawn cell (state 2) is never a pass: the consent is no longer in force, however authentic.
+   * TRAP: the ref list is signed by no one, so a file can drop a withdrawn ref. Every accepted cell the receipt lists
+   * counts, and one with no ref is unreadable: a floor, since the items are not proven exhaustive either.
    */
   private async verifyConsentAnchor(
+    r: Record<string, unknown>,
     bundle: Record<string, unknown>,
     merkleRoot: string,
     citizenAssertion: CheckStatus,
@@ -832,10 +844,11 @@ export class ReceiptVerifier {
 
     const root = stripHex(merkleRoot).toLowerCase();
     const records: ConsentAnchorRecord[] = [];
+    const cells = Math.max(refs.length, acceptedCellCount(r));
     let active = 0;
     let withdrawn = 0;
     let pending = 0;
-    let unread = 0;
+    let unread = cells - refs.length;
     const foreign: string[] = [];
     for (const ref of refs) {
       const call = await this.rpc(rpcUrl, "eth_call", [{ to: target.address, data: REGISTRY_SELECTOR + stripHex(ref) }, "latest"], session);
@@ -863,9 +876,9 @@ export class ReceiptVerifier {
       );
       return "fail";
     }
-    const counts = `${String(refs.length)} cell(s): ${String(active)} active, ${String(withdrawn)} withdrawn, ` +
+    const counts = `${String(cells)} cell(s): ${String(active)} active, ${String(withdrawn)} withdrawn, ` +
       `${String(pending)} not anchored yet, ${String(unread)} unreadable`;
-    session.consentCounts = { cells: refs.length, active, withdrawn, pending, unreadable: unread };
+    session.consentCounts = { cells, active, withdrawn, pending, unreadable: unread };
     const blocks = [...new Set(records.map((rec) => rec.anchoredBlock))].join(", ");
     if (withdrawn > 0) {
       notes.push(
@@ -875,10 +888,14 @@ export class ReceiptVerifier {
       );
       return "withdrawn";
     }
-    if (active !== refs.length) {
+    if (active !== cells) {
+      const unnamed = cells > refs.length
+        ? ` The bundle names a consentRef for ${String(refs.length)} of the receipt's ${String(cells)} accepted cells, and ` +
+          "no one signs that list: an unnamed cell counts as unreadable."
+        : "";
       notes.push(
-        `consentAnchor UNAVAILABLE on chainId ${String(chainId)} (${counts}). Anchoring is asynchronous and an RPC can ` +
-          "fail: this is NOT a contradiction.",
+        `consentAnchor UNAVAILABLE on chainId ${String(chainId)} (${counts}).${unnamed} Anchoring is asynchronous and an ` +
+          "RPC can fail: this is NOT a contradiction.",
       );
       return "unavailable";
     }
@@ -1351,23 +1368,44 @@ function checkReceiptIntegrity(reason: string | null, window: OfferWindow | null
   return "pass";
 }
 
-function integrityFailure(r: Record<string, unknown>, offer: Record<string, unknown>): string | null {
+/**
+ * A field the issuer never writes on a passkey receipt (ConsentReceipt::build): the file is not one Agreely issued, so
+ * it is unreadable, never a tamper, as the web verifier's bundleShapeOf reads it.
+ */
+function passkeyFieldOutsideFormat(r: Record<string, unknown>): string | null {
   for (const k of Object.keys(r)) {
-    if (!PASSKEY_RECEIPT_KEYS.has(k)) return `the receipt carries a top-level field outside the receipt format (${k})`;
+    if (!PASSKEY_RECEIPT_KEYS.has(k)) return `the passkey receipt carries a top-level field the issuer never writes (${k})`;
   }
+  const subject = asObject(r["credentialSubject"]);
+  for (const k of Object.keys(subject)) {
+    if (k !== "id" && k !== "consent") return `the passkey receipt's credentialSubject carries a field the issuer never writes (${k})`;
+  }
+  for (const k of Object.keys(asObject(subject["consent"]))) {
+    if (!ALLOWED_CONSENT_KEYS.has(k)) return `the passkey receipt's consent carries a field the issuer never writes (${k})`;
+  }
+  return null;
+}
+
+/** Accepted cells the receipt lists: one consentRef each. */
+function acceptedCellCount(r: Record<string, unknown>): number {
+  return asArray(asObject(asObject(r["credentialSubject"])["consent"])["items"]).length;
+}
+
+/** What the consent anchor read says about the consent being in force. Only a complete read says "active". */
+function withdrawalOf(consentAnchor: CheckStatus, session: ChainSession): Pick<ReceiptVerification, "withdrawal" | "withdrawnAt"> {
+  if (consentAnchor === "pass") return { withdrawal: "active" };
+  if (consentAnchor !== "withdrawn") return { withdrawal: "not_checked" };
+  const latest = Math.max(0, ...(session.consentRecords ?? []).filter((rec) => rec.state === "withdrawn").map((rec) => rec.revokedAt));
+  return latest > 0 ? { withdrawal: "withdrawn", withdrawnAt: latest } : { withdrawal: "withdrawn" };
+}
+
+function integrityFailure(r: Record<string, unknown>, offer: Record<string, unknown>): string | null {
   if (!canonEqual(r["type"], PASSKEY_RECEIPT_TYPE)) return "the receipt type is not a passkey ConsentReceipt";
   if (!canonEqual(r["@context"], PASSKEY_RECEIPT_CONTEXT)) return "the receipt @context is not the consent receipt context";
   if (typeof r["id"] !== "string" || !r["id"].startsWith("urn:agreely:receipt:")) {
     return "the receipt id is not an urn:agreely:receipt identifier";
   }
-  const subject = asObject(r["credentialSubject"]);
-  for (const k of Object.keys(subject)) {
-    if (k !== "id" && k !== "consent") return `credentialSubject carries a field the offer does not account for (${k})`;
-  }
-  const consent = asObject(subject["consent"]);
-  for (const k of Object.keys(consent)) {
-    if (!ALLOWED_CONSENT_KEYS.has(k)) return `the consent carries a field the offer does not account for (${k})`;
-  }
+  const consent = asObject(asObject(r["credentialSubject"])["consent"]);
   const offerConsent = asObject(offer["consent"]);
   if (r["issuer"] !== offer["issuer"]) return "the issuer differs from the signed offer's";
   if (r["validUntil"] !== (offer["validUntil"] || "")) return "validUntil differs from the signed offer's";
@@ -1579,6 +1617,7 @@ function malformedResult(input: "bundle" | "receipt", type: ReceiptType, reason:
     consentAnchor: "skipped",
     cellLabelBinding: "skipped",
     overall: "malformed",
+    withdrawal: "not_checked",
     notes: [
       `MALFORMED: ${reason}. No check ran: this is a file this verifier cannot read, not evidence that it was ` +
         "altered. A file Agreely issued is a version \"1\" bundle or a receipt object.",

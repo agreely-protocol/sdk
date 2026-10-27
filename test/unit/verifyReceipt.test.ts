@@ -94,9 +94,38 @@ const bundleVectors = JSON.parse(
 ) as {
   bundleVerification: {
     didDocuments: string;
-    cases: Array<{ name: string; file: string; resolveDids: boolean | "none"; ipfsBody?: unknown; expect: unknown }>;
+    cases: Array<{
+      name: string;
+      file: string;
+      resolveDids: boolean | "none";
+      ipfsBody?: unknown;
+      chain?: { chainId: number; registryAddress: string; registryAnswer: string };
+      expect: unknown;
+    }>;
   };
 };
+
+/** The canonicalizer refuses numbers; a chain read carries integers (unix seconds, blocks, counts), compared as their digits. */
+function numbersAsStrings(value: unknown): unknown {
+  if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map(numbersAsStrings);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, numbersAsStrings(v)]));
+  }
+  return value;
+}
+
+/** The chain a vector case states: every eth_call registry(bytes32) answers `registryAnswer`, any other call is refused. */
+function registryFetch(registryAnswer: string): typeof fetch {
+  return (async (_input: string | URL, init?: RequestInit) => {
+    const req = JSON.parse(String(init?.body ?? "{}")) as { method?: string; params?: Array<{ data?: string }> };
+    const data = req.params?.[0]?.data ?? "";
+    const body = req.method === "eth_call" && data.startsWith("0x7ef50298")
+      ? { jsonrpc: "2.0", id: 1, result: registryAnswer }
+      : { jsonrpc: "2.0", id: 1, error: { message: "not served by this vector" } };
+    return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+  }) as unknown as typeof fetch;
+}
 
 function vectorFile(rel: string): unknown {
   return JSON.parse(readFileSync(fileURLToPath(new URL(`../../vectors/${rel}`, import.meta.url)), "utf8"));
@@ -116,8 +145,15 @@ describe("Agreely.verifyReceipt on genuine and forged receipts and bundles (gold
         opts.fetch = (async () =>
           new Response(JSON.stringify(c.ipfsBody), { headers: { "Content-Type": "application/json" } })) as unknown as typeof fetch;
       }
+      if (c.chain !== undefined) {
+        opts.rpcUrl = "https://rpc.test";
+        opts.chainId = c.chain.chainId;
+        opts.registryAddress = c.chain.registryAddress;
+        opts.fetch = registryFetch(c.chain.registryAnswer);
+      }
       const result = await Agreely.verifyReceipt(vectorFile(c.file), opts);
-      expect(canonicalize(result as unknown)).toBe(canonicalize(c.expect));
+      expect(canonicalize(numbersAsStrings(result))).toBe(canonicalize(numbersAsStrings(c.expect)));
+      expect(result).toEqual(c.expect);
     });
   }
 });

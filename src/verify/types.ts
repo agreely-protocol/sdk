@@ -47,11 +47,33 @@ export type CheckStatus = "pass" | "fail" | "unavailable" | "unbound" | "skipped
  *                  `unavailable` elsewhere still gives `unavailable`, and the consentAnchor check reads `withdrawn`.
  *   - malformed    the input is not a receipt or bundle this verifier can read: not
  *                  an object, a bundle of another version, a bundle whose receipt or
- *                  signed offer is missing or not an object, a value the
+ *                  signed offer is missing or not an object, a passkey receipt in a
+ *                  bundle carrying a field the issuer never writes (at its top level,
+ *                  in credentialSubject or in its consent), a value the
  *                  canonicalizer refuses, or nesting past 64 levels. No check ran,
  *                  so it says nothing about alteration. Never a pass.
+ *
+ * `overall` judges the receipt. Whether the consent is still in force is `withdrawal`: without an
+ * `rpcUrl` nothing reads it, so a withdrawn consent verified offline still reads `verified`.
  */
 export type OverallStatus = "verified" | "partial" | "incomplete" | "failed" | "unavailable" | "malformed" | "withdrawn";
+
+/**
+ * Whether the consent is still in force, as the chain records it. Always present.
+ *
+ *   - active       every accepted cell was read on chain (`rpcUrl`) under the bundle's bound Merkle root,
+ *                  and none is withdrawn.
+ *   - withdrawn    the chain records the withdrawal of at least one cell under that root: `withdrawnAt`
+ *                  gives the latest withdrawal when the record carries its instant.
+ *   - not_checked  nothing established it: no `rpcUrl`; a paper or telephone receipt or a bare passkey
+ *                  receipt (this SDK reads the consent's on-chain record from a passkey bundle only); a
+ *                  root no verified passkey assertion binds; or a read that did not cover every cell (an
+ *                  RPC failure, a cell not anchored yet, a refused registry, a contradicting record). The
+ *                  consent may have been withdrawn.
+ *
+ * Says nothing about the receipt's authenticity: read `overall` first.
+ */
+export type WithdrawalStatus = "active" | "withdrawn" | "not_checked";
 
 /**
  * Which kind of receipt was verified.
@@ -107,6 +129,8 @@ export type ReceiptType = "company_attested" | "company_documented" | "citizen";
  *                       "pass" only when every cell's record was read and is in force; a
  *                       withdrawn cell (state 2, under the bundle's root) is "withdrawn", with
  *                       its `revokedAt` in consentAnchorRecords. A record under another root is "fail".
+ *                       The bundle's ref list is signed by no one, so every accepted cell the receipt
+ *                       lists counts: a cell with no ref in the list counts as unreadable.
  *   - cellLabelBinding  whether the human-readable cell labels (category/purpose) are
  *                       CRYPTOGRAPHICALLY bound, the one field to read before trusting
  *                       a displayed label.
@@ -122,6 +146,10 @@ export interface ReceiptVerification {
   consentAnchor: CheckStatus;
   cellLabelBinding: CheckStatus;
   overall: OverallStatus;
+  /** Whether the consent is still in force, as the chain records it ({@link WithdrawalStatus}). */
+  withdrawal: WithdrawalStatus;
+  /** Present when `withdrawal` is "withdrawn" and the chain records when: the latest withdrawal, unix seconds. */
+  withdrawnAt?: number;
   /** Present when documentAnchor passed: when, and in which block, the document CID was anchored. */
   documentAnchorRecord?: DocumentAnchorRecord;
   /** Present when consentAnchor read a cell under the bundle's Merkle root: one record per such cell. */
