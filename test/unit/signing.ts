@@ -29,6 +29,7 @@ export function testIssuer(issuer = "did:web:api.agreely.ca:c:acme") {
     verificationMethod: [
       { id: vm, type: "Multikey", controller: issuer, publicKeyMultibase: "z" + base58(new Uint8Array([0xed, 0x01, ...rawPub])) },
     ],
+    assertionMethod: [vm],
   } as unknown as DidDocument;
   return {
     issuer,

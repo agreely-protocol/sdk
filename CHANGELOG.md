@@ -85,6 +85,11 @@ to [Semantic Versioning](https://semver.org/).
   receipt's content gives `disclosureCopy: "fail"` (and `companySignature: "fail"`
   when the receipt body holds it), with the reason in the note. A DID document entry
   that is not an object is skipped.
+- The company signature is checked only with the method `proof[0].verificationMethod`
+  names, controlled by the issuer and listed under the issuer document's
+  `assertionMethod` (a fragment naming no method uses the document's sole
+  `assertionMethod` key). A resolved document with no such key gives
+  `companySignature: "fail"`, and the notes name the key that checked the signature.
 - The default DID resolver applies `timeoutMs`.
 - The `resolver` documentation states what a `did:web` issuer proves: a receipt
   signed by whoever controls that host's DID document. Inject a `resolver` that pins

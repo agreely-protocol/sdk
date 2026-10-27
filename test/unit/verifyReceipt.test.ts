@@ -452,6 +452,7 @@ describe("a VERBAL receipt (VerbalConsentReceipt, company_documented) is never r
     verificationMethod: [
       { id: vm, type: "Multikey", controller: issuer, publicKeyMultibase: "z" + base58(new Uint8Array([0xed, 0x01, ...rawPub])) },
     ],
+    assertionMethod: [vm],
   } as unknown as DidDocument;
   const resolver = (did: string): DidDocument | null => (did === issuer ? didDoc : null);
 

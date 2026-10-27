@@ -73,9 +73,9 @@ describe("a hostile receipt never throws (N9)", () => {
     expect(result.overall).toBe("failed");
   });
 
-  it("a resolved DID document whose verificationMethod holds a null is unavailable, never a throw", async () => {
+  it("a resolved DID document whose verificationMethod holds a null fails, never a throw", async () => {
     const result = await Agreely.verifyReceipt(artefact("a3v3.receipt"), { resolver: () => ({ verificationMethod: [null] }) as unknown as DidDocument });
-    expect(result.companySignature).toBe("unavailable");
+    expect(result.companySignature).toBe("fail");
   });
 
   it("a resolver whose document throws when read still resolves, as malformed", async () => {

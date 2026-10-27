@@ -449,17 +449,12 @@ export class ReceiptVerifier {
       return "fail";
     }
 
-    const key = await this.resolveEd25519Key(issuer, vm);
-    if (!key) {
-      notes.push(
-        `Company signature UNVERIFIABLE: could not resolve the issuer DID ${issuer} (key ${vm}) to an Ed25519 key ` +
-          "(network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
-      );
-      return "unavailable";
-    }
+    const resolved = await this.resolveCompanyKey(issuer, vm);
+    if (resolved.kind !== "key") return companyKeyRefused(resolved, issuer, vm, notes);
+    const { key, vmId } = resolved;
 
     if (verifyEd25519(key, canonical, signature)) {
-      notes.push(`Company signature verified against issuer DID ${issuer} (key ${vm}).`);
+      notes.push(`Company signature verified against issuer DID ${issuer} (key ${vmId}).`);
       if (type === "company_documented") {
         const scriptVersion = asString(asObject(r["evidence"])["scriptVersion"]);
         notes.push(
@@ -476,7 +471,7 @@ export class ReceiptVerifier {
       return "pass";
     }
     notes.push(
-      `Company signature check FAILED against issuer DID ${issuer} (key ${vm}): the canonical receipt body does not ` +
+      `Company signature check FAILED against issuer DID ${issuer} (key ${vmId}): the canonical receipt body does not ` +
         "match the signature. The receipt was altered after signing or the wrong key was resolved.",
     );
     return "fail";
@@ -514,20 +509,15 @@ export class ReceiptVerifier {
       notes.push("Company signature check FAILED: the proofValue is not a valid multibase signature.");
       return "fail";
     }
-    const key = await this.resolveEd25519Key(issuer, vm);
-    if (!key) {
-      notes.push(
-        `Company signature UNVERIFIABLE: could not resolve the issuer DID ${issuer} (key ${vm}) to an Ed25519 key ` +
-          "(network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
-      );
-      return "unavailable";
-    }
+    const resolved = await this.resolveCompanyKey(issuer, vm);
+    if (resolved.kind !== "key") return companyKeyRefused(resolved, issuer, vm, notes);
+    const { key, vmId } = resolved;
     if (verifyEd25519(key, canonical, signature)) {
-      notes.push(`Company signature over the signed offer verified against issuer DID ${issuer} (key ${vm}).`);
+      notes.push(`Company signature over the signed offer verified against issuer DID ${issuer} (key ${vmId}).`);
       return "pass";
     }
     notes.push(
-      `Company signature check FAILED against issuer DID ${issuer} (key ${vm}): the signed offer does not match the ` +
+      `Company signature check FAILED against issuer DID ${issuer} (key ${vmId}): the signed offer does not match the ` +
         "signature. The offer was altered after signing or the wrong key was resolved.",
     );
     return "fail";
@@ -955,14 +945,19 @@ export class ReceiptVerifier {
     }
   }
 
-  private async resolveEd25519Key(issuer: string, vmId: string): Promise<Uint8Array | null> {
+  /**
+   * The key that checks proof[0] ({@link companyKeyMethod}). A document that did not resolve is "unresolved"
+   * (unavailable); a resolved one with no such method, or whose method carries no Ed25519 multikey, is "unlisted" (fail).
+   */
+  private async resolveCompanyKey(issuer: string, vmId: string): Promise<CompanyKey> {
     const doc = await this.resolveDid(issuer);
-    const vm = pickVerificationMethod(doc, vmId);
-    if (!vm?.publicKeyMultibase) return null;
+    if (!isPlainObject(doc)) return { kind: "unresolved" };
+    const vm = companyKeyMethod(doc, issuer, vmId);
+    if (!vm) return { kind: "unlisted" };
     try {
-      return decodeEd25519PublicKeyMultibase(vm.publicKeyMultibase);
+      return { kind: "key", key: decodeEd25519PublicKeyMultibase(vm.publicKeyMultibase), vmId: vm.id };
     } catch {
-      return null;
+      return { kind: "unlisted" };
     }
   }
 
@@ -1023,11 +1018,56 @@ function findWebAuthnProof(proofs: unknown[]): Record<string, unknown> | null {
   return null;
 }
 
-function pickVerificationMethod(doc: DidDocument | null, vmId: string): DidVerificationMethod | null {
-  if (!isPlainObject(doc) || !Array.isArray(doc.verificationMethod)) return null;
+type CompanyKey = { kind: "unresolved" } | { kind: "unlisted" } | { kind: "key"; key: Uint8Array; vmId: string };
+
+/** The note and verdict when no key checks proof[0]: an unresolved document is inconclusive, an unlisted key fails. */
+function companyKeyRefused(
+  resolved: Exclude<CompanyKey, { kind: "key" }>,
+  issuer: string,
+  vm: string,
+  notes: string[],
+): CheckStatus {
+  if (resolved.kind === "unresolved") {
+    notes.push(
+      `Company signature UNVERIFIABLE: could not resolve the issuer DID ${issuer} (key ${vm}) to an Ed25519 key ` +
+        "(network/resolution failure or key not found). This is INCONCLUSIVE, NOT a signature mismatch.",
+    );
+    return "unavailable";
+  }
+  notes.push(
+    `Company signature check FAILED: the issuer DID document of ${issuer} lists no Ed25519 key under assertionMethod ` +
+      `for proof[0] (key ${vm}), so no key of the company may check this signature.`,
+  );
+  return "fail";
+}
+
+/**
+ * The method that checks proof[0] (did.js issuerKeyFromDoc): the one whose id is `vmId`, controlled by the issuer,
+ * referenced under the document's `assertionMethod` (full id or '#fragment') and carrying a multibase key. A fragment
+ * of the issuer naming no method falls back to the document's SOLE assertionMethod method. Never the first method:
+ * the document also lists the company's own `#recovery-1` key (capabilityInvocation), which Agreely never holds.
+ */
+function companyKeyMethod(
+  doc: DidDocument,
+  issuer: string,
+  vmId: string,
+): (DidVerificationMethod & { id: string; publicKeyMultibase: string }) | null {
   // A resolved document is outside input too: an entry that is not an object is skipped, never dereferenced.
-  const methods = doc.verificationMethod.filter((m): m is DidVerificationMethod => isPlainObject(m));
-  return methods.find((m) => m.id === vmId) ?? methods[0] ?? null;
+  const methods = asArray(doc.verificationMethod).filter((m): m is DidVerificationMethod => isPlainObject(m));
+  const assertion = asArray(doc["assertionMethod"]);
+  const asserts = (m: DidVerificationMethod): boolean =>
+    typeof m.id === "string" &&
+    (assertion.includes(m.id) || (m.id.includes("#") && assertion.includes("#" + m.id.split("#")[1]!)));
+  const named = methods.filter((m) => m.id === vmId);
+  let vm: DidVerificationMethod | null = null;
+  if (named.length === 1) {
+    vm = named[0]!;
+  } else if (named.length === 0 && issuer !== "" && vmId.startsWith(issuer + "#")) {
+    const listed = methods.filter(asserts);
+    vm = listed.length === 1 ? listed[0]! : null;
+  }
+  if (!vm || vm.controller !== issuer || !asserts(vm) || typeof vm.publicKeyMultibase !== "string") return null;
+  return vm as DidVerificationMethod & { id: string; publicKeyMultibase: string };
 }
 
 /**

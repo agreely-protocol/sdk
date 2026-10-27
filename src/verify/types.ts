@@ -73,6 +73,10 @@ export type ReceiptType = "company_attested" | "company_documented" | "citizen";
  *   - companySignature  recorded receipt: the Ed25519 signature over the body. Passkey
  *                       bundle: proof[0] over the signed offer. "unsupported" on a
  *                       bare passkey receipt (the offer travels only in the bundle).
+ *                       Checked only with the method proof[0] names, controlled by the
+ *                       issuer and listed under the issuer document's assertionMethod
+ *                       (a fragment naming no method: the document's sole
+ *                       assertionMethod key). No such key in a resolved document: "fail".
  *   - receiptIntegrity  passkey bundle: the receipt matches the signed offer field by
  *                       field, the disclosureHash recomputes from the offer, validFrom
  *                       equals grantedAt, and, once the company signature holds,
@@ -151,6 +155,8 @@ export interface DidDocument {
   verificationMethod?: DidVerificationMethod[];
   /** Method references (`#passkey-1` or the full id) a citizen key must appear under. */
   authentication?: unknown[];
+  /** Method references (`#kms-1` or the full id) the company key that checks proof[0] must appear under. */
+  assertionMethod?: unknown[];
   [key: string]: unknown;
 }
 
