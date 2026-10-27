@@ -68,7 +68,10 @@ function offer(edit: (o: Record<string, unknown>) => void = () => {}): Record<st
   return o;
 }
 
-/** The passkey receipt the app derives from `o`, signed (proof[0]) over the offer. No passkey proof: only the company half matters here. */
+/**
+ * The passkey receipt the app derives from `o`, signed (proof[0]) over the offer. proof[1] has the issued shape but
+ * signs nothing: only the company half matters here.
+ */
 function bundleOf(o: Record<string, unknown>, editConsent: (c: Record<string, unknown>) => void = () => {}) {
   const consent: Record<string, unknown> = {
     action: "grant",
@@ -93,7 +96,18 @@ function bundleOf(o: Record<string, unknown>, editConsent: (c: Record<string, un
       validFrom: GRANTED_AT,
       validUntil: "",
       credentialSubject: { id: "did:agreely:citizen:v2", consent },
-      proof: [company.proofOver(o)],
+      proof: [
+        company.proofOver(o),
+        {
+          type: "WebAuthnAssertion",
+          verificationMethod: "did:agreely:citizen:v2#passkey-1",
+          nonce: o["nonce"],
+          challenge: "0x" + "00".repeat(32),
+          authenticatorData: "",
+          clientDataJSON: "",
+          signature: "",
+        },
+      ],
     },
     signedOffer: o,
     merkleRoot: "0x" + "ab".repeat(32),

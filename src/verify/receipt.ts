@@ -113,6 +113,10 @@ const PASSKEY_RECEIPT_KEYS = new Set(["@context", "type", "id", "issuer", "valid
 const PASSKEY_RECEIPT_TYPE = ["VerifiableCredential", "ConsentReceipt"];
 const PASSKEY_RECEIPT_CONTEXT = ["https://www.w3.org/ns/credentials/v2", "https://agreely.ca/credentials/consent/v1"];
 const BUNDLE_VERSION = "1";
+// No signature covers a proof's own members, so they are held to the exact shape the issuer writes
+// (CompanyDidService::dataIntegrityProof, ConsentReceipt::build): exactly these keys, every value a string.
+const ISSUER_PROOF_KEYS = ["type", "cryptosuite", "created", "verificationMethod", "proofPurpose", "proofValue"];
+const CITIZEN_PROOF_KEYS = ["type", "verificationMethod", "nonce", "challenge", "authenticatorData", "clientDataJSON", "signature"];
 
 const ALLOWED_CONSENT_KEYS = new Set([
   "action",
@@ -233,8 +237,14 @@ export class ReceiptVerifier {
         ? "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable."
         : "A verbal (company-documented) receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
     );
-    // The signature is taken over the receipt body itself, so it IS the integrity check.
-    const receiptIntegrity = companySignature;
+    // The signature is taken over the receipt body itself, so it IS the integrity check, except for the proof's own
+    // members, which nothing signs.
+    const proofFailure = recordedProofFailure(r);
+    let receiptIntegrity = companySignature;
+    if (proofFailure !== null) {
+      receiptIntegrity = "fail";
+      notes.push(`Receipt integrity FAILED: ${proofFailure}.`);
+    }
     const cellLabelBinding = assessRecordedCellLabels(companySignature, notes);
     const disclosureCopy = await this.verifyRecordedDisclosureCopy(r, notes);
     const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
@@ -242,7 +252,9 @@ export class ReceiptVerifier {
     const consentAnchor: CheckStatus = "skipped";
 
     let overall: ReceiptVerification["overall"];
-    if (companySignature === "fail" || disclosureCopy === "fail" || documentAnchor === "fail") overall = "failed";
+    if (companySignature === "fail" || receiptIntegrity === "fail" || disclosureCopy === "fail" || documentAnchor === "fail") {
+      overall = "failed";
+    }
     else if (companySignature === "unavailable" || session.registryRefused) overall = "unavailable";
     // A telephone receipt is the organisation's word, authenticated: never more than partial.
     else overall = type === "company_attested" ? "verified" : "partial";
@@ -1010,10 +1022,73 @@ function receiptType(r: Record<string, unknown>): ReceiptType {
   return "citizen";
 }
 
+/** The person's WebAuthn assertion is proof[1], as ConsentReceipt::build writes it, never another position. */
 function findWebAuthnProof(proofs: unknown[]): Record<string, unknown> | null {
-  for (const p of proofs) {
-    const obj = asObject(p);
-    if (asString(obj["type"]) === "WebAuthnAssertion") return obj;
+  const obj = asObject(proofs[1]);
+  return asString(obj["type"]) === "WebAuthnAssertion" ? obj : null;
+}
+
+function exactStringMembers(o: unknown, keys: string[]): o is Record<string, string> {
+  return (
+    isPlainObject(o) &&
+    Object.keys(o).length === keys.length &&
+    keys.every((k) => Object.prototype.hasOwnProperty.call(o, k) && typeof o[k] === "string")
+  );
+}
+
+const controlledBy = (vm: string, did: unknown): boolean => typeof did === "string" && did !== "" && vm.startsWith(did + "#");
+
+/** proof[0] as the issuer writes it (verify-core.js issuerProofShaped): the company's eddsa-jcs-2022 proof. */
+function issuerProofShaped(proof: unknown, issuer: unknown): proof is Record<string, string> {
+  return (
+    exactStringMembers(proof, ISSUER_PROOF_KEYS) &&
+    proof["type"] === "DataIntegrityProof" &&
+    proof["cryptosuite"] === "eddsa-jcs-2022" &&
+    proof["proofPurpose"] === "assertionMethod" &&
+    controlledBy(proof["verificationMethod"]!, issuer)
+  );
+}
+
+/** proof[1] as ConsentReceipt::build writes it (verify-core.js citizenProofShaped): the person's WebAuthn assertion. */
+function citizenProofShaped(proof: unknown, subject: unknown): proof is Record<string, string> {
+  return (
+    exactStringMembers(proof, CITIZEN_PROOF_KEYS) &&
+    proof["type"] === "WebAuthnAssertion" &&
+    controlledBy(proof["verificationMethod"]!, subject)
+  );
+}
+
+/**
+ * A passkey receipt carries exactly the company's proof then the person's, and the members the issuer copies from the
+ * signed offer equal it (verify-core.js passkeyProofsShaped + proofMembersPinned). An offer without createdAt pins no
+ * `created`, as offerWindowOf skips it.
+ */
+function passkeyProofFailure(r: Record<string, unknown>, offer: Record<string, unknown>): string | null {
+  const proof = asArray(r["proof"]);
+  const [issuerProof, citizenProof] = proof;
+  const subject = asObject(r["credentialSubject"])["id"];
+  if (proof.length !== 2 || !issuerProofShaped(issuerProof, r["issuer"]) || !citizenProofShaped(citizenProof, subject)) {
+    return "the proof array is not the company's DataIntegrityProof then the person's WebAuthnAssertion, each with exactly the members the issuer writes";
+  }
+  if (typeof offer["createdAt"] === "string" && issuerProof["created"] !== offer["createdAt"]) {
+    return "proof[0].created differs from the signed offer's createdAt";
+  }
+  if (citizenProof["nonce"] !== offer["nonce"]) return "proof[1].nonce differs from the signed offer's nonce";
+  return null;
+}
+
+/** A recorded receipt carries exactly one company proof, and a v2 to v4 one was created at its recordedAt. */
+function recordedProofFailure(r: Record<string, unknown>): string | null {
+  const proof = asArray(r["proof"]);
+  const issuerProof = proof[0];
+  if (proof.length !== 1 || !issuerProofShaped(issuerProof, r["issuer"])) {
+    return "the proof array is not exactly one company DataIntegrityProof with the members the issuer writes";
+  }
+  // TRAP: a v1 receipt (no receiptVersion) pins nothing until production is measured to hold created === grantedAt.
+  if (!Object.prototype.hasOwnProperty.call(r, "receiptVersion")) return null;
+  const recordedAt = asObject(asObject(r["credentialSubject"])["consent"])["recordedAt"];
+  if (typeof recordedAt !== "string" || issuerProof["created"] !== recordedAt) {
+    return "proof[0].created differs from the consent's recordedAt";
   }
   return null;
 }
@@ -1042,8 +1117,9 @@ function companyKeyRefused(
 }
 
 /**
- * The method that checks proof[0] (did.js issuerKeyFromDoc): the one whose id is `vmId`, controlled by the issuer,
- * referenced under the document's `assertionMethod` (full id or '#fragment') and carrying a multibase key. A fragment
+ * The method that checks proof[0] (did.js issuerKeyFromDoc): the one whose id is `vmId`, an id under the issuer
+ * (issuer + '#' + fragment), controlled by the issuer, referenced under the document's `assertionMethod` (full id, or
+ * '#fragment', which resolves only as issuer + '#fragment') and carrying a multibase key. A fragment
  * of the issuer naming no method falls back to the document's SOLE assertionMethod method. Never the first method:
  * the document also lists the company's own `#recovery-1` key (capabilityInvocation), which Agreely never holds.
  */
@@ -1055,9 +1131,12 @@ function companyKeyMethod(
   // A resolved document is outside input too: an entry that is not an object is skipped, never dereferenced.
   const methods = asArray(doc.verificationMethod).filter((m): m is DidVerificationMethod => isPlainObject(m));
   const assertion = asArray(doc["assertionMethod"]);
+  // A method named under another DID never checks proof[0], even one the issuer controls.
   const asserts = (m: DidVerificationMethod): boolean =>
     typeof m.id === "string" &&
-    (assertion.includes(m.id) || (m.id.includes("#") && assertion.includes("#" + m.id.split("#")[1]!)));
+    issuer !== "" &&
+    m.id.startsWith(issuer + "#") &&
+    (assertion.includes(m.id) || assertion.includes(m.id.slice(issuer.length)));
   const named = methods.filter((m) => m.id === vmId);
   let vm: DidVerificationMethod | null = null;
   if (named.length === 1) {
@@ -1327,7 +1406,7 @@ function integrityFailure(r: Record<string, unknown>, offer: Record<string, unkn
   if (typeof r["validFrom"] !== "string" || r["validFrom"] !== consent["grantedAt"]) {
     return "validFrom differs from grantedAt";
   }
-  return null;
+  return passkeyProofFailure(r, offer);
 }
 
 /** sha256(JCS(preimage)) equals BOTH the receipt's and the offer's stated hash. v2 offer: {disclosure, legalBasis}. */

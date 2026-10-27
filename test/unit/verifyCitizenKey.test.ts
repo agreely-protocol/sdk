@@ -137,7 +137,10 @@ async function withOffer(
   }
   const company = testIssuer(ISSUER);
   const receipt = bundle["receipt"] as Record<string, unknown>;
-  receipt["proof"] = [company.proofOver(offer), (receipt["proof"] as unknown[])[1]];
+  const issuerProof = company.proofOver(offer);
+  // The issuer writes proof[0].created from the offer's createdAt, and the verifier holds the two equal.
+  if (typeof offer["createdAt"] === "string") issuerProof["created"] = offer["createdAt"];
+  receipt["proof"] = [issuerProof, (receipt["proof"] as unknown[])[1]];
   bundle["signedOffer"] = offer;
   return verify(bundle, { resolver: resolverFor(citizenDocument, company.didDoc) });
 }

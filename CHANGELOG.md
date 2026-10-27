@@ -3,6 +3,25 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## 0.6.1 - Unreleased
+
+### Changed
+
+- **`verifyReceipt` holds the proof array to the shape the issuer writes.** A
+  passkey receipt carries exactly two proofs, the company's `DataIntegrityProof`
+  then the person's `WebAuthnAssertion`; a paper or telephone receipt carries
+  exactly the company's proof. Each proof has exactly its issued members, all
+  strings, under the issuer (proof[0]) or the subject (proof[1]). The members
+  copied from a signed value must equal it: a passkey `proof[0].created` is the
+  offer's `createdAt` and `proof[1].nonce` its `nonce`; a recorded receipt with a
+  `receiptVersion` has `proof[0].created` equal to its `recordedAt`. Otherwise
+  `receiptIntegrity` reads `fail` and `overall` reads `failed`. The passkey
+  assertion is read at `proof[1]` only.
+- **The key that checks proof[0] is a method of the issuer.** Its id is the
+  issuer DID followed by `#` and a fragment, and a relative `#fragment` under
+  `assertionMethod` names only the issuer's own method. A method whose id names
+  another DID never checks a receipt, whoever controls it.
+
 ## 0.6.0 - 2026-10-27
 
 ### Added

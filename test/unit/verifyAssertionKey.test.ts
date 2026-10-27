@@ -80,6 +80,12 @@ describe("the company signature is checked only with a key listed under assertio
     expect(result.overall).toBe("failed");
   });
 
+  it("the fallback finds the sole assertionMethod key when it is not the first method", async () => {
+    const result = await verify(labelled(F12.genuine, "#not-a-key"), recoveryFirst());
+    expect(result.companySignature).toBe("pass");
+    expect(companyNote(result)).toContain(`${ISSUER}#kms-1`);
+  });
+
   it("a fragment naming no method FAILS when the document lists two assertionMethod keys", async () => {
     const doc = clone(F12.issuerDocument);
     doc["assertionMethod"] = [...(doc["assertionMethod"] as unknown[]), "#recovery-1"];
@@ -92,6 +98,34 @@ describe("the company signature is checked only with a key listed under assertio
     doc.verificationMethod![0]!.controller = "did:web:elsewhere.example";
     const result = await verify(F12.genuine, doc);
     expect(result.companySignature).toBe("fail");
+  });
+
+  it("a method named under another DID never checks the receipt, even one the issuer controls and lists by fragment", async () => {
+    const doc = clone(F12.issuerDocument);
+    const foreign = "did:web:elsewhere.example#kms-1";
+    doc.verificationMethod!.push({ ...doc.verificationMethod![0]!, id: foreign });
+    doc["assertionMethod"] = ["#kms-1"];
+    const r = clone(F12.genuine);
+    (r["proof"] as Record<string, unknown>[])[0]!["verificationMethod"] = foreign;
+    const result = await verify(r, doc);
+    expect(result.companySignature).toBe("fail");
+    expect(result.overall).toBe("failed");
+  });
+
+  it("a relative '#fragment' under assertionMethod resolves only as issuer + '#fragment'", async () => {
+    const doc = clone(F12.issuerDocument);
+    doc.verificationMethod![0]!.id = `${ISSUER}#kms-1#x`;
+    doc["assertionMethod"] = ["#kms-1"];
+    const result = await verify(labelled(F12.genuine, "#kms-1#x"), doc);
+    expect(result.companySignature).toBe("fail");
+  });
+
+  it("a relative '#fragment' under assertionMethod names the issuer's own method", async () => {
+    const doc = clone(F12.issuerDocument);
+    doc["assertionMethod"] = ["#kms-1"];
+    const result = await verify(F12.genuine, doc);
+    expect(result.companySignature).toBe("pass");
+    expect(result.overall).toBe("verified");
   });
 
   it("an issuer document that does not resolve stays unavailable, never a failure", async () => {

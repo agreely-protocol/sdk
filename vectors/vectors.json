@@ -255,6 +255,30 @@
           "capabilityInvocation": [
             "#recovery-1"
           ]
+        },
+        "did:web:app.agreely.ca:c:vector-foreign-method": {
+          "@context": [
+            "https://www.w3.org/ns/did/v1",
+            "https://w3id.org/security/data-integrity/v2"
+          ],
+          "id": "did:web:app.agreely.ca:c:vector-foreign-method",
+          "verificationMethod": [
+            {
+              "id": "did:web:app.agreely.ca:c:vector-foreign-method#kms-1",
+              "type": "Multikey",
+              "controller": "did:web:app.agreely.ca:c:vector-foreign-method",
+              "publicKeyMultibase": "z6MkiH3fHEsJvz2WJkGoasK5Xf29pbWp25kGr6MqpscXG27w"
+            },
+            {
+              "id": "did:web:evil.example#kms-1",
+              "type": "Multikey",
+              "controller": "did:web:app.agreely.ca:c:vector-foreign-method",
+              "publicKeyMultibase": "z6MkuVYSb7j6FKYjkipeJEn7kxwoWi5wuzqH2oyX9eDy1kWZ"
+            }
+          ],
+          "assertionMethod": [
+            "#kms-1"
+          ]
         }
       },
       "ipfsBody": {
@@ -785,6 +809,262 @@
             "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
           ]
         }
+      },
+      {
+        "name": "a paper receipt carrying a second proof fails its integrity, its signature intact",
+        "resolveDids": true,
+        "ipfs": false,
+        "receipt": {
+          "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://agreely.ca/credentials/consent/v1"
+          ],
+          "assuranceLevel": "company_attested",
+          "credentialSubject": {
+            "consent": {
+              "action": "grant",
+              "document": {
+                "code": "communications",
+                "effectiveDate": "2026-05-01",
+                "name": "Consentement aux communications",
+                "version": "1.1"
+              },
+              "documentVersion": "0e2f0cab-9ab3-493a-8baa-4e7f7100a531",
+              "effectiveDate": "2019-03-15T04:00:00Z",
+              "grantedAt": "2019-03-15T04:00:00Z",
+              "items": [
+                {
+                  "category": "coordonnées",
+                  "itemId": "0x3780630d5466eb658eb415a04c0800f7e741ba8175697490d5e58f8f837ee5b5",
+                  "purpose": "communications marketing"
+                }
+              ],
+              "recordedAt": "2026-10-24T17:14:06Z"
+            }
+          },
+          "evidence": {
+            "documentVersion": "0e2f0cab-9ab3-493a-8baa-4e7f7100a531",
+            "documentVersionMatch": "attested-by-issuer",
+            "pdfHash": "0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27",
+            "pdfHeldBy": "company",
+            "type": "HandSignedPaperConsent"
+          },
+          "id": "urn:agreely:receipt:67624031-96dc-47eb-b98a-d97ccad97e6c",
+          "issuer": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+          "proof": [
+            {
+              "created": "2026-10-24T17:14:06Z",
+              "cryptosuite": "eddsa-jcs-2022",
+              "proofPurpose": "assertionMethod",
+              "proofValue": "z2QizRJBo2xTpdLJRXcv7XPPicMEK25pPxaQzoDabKgyV43bSqWFSuwVKjfAs45AyVNGP5Yins4hxPZQNn1uQZXZR",
+              "type": "DataIntegrityProof",
+              "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+            },
+            {
+              "created": "2026-10-24T17:14:06Z",
+              "cryptosuite": "eddsa-jcs-2022",
+              "proofPurpose": "assertionMethod",
+              "proofValue": "z2QizRJBo2xTpdLJRXcv7XPPicMEK25pPxaQzoDabKgyV43bSqWFSuwVKjfAs45AyVNGP5Yins4hxPZQNn1uQZXZR",
+              "type": "DataIntegrityProof",
+              "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+            }
+          ],
+          "receiptVersion": "3",
+          "type": [
+            "VerifiableCredential",
+            "ConsentReceipt",
+            "CompanyAttestedConsentReceipt"
+          ],
+          "validFrom": "2019-03-15T04:00:00Z",
+          "validUntil": "2028-10-25T03:59:59Z"
+        },
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_attested",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "This proves the company ATTESTED to a hand-signed PDF (hash 0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27); it does NOT prove a human signed.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Receipt integrity FAILED: the proof array is not exactly one company DataIntegrityProof with the members the issuer writes.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "a paper receipt whose proof created instant was moved off its recordedAt fails its integrity",
+        "resolveDids": true,
+        "ipfs": false,
+        "receipt": {
+          "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://agreely.ca/credentials/consent/v1"
+          ],
+          "assuranceLevel": "company_attested",
+          "credentialSubject": {
+            "consent": {
+              "action": "grant",
+              "document": {
+                "code": "communications",
+                "effectiveDate": "2026-05-01",
+                "name": "Consentement aux communications",
+                "version": "1.1"
+              },
+              "documentVersion": "0e2f0cab-9ab3-493a-8baa-4e7f7100a531",
+              "effectiveDate": "2019-03-15T04:00:00Z",
+              "grantedAt": "2019-03-15T04:00:00Z",
+              "items": [
+                {
+                  "category": "coordonnées",
+                  "itemId": "0x3780630d5466eb658eb415a04c0800f7e741ba8175697490d5e58f8f837ee5b5",
+                  "purpose": "communications marketing"
+                }
+              ],
+              "recordedAt": "2026-10-24T17:14:06Z"
+            }
+          },
+          "evidence": {
+            "documentVersion": "0e2f0cab-9ab3-493a-8baa-4e7f7100a531",
+            "documentVersionMatch": "attested-by-issuer",
+            "pdfHash": "0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27",
+            "pdfHeldBy": "company",
+            "type": "HandSignedPaperConsent"
+          },
+          "id": "urn:agreely:receipt:67624031-96dc-47eb-b98a-d97ccad97e6c",
+          "issuer": "did:web:app.agreely.ca:c:showcase-assurance-boreale",
+          "proof": [
+            {
+              "created": "2026-10-26T10:00:00Z",
+              "cryptosuite": "eddsa-jcs-2022",
+              "proofPurpose": "assertionMethod",
+              "proofValue": "z2QizRJBo2xTpdLJRXcv7XPPicMEK25pPxaQzoDabKgyV43bSqWFSuwVKjfAs45AyVNGP5Yins4hxPZQNn1uQZXZR",
+              "type": "DataIntegrityProof",
+              "verificationMethod": "did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1"
+            }
+          ],
+          "receiptVersion": "3",
+          "type": [
+            "VerifiableCredential",
+            "ConsentReceipt",
+            "CompanyAttestedConsentReceipt"
+          ],
+          "validFrom": "2019-03-15T04:00:00Z",
+          "validUntil": "2028-10-25T03:59:59Z"
+        },
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_attested",
+          "companySignature": "pass",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "pass",
+          "overall": "failed",
+          "notes": [
+            "Company signature verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
+            "This proves the company ATTESTED to a hand-signed PDF (hash 0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27); it does NOT prove a human signed.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Receipt integrity FAILED: proof[0].created differs from the consent's recordedAt.",
+            "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
+      },
+      {
+        "name": "a receipt signed by a method named under another DID fails, even one the issuer controls and lists by fragment",
+        "resolveDids": true,
+        "ipfs": false,
+        "receipt": {
+          "@context": [
+            "https://www.w3.org/ns/credentials/v2",
+            "https://agreely.ca/credentials/consent/v1"
+          ],
+          "assuranceLevel": "company_attested",
+          "credentialSubject": {
+            "consent": {
+              "action": "grant",
+              "document": {
+                "code": "communications",
+                "effectiveDate": "2026-05-01",
+                "name": "Consentement aux communications",
+                "version": "1.1"
+              },
+              "documentVersion": "0e2f0cab-9ab3-493a-8baa-4e7f7100a531",
+              "effectiveDate": "2019-03-15T04:00:00Z",
+              "grantedAt": "2019-03-15T04:00:00Z",
+              "items": [
+                {
+                  "category": "coordonnées",
+                  "itemId": "0x3780630d5466eb658eb415a04c0800f7e741ba8175697490d5e58f8f837ee5b5",
+                  "purpose": "communications marketing"
+                }
+              ],
+              "recordedAt": "2026-10-24T17:14:06Z"
+            }
+          },
+          "evidence": {
+            "documentVersion": "0e2f0cab-9ab3-493a-8baa-4e7f7100a531",
+            "documentVersionMatch": "attested-by-issuer",
+            "pdfHash": "0xf83c2ff9432463036a2737d32a01c20cb6030d79067a746af60831672cf04d27",
+            "pdfHeldBy": "company",
+            "type": "HandSignedPaperConsent"
+          },
+          "id": "urn:agreely:receipt:67624031-96dc-47eb-b98a-d97ccad97e6c",
+          "issuer": "did:web:app.agreely.ca:c:vector-foreign-method",
+          "receiptVersion": "3",
+          "type": [
+            "VerifiableCredential",
+            "ConsentReceipt",
+            "CompanyAttestedConsentReceipt"
+          ],
+          "validFrom": "2019-03-15T04:00:00Z",
+          "validUntil": "2028-10-25T03:59:59Z",
+          "proof": [
+            {
+              "created": "2026-10-24T17:14:06Z",
+              "cryptosuite": "eddsa-jcs-2022",
+              "proofPurpose": "assertionMethod",
+              "proofValue": "zxovhJ37taqmiB9q5LtRFR7AEsYKfcpbzSur9HJWhkU5wNJGEgv33LhbEhY4GXB5eJ5ucQA6UkPP6wk5Yv1vVL9R",
+              "type": "DataIntegrityProof",
+              "verificationMethod": "did:web:evil.example#kms-1"
+            }
+          ]
+        },
+        "expect": {
+          "input": "receipt",
+          "receiptType": "company_attested",
+          "companySignature": "fail",
+          "receiptIntegrity": "fail",
+          "citizenAssertion": "unsupported",
+          "disclosureCopy": "skipped",
+          "documentAnchor": "skipped",
+          "consentAnchor": "skipped",
+          "cellLabelBinding": "fail",
+          "overall": "failed",
+          "notes": [
+            "Company signature check FAILED: the issuer DID document of did:web:app.agreely.ca:c:vector-foreign-method lists no Ed25519 key under assertionMethod for proof[0] (key did:web:evil.example#kms-1), so no key of the company may check this signature.",
+            "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
+            "Receipt integrity FAILED: the proof array is not exactly one company DataIntegrityProof with the members the issuer writes.",
+            "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
+            "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
+            "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
+            "consentAnchor skipped: a recorded receipt carries no consentRef to read on chain."
+          ]
+        }
       }
     ]
   },
@@ -1308,19 +1588,19 @@
           "input": "bundle",
           "receiptType": "citizen",
           "companySignature": "pass",
-          "receiptIntegrity": "pass",
+          "receiptIntegrity": "fail",
           "citizenAssertion": "fail",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
           "consentAnchor": "skipped",
-          "cellLabelBinding": "pass",
+          "cellLabelBinding": "fail",
           "overall": "failed",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
-            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Receipt integrity FAILED: the proof array is not the company's DataIntegrityProof then the person's WebAuthnAssertion, each with exactly the members the issuer writes.",
             "Citizen assertion FAILED: the WebAuthn signature did not verify against the resolved passkey.",
-            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
             "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
             "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
@@ -1335,19 +1615,19 @@
           "input": "bundle",
           "receiptType": "citizen",
           "companySignature": "pass",
-          "receiptIntegrity": "pass",
+          "receiptIntegrity": "fail",
           "citizenAssertion": "fail",
           "disclosureCopy": "skipped",
           "documentAnchor": "skipped",
           "consentAnchor": "skipped",
-          "cellLabelBinding": "pass",
+          "cellLabelBinding": "fail",
           "overall": "failed",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
-            "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
+            "Receipt integrity FAILED: proof[1].nonce differs from the signed offer's nonce.",
             "Citizen assertion FAILED: the passkey signature verifies, but the challenge it signed does not recompute from this receipt's issuer, subject, requestId, action and grantedAt with the bundle's Merkle root and nonce. The assertion belongs to another consent.",
-            "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
+            "Cell labels UNBOUND: the receipt's cells are not proven to be items of a verified company offer.",
             "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
             "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
