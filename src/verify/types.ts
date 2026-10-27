@@ -11,7 +11,10 @@
  *   - unavailable  the check could NOT be completed: a DID could not be resolved,
  *                  a gateway or an RPC failed, refused or timed out. DISTINCT from
  *                  "fail": a valid receipt during an outage must never look
- *                  byte-identical to a forgery.
+ *                  byte-identical to a forgery. With an rpcUrl, an anchor check
+ *                  also reads "unavailable" when the bundle names a registry or
+ *                  chain other than the one read: that unknown registry is refused
+ *                  before any RPC call, and the note says "unknown registry".
  *   - unbound      the signature verifies, but nothing ties it to this receipt's
  *                  content (a bare passkey receipt's assertion). Proves nothing
  *                  about the receipt.
@@ -33,7 +36,11 @@ export type CheckStatus = "pass" | "fail" | "unavailable" | "unbound" | "skipped
  *                  the bundle issued with it. Never a pass, never a tamper.
  *   - failed       a check ACTIVELY failed (a tamper / wrong key / contradiction).
  *   - unavailable  a decisive check could NOT be completed (the DID could not be
- *                  resolved). Verification is inconclusive, NOT a forgery.
+ *                  resolved). Verification is inconclusive, NOT a forgery. Also given,
+ *                  with an rpcUrl, when the bundle names a registry or chain other than
+ *                  the one read (an unknown registry, refused before any RPC call),
+ *                  unless a check failed: such a bundle is never `verified` or
+ *                  `withdrawn`.
  *   - withdrawn    the receipt is authentic and its consent was withdrawn on chain. Given only when every other
  *                  decisive check would have produced `verified`: a `fail` elsewhere still gives `failed`, an
  *                  `unavailable` elsewhere still gives `unavailable`, and the consentAnchor check reads `withdrawn`.
