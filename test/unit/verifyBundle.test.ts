@@ -174,6 +174,8 @@ describe("a bundle naming a registry the SDK does not read is refused, with no R
     expect(result.consentAnchor).toBe("unavailable");
     expect(result.overall).toBe("unavailable");
     expect(result.notes.join("\n")).toContain(`unknown registry: the bundle names the registry ${address.toLowerCase()} on chainId 84532, which is not a known registry for chainId 84532`);
+    expect(result.registryRefused).toBe(true);
+    expect(result.consentAnchorCounts).toBeUndefined();
     expect(rpc.calls).toHaveLength(0);
   });
 
@@ -237,6 +239,9 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
     expect(result.consentAnchor).toBe("withdrawn");
     expect(result.consentAnchorRecords![0]!.state).toBe("withdrawn");
     expect(result.consentAnchorRecords![0]!.revokedAt).toBe(1760000600);
+    const cells = (bundle()["consentRefs"] as string[]).length;
+    expect(result.consentAnchorCounts).toEqual({ cells, active: 0, withdrawn: cells, pending: 0, unreadable: 0 });
+    expect(result.registryRefused).toBeUndefined();
     expect(result.notes.join("\n")).toContain("WITHDRAWN");
     expect(result.notes.join("\n")).toContain("NOT a forgery");
   });
@@ -310,6 +315,21 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
       expect(result.consentAnchor).toBe("unavailable");
       expect(result.overall).not.toBe("failed");
     }
+  });
+
+  it("a plain outage carries no registryRefused: only a refused registry sets it", async () => {
+    const down = rpcFetch(() => new Response("down", { status: 502 }));
+    const result = await verify(bundle(), { ...SEPOLIA, fetch: down.fetch });
+    expect(result.consentAnchor).toBe("unavailable");
+    expect(result.registryRefused).toBeUndefined();
+  });
+
+  it("a pending read tallies every cell as not anchored yet, and carries no withdrawal", async () => {
+    const pending = rpcFetch((m) => (m === "eth_call" ? anchorWord("0x" + "00".repeat(32), 0, 0, 0) : null));
+    const result = await verify(bundle(), { ...SEPOLIA, fetch: pending.fetch });
+    const cells = (bundle()["consentRefs"] as string[]).length;
+    expect(result.consentAnchor).toBe("unavailable");
+    expect(result.consentAnchorCounts).toEqual({ cells, active: 0, withdrawn: 0, pending: cells, unreadable: 0 });
   });
 
   it("is never read for a bare receipt, whose Merkle root nothing binds", async () => {

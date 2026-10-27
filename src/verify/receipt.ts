@@ -140,6 +140,7 @@ type ChainSession = {
   registryRefused?: boolean;
   documentRecord?: DocumentAnchorRecord;
   consentRecords?: ConsentAnchorRecord[];
+  consentCounts?: ReceiptVerification["consentAnchorCounts"];
 };
 type NamedRegistry = { chainId: string; registry: string };
 
@@ -862,6 +863,7 @@ export class ReceiptVerifier {
     }
     const counts = `${String(refs.length)} cell(s): ${String(active)} active, ${String(withdrawn)} withdrawn, ` +
       `${String(pending)} not anchored yet, ${String(unread)} unreadable`;
+    session.consentCounts = { cells: refs.length, active, withdrawn, pending, unreadable: unread };
     const blocks = [...new Set(records.map((rec) => rec.anchoredBlock))].join(", ");
     if (withdrawn > 0) {
       notes.push(
@@ -1388,11 +1390,15 @@ function namedRegistryOf(bundle: Record<string, unknown>): NamedRegistry | null 
   return { registry, chainId: typeof chainId === "string" || typeof chainId === "number" ? String(chainId) : "" };
 }
 
-/** The anchor records a verification read, for its result: absent when none was read. */
-function anchorRecords(session: ChainSession): Pick<ReceiptVerification, "documentAnchorRecord" | "consentAnchorRecords"> {
+/** The anchor records, consent tally and registry refusal a verification read, for its result: absent when none. */
+function anchorRecords(
+  session: ChainSession,
+): Pick<ReceiptVerification, "documentAnchorRecord" | "consentAnchorRecords" | "consentAnchorCounts" | "registryRefused"> {
   return {
     ...(session.documentRecord ? { documentAnchorRecord: session.documentRecord } : {}),
     ...(session.consentRecords ? { consentAnchorRecords: session.consentRecords } : {}),
+    ...(session.consentCounts ? { consentAnchorCounts: session.consentCounts } : {}),
+    ...(session.registryRefused ? { registryRefused: true } : {}),
   };
 }
 

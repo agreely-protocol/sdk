@@ -121,6 +121,10 @@ export interface ReceiptVerification {
   documentAnchorRecord?: DocumentAnchorRecord;
   /** Present when consentAnchor read a cell under the bundle's Merkle root: one record per such cell. */
   consentAnchorRecords?: ConsentAnchorRecord[];
+  /** Per-cell tally of the `--onchain` consent anchor read, when that read ran. */
+  consentAnchorCounts?: { cells: number; active: number; withdrawn: number; pending: number; unreadable: number };
+  /** True when an anchor check refused the bundle's registry before any RPC call (an unknown registry or chain). */
+  registryRefused?: boolean;
   /** Plain-language notes stating what each result proves vs trusts. */
   notes: string[];
 }
