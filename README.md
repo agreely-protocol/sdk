@@ -943,8 +943,8 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   (the document anchor) or a bundle with a `consentRef` (the consent anchor). Those checks read
   `unavailable` with an `unknown registry` note, and `overall` reads `unavailable` (never
   `verified`) unless a check failed. A bundle with neither reads nothing on chain, so the refusal
-  does not apply: `a3v3.bundle.json` names the Sepolia registry and still reads `verified`. Programs should read the
-  `consentAnchorCounts` and `registryRefused` fields, not the notes, which are for humans. A bare
+  does not apply, and it can read `verified`. Programs should read the `consentAnchorCounts`
+  and `registryRefused` fields, not the notes, which are for humans. A bare
   passkey receipt proves nothing on its own: its assertion reads `unbound`,
   `overall` reads `incomplete`, and the notes say to verify the bundle.
   A `company_attested` paper receipt is `verified` when sound, bare or wrapped. A

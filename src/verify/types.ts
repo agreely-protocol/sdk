@@ -38,9 +38,10 @@ export type CheckStatus = "pass" | "fail" | "unavailable" | "unbound" | "skipped
  *   - unavailable  a decisive check could NOT be completed (the DID could not be
  *                  resolved). Verification is inconclusive, NOT a forgery. Also given,
  *                  with an rpcUrl, when the bundle names a registry or chain other than
- *                  the one read (an unknown registry, refused before any RPC call),
- *                  unless a check failed: such a bundle is never `verified` or
- *                  `withdrawn`.
+ *                  the one read and an anchor check would read the chain (a receipt
+ *                  with a `document.ipfsCid`, or a bundle with a `consentRef`): that
+ *                  unknown registry is refused before any RPC call, unless a check
+ *                  failed. Such a bundle is never `verified` or `withdrawn`.
  *   - withdrawn    the receipt is authentic and its consent was withdrawn on chain. Given only when every other
  *                  decisive check would have produced `verified`: a `fail` elsewhere still gives `failed`, an
  *                  `unavailable` elsewhere still gives `unavailable`, and the consentAnchor check reads `withdrawn`.
