@@ -36,7 +36,7 @@ to [Semantic Versioning](https://semver.org/).
   cell read under that root: its state, `anchoredAt`, `revokedAt` and
   `anchoredBlock`.
 - `ReceiptVerification` carries `consentAnchorCounts` (cells, active, withdrawn, pending,
-  unreadable, set when the consent anchor read ran) and `registryRefused` (true when a
+  unreadable, set when the consent anchor read ran and did not fail) and `registryRefused` (true when a
   bundle's registry was refused before any RPC call), so programs read fields, not notes.
 - **The on-chain checks read the registry by `eth_call` only.** The document anchor
   is one `rootOf(keccak256(cid))`: a record in the consent-document lane (3) passes

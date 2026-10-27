@@ -939,8 +939,11 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   recorded reads `unavailable`. On a chain other than Base mainnet and Base Sepolia, pass
   `registryAddress`, or the anchor checks read `unavailable`. With `rpcUrl`, a bundle whose
   issuer key delegation names a registry or chain other than the one read is refused before
-  any RPC call: the anchor checks read `unavailable` with an `unknown registry` note, and `overall`
-  reads `unavailable` (never `verified`) unless a check failed. Programs should read the
+  any RPC call when an anchor check would read the chain: a receipt with a `document.ipfsCid`
+  (the document anchor) or a bundle with a `consentRef` (the consent anchor). Those checks read
+  `unavailable` with an `unknown registry` note, and `overall` reads `unavailable` (never
+  `verified`) unless a check failed. A bundle with neither reads nothing on chain, so the refusal
+  does not apply: `a3v3.bundle.json` names the Sepolia registry and still reads `verified`. Programs should read the
   `consentAnchorCounts` and `registryRefused` fields, not the notes, which are for humans. A bare
   passkey receipt proves nothing on its own: its assertion reads `unbound`,
   `overall` reads `incomplete`, and the notes say to verify the bundle.

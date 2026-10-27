@@ -212,6 +212,26 @@ describe("a bundle naming a registry the SDK does not read is refused, with no R
   });
 });
 
+describe("a recorded paper receipt whose bundle names another registry is refused, with no RPC", () => {
+  // a3v2.receipt is a recorded paper receipt that carries a document CID; a3v3's bundle supplies the issuer's
+  // delegation, which names the emit-only registry. A bare paper receipt has no bundle, so nothing is named to refuse.
+  it("reads the document anchor unavailable, overall unavailable and registryRefused, and makes no RPC call", async () => {
+    const paperBundle = {
+      version: "1",
+      receipt: artefact("a3v2.receipt"),
+      didDocuments: (artefact("a3v3.bundle") as { didDocuments: unknown }).didDocuments,
+    };
+    const rpc = rpcFetch(() => rootWord(3));
+    const result = await verify(paperBundle, { ...SEPOLIA, fetch: rpc.fetch });
+    expect(result.companySignature).toBe("pass");
+    expect(result.documentAnchor).toBe("unavailable");
+    expect(result.overall).toBe("unavailable");
+    expect(result.registryRefused).toBe(true);
+    expect(result.notes.join("\n")).toContain("unknown registry");
+    expect(rpc.calls).toHaveLength(0);
+  });
+});
+
 describe("the consent anchor is read with eth_call registry(consentRef) (N6)", () => {
   const bundle = () => onReadableRegistry(artefact("a1v1.bundle"));
   const root = () => String(bundle()["merkleRoot"]);
