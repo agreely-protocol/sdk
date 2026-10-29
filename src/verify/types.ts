@@ -61,14 +61,16 @@ export type OverallStatus = "verified" | "partial" | "incomplete" | "failed" | "
 /**
  * Whether the consent is still in force, as the chain records it. Always present.
  *
- *   - active       every accepted cell was read on chain (`rpcUrl`) under the bundle's bound Merkle root,
- *                  and none is withdrawn.
+ *   - active       every cell was read on chain (`rpcUrl`) under the trusted Merkle root, and none is
+ *                  withdrawn: on a passkey bundle, the root its verified assertion binds and every accepted
+ *                  cell; on a version 4 paper or telephone receipt in a bundle, the root and refs it signs.
  *   - withdrawn    the chain records the withdrawal of at least one cell under that root: `withdrawnAt`
  *                  gives the latest withdrawal when the record carries its instant.
- *   - not_checked  nothing established it: no `rpcUrl`; a paper or telephone receipt or a bare passkey
- *                  receipt (this SDK reads the consent's on-chain record from a passkey bundle only); a
- *                  root no verified passkey assertion binds; or a read that did not cover every cell (an
- *                  RPC failure, a cell not anchored yet, a refused registry, a contradicting record). The
+ *   - not_checked  nothing established it: no `rpcUrl`; a bare passkey receipt, a paper or telephone receipt
+ *                  before version 4 (it signs no anchor) or one outside its bundle; a root no verified
+ *                  signature binds, or a version 4 receipt whose company key the registry did not confirm at
+ *                  the instant it signed; or a read that did not cover every cell (an RPC failure, a cell not
+ *                  anchored yet, an unknown anchor count, a refused registry, a contradicting record). The
  *                  consent may have been withdrawn.
  *
  * Says nothing about the receipt's authenticity: read `overall` first.
@@ -155,11 +157,123 @@ export interface ReceiptVerification {
   /** Present when consentAnchor read a cell under the bundle's Merkle root: one record per such cell. */
   consentAnchorRecords?: ConsentAnchorRecord[];
   /** Per-cell tally of the consent anchor read (the `rpcUrl` option), set when that read ran and did not fail. */
-  consentAnchorCounts?: { cells: number; active: number; withdrawn: number; pending: number; unreadable: number };
+  consentAnchorCounts?: {
+    cells: number;
+    active: number;
+    withdrawn: number;
+    pending: number;
+    unreadable: number;
+    /** The refCount of the one AnchorBatch log of the trusted root at the block its refs sit in, when read. */
+    anchorBatchRefs?: number;
+  };
   /** True when an anchor check refused the bundle's registry before any RPC call (an unknown registry or chain). */
   registryRefused?: boolean;
+  /**
+   * With an `rpcUrl`, when a company key verified the signature: is that key in force on the company's domain at the
+   * instant it signed (`companyKeyOf`)? pass (authentic), fail (not authorised then, signed after the consent anchor,
+   * or voided), unavailable (no window yet, recorded late, retired since on the issuer's own date, unreadable or
+   * unreachable, or no domain), skipped (no key verified the signature). Absent without an `rpcUrl`.
+   */
+  companyKeyRegistry?: CheckStatus;
+  /** What the registry said about the company key, beside `companyKeyRegistry`. */
+  companyKey?: CompanyKeyReading;
+  /**
+   * With an `rpcUrl`, on a passkey bundle: the person's key on chain (`keyOf`), read with the consent's anchor.
+   * pass (the chain confirms the key at grantedAt), fail (a refusal: not in force at grantedAt, or granted after
+   * the consent's anchor), unavailable (a caution or nothing to add: see `citizenKey.reason`), skipped (no salt and
+   * no keyOf registry read, or no verified assertion). Absent without an `rpcUrl` and on other receipts.
+   */
+  citizenKeyChain?: CheckStatus;
+  /** The person's key reading, beside `citizenKeyChain`. */
+  citizenKey?: CitizenKeyReading;
+  /**
+   * A recorded receipt of version 4 in a bundle, whose signature held: the anchor batch it signs and how the
+   * bundle's own (unsigned) root and refs stand against it. Absent otherwise.
+   */
+  signedAnchor?: SignedAnchorReading;
+  /** The gateway that delivered the IPFS document, as configured (or the origin of a function's URL). */
+  disclosureGateway?: string;
   /** Plain-language notes stating what each result proves vs trusts. */
   notes: string[];
+}
+
+/**
+ * The company key's standing at its signing instant: a window verdict (see `companyKeyRegistry`), `unreachable`
+ * (the read failed or did not decode) or `no-domain` (the issuer DID document names no domain).
+ */
+export type CompanyKeyVerdict =
+  | "authentic"
+  | "key-not-authorised"
+  | "signed-after-anchor"
+  | "pending"
+  | "voided"
+  | "recorded-late"
+  | "retired-issuer-dated"
+  | "unknown"
+  | "unreachable"
+  | "no-domain";
+
+export interface CompanyKeyReading {
+  verdict: CompanyKeyVerdict;
+  /** The company domain the issuer DID document names (its first alsoKnownAs), "" when none. */
+  domain: string;
+  /** keccak256(domain), "" when no domain. */
+  domainHash: string;
+  /** sha256 of the raw Ed25519 key that verified the signature. */
+  keyId: string;
+  /** The signing instant, unix seconds: recordedAt for a recorded receipt of version 2 to 4, grantedAt otherwise. */
+  signedAt: number | null;
+  /** The latest consent anchor that bounds the signing instant (unix seconds), or null: the date is the issuer's own. */
+  boundedBy: number | null;
+  /** Not authorised because the signing instant falls before the key's validFrom. */
+  notYetEffective: boolean;
+  /** The window an authentic key was in force over (unix seconds, as decimal strings; retiredAt "0" = open). */
+  window?: { validFrom: string; retiredAt: string };
+  /** The key the company's DID record names today (getCompanyDid), when it answered. */
+  currentKeyId?: string;
+  /** An authentic key the company has since rotated away from. */
+  rotated?: boolean;
+}
+
+export interface CitizenKeyReading {
+  /** keyOf's answer at grantedAt (notLinked: no salt in the bundle; notRecorded: still unrecorded 72 h after it). */
+  chainState:
+    | "notLinked"
+    | "unreadable"
+    | "unreachable"
+    | "pending"
+    | "notRecorded"
+    | "voided"
+    | "notInForce"
+    | "recordedLate"
+    | "inForce";
+  /** green: confirmed. red: refused. amber: a caution. neutral: the chain adds nothing. */
+  colour: "green" | "red" | "amber" | "neutral";
+  reason: string;
+  /** This verifier's own known registry for the chain was read (an explicit other registryAddress is not). */
+  keyOfRegistry: boolean;
+  /** True when the reading withholds the key: overall cannot read verified. */
+  withholds: boolean;
+  /** keccak256(JCS(claim) || salt), when the bundle carries a readable salt. */
+  fingerprint?: string;
+  /** The key window keyOf returned (unix seconds as decimal strings). */
+  record?: { validFrom: string; anchoredAt: string; retiredAt: string; voidedAt: string };
+  /** grantedAt in unix seconds, or null when it does not parse. */
+  grantedAt: number | null;
+  /** The verifier's clock, unix seconds. */
+  now: number;
+}
+
+export interface SignedAnchorReading {
+  /**
+   *   bound        the bundle's root equals the signed root and every bundle ref is a signed ref
+   *   contradicts  the bundle's root differs, or it carries a ref the signature does not (consentAnchor fails)
+   *   malformed    a signed member is missing or malformed, or the bundle carries no root: no anchor is tied
+   */
+  binding: "bound" | "contradicts" | "malformed";
+  /** The signed root and refs ("" and [] when malformed). The chain is read on these, never on the bundle's. */
+  merkleRoot: string;
+  consentRefs: string[];
 }
 
 /** A document CID's on-chain anchor (rootOf, lane 3). Times are unix seconds. */
@@ -246,9 +360,27 @@ export interface VerifyReceiptOptions {
    * call is a privacy and availability cost the caller chooses.
    */
   verifyDisclosure?: boolean;
-  /** Map an IPFS CID to a gateway URL. Default: the Lighthouse gateway. */
-  ipfsGateway?: (cid: string) => string;
-  /** JSON-RPC URL for the opt-in on-chain checks (documentAnchor, consentAnchor). Omit to skip them. */
+  /**
+   * A gateway YOU name, asked FIRST, before `ipfsGateways`: a prefix to which the CID is appended
+   * (`https://host/ipfs/`), a template carrying `{cid}`, or a function of the CID. It is trusted no more than
+   * any other: its bytes count only once they re-encode to the CID.
+   */
+  ipfsGateway?: string | ((cid: string) => string);
+  /**
+   * The gateways asked in order after `ipfsGateway`, each a prefix or a `{cid}` template. Replaces the default
+   * list (Lighthouse). A gateway that errors, sends more than one block (262144 bytes) or sends bytes that do not
+   * re-encode to the CID delivers nothing, and the next one is asked.
+   */
+  ipfsGateways?: readonly string[];
+  /**
+   * The verifier's clock, in milliseconds since the epoch (default `Date.now`). Read once per verification, to tell
+   * a person's key not anchored YET from one never recorded (72 hours after grantedAt). Pin it in tests.
+   */
+  now?: () => number;
+  /**
+   * JSON-RPC URL for the opt-in on-chain checks (documentAnchor, consentAnchor, companyKeyRegistry,
+   * citizenKeyChain). Omit to skip them: without it, nothing is read on chain and no result changes.
+   */
   rpcUrl?: string;
   /**
    * AgreelyRegistry address, read by eth_call (`rootOf`, `registry`) whatever it is. Default: the known registry

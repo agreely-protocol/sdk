@@ -404,7 +404,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -483,7 +483,7 @@
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -646,7 +646,7 @@
             "Cell-label binding UNVERIFIABLE: the issuer DID could not be resolved, so the company signature that binds the category/purpose labels could not be checked.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -812,7 +812,7 @@
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -904,7 +904,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -988,7 +988,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -1071,7 +1071,7 @@
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       }
@@ -1149,7 +1149,7 @@
     ]
   },
   "bundleVerification": {
-    "description": "Receipt AND verification-bundle golden vectors from GENUINE dev artefacts and the forgeries of QA pass qa-ver1 (vectors/receipts/). Both SDKs assert these byte-identically. A case reads `file` (relative to vectors/), resolves DIDs from receipts/did-documents.json (resolveDids true) or from nothing (\"none\"), and with `ipfsBody` turns verifyDisclosure on and serves that body for any CID. f7-issuer.bundle.json and f11-basis.bundle.json are the genuine A1 v1 and A1 v2 bundles with their receipt replaced by the forged receipt of the same name. A case with `chain` reads the consent anchor on that chainId and registryAddress through an rpcUrl whose every eth_call registry(bytes32) answers `registryAnswer` (any other call is refused): a1v1 names that registry in its delegation.",
+    "description": "Receipt AND verification-bundle golden vectors from GENUINE dev artefacts and the forgeries of QA pass qa-ver1 (vectors/receipts/). Both SDKs assert these byte-identically. A case reads `file` (relative to vectors/), resolves DIDs from receipts/did-documents.json (resolveDids true) or from nothing (\"none\"). A case with `ipfsFile` (the exact pinned bytes, relative to vectors/) or `ipfsBody` (served as its JSON) turns verifyDisclosure on, with ipfsGateways [] and the gateway https://ipfs.test/ipfs/ as ipfsGateway, which serves those bytes for any CID. f7-issuer.bundle.json and f11-basis.bundle.json are the genuine A1 v1 and A1 v2 bundles with their receipt replaced by the forged receipt of the same name. A case with `chain` reads on that chainId and registryAddress through an rpcUrl that answers by selector: every eth_call registry(bytes32) answers `registryAnswer`, every companyKeyOf(bytes32,bytes32) `companyKeyOfAnswer`, and any other call is refused, with the verifier's clock pinned at `now` (unix seconds): a1v1 names that registry in its delegation.",
     "didDocuments": "receipts/did-documents.json",
     "cases": [
       {
@@ -1212,42 +1212,7 @@
         "name": "a genuine v1 bundle with a CID verifies, and its opt-in disclosure copy passes",
         "file": "receipts/cidv1.bundle.json",
         "resolveDids": true,
-        "ipfsBody": {
-          "disclosure": {
-            "categories": {
-              "en": "The categories of personal information covered by this document are: Telephone number, Email.",
-              "fr": "Les catégories de renseignements personnels visées par le présent document sont : Numéro de téléphone, Courriel."
-            },
-            "means": {
-              "en": "We collect your personal information directly from you, in particular through our forms and your dashboard (P-39.1 s. 8, para. 1, subpara. 2).",
-              "fr": "Nous recueillons vos renseignements personnels directement auprès de vous, notamment au moyen de nos formulaires et de votre tableau de bord (P-39.1 art. 8, par. 2°)."
-            },
-            "purpose": {
-              "en": "We collect your personal information for the following specific purposes: Satisfaction survey, Monthly newsletter. This information is used only for those specific purposes and your consent is requested for each of them (P-39.1 s. 8 and 14).",
-              "fr": "Nous recueillons vos renseignements personnels aux fins spécifiques suivantes : Sondage de satisfaction, Infolettre mensuelle. Ces renseignements ne sont utilisés que pour ces fins spécifiques et votre consentement est demandé pour chacune d'elles (P-39.1 art. 8 et 14)."
-            },
-            "recipients": {
-              "en": "People in our organization whose duties require it may access your personal information (P-39.1 s. 20). It is not communicated to any third party without your consent, except in the cases provided for by law (P-39.1 ss. 13, 18 and 18.3).",
-              "fr": "Les personnes de notre organisation dont les fonctions le justifient peuvent accéder à vos renseignements personnels (P-39.1 art. 20). Ceux-ci ne sont communiqués à aucun tiers sans votre consentement, sauf dans les cas prévus par la loi (P-39.1 art. 13, 18 et 18.3)."
-            },
-            "responsable": {
-              "contact": "vie-privee@qa1021b-boulangerie.ca",
-              "name": "Ève-Hélène Côté"
-            },
-            "retention": {
-              "en": "Your personal information is kept only as long as necessary to fulfil the purposes, then destroyed or anonymized in accordance with the law (P-39.1 s. 23). Email - newsletter: kept for 24 months after the purposes are achieved, then destroyed.",
-              "fr": "Vos renseignements personnels sont conservés le temps nécessaire à la réalisation des fins, puis détruits ou anonymisés conformément à la loi (P-39.1 art. 23). Courriel - infolettre : conservation de 24 mois après l'accomplissement des fins, puis destruction."
-            },
-            "rights": {
-              "en": "You have a right of access and rectification, the right to obtain your information in a structured, commonly used technological format, and the right to require that its dissemination cease or that it be de-indexed (P-39.1 s. 27, 28 and 28.1). To exercise these rights, contact the person in charge of the protection of personal information below.",
-              "fr": "Vous disposez d'un droit d'accès et de rectification, du droit d'obtenir vos renseignements dans un format technologique structuré et couramment utilisé, ainsi que du droit d'exiger la cessation de la diffusion ou la désindexation (P-39.1 art. 27, 28 et 28.1). Pour les exercer, communiquez avec le responsable de la protection des renseignements personnels ci-dessous."
-            },
-            "withdrawal": {
-              "en": "You may withdraw your consent to the communication or use of your personal information (P-39.1 s. 8, para. 1, subpara. 4). You may do so at any time, as easily as you gave it, from your Agreely dashboard or by contacting the person in charge of the protection of personal information. Withdrawal applies going forward and has no retroactive effect.",
-              "fr": "Vous pouvez retirer votre consentement à la communication ou à l'utilisation de vos renseignements personnels (P-39.1 art. 8, par. 4°). Vous pouvez le faire à tout moment, aussi simplement que vous l'avez donné, depuis votre tableau de bord Agreely ou en communiquant avec le responsable de la protection des renseignements personnels. Le retrait du consentement vaut pour l'avenir et n'a pas d'effet rétroactif."
-            }
-          }
-        },
+        "ipfsFile": "ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
         "expect": {
           "input": "bundle",
           "receiptType": "citizen",
@@ -1260,13 +1225,14 @@
           "cellLabelBinding": "pass",
           "overall": "verified",
           "withdrawal": "not_checked",
+          "disclosureGateway": "https://ipfs.test/ipfs/",
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc (key did:web:app.agreely.ca:c:qa1021b-boulangerie-eve-helene-inc#kms-1).",
             "Receipt integrity verified: every field the company-signed offer carries matches the receipt (issuer, validUntil, the consent and its cells), the disclosureHash recomputes from the offer's disclosure (and legalBasis), validFrom equals grantedAt, and the receipt carries no field outside the receipt format. The receipt id is not covered by the offer. The receipt's grantedAt lies between the signed offer's createdAt and expiresAt.",
             "Citizen assertion verified and bound: the passkey did:agreely:citizen:BBS4C9BFTZXT2VC246J5KFA37W#passkey-1 signed the challenge recomputed from this receipt's issuer, subject, requestId, action and grantedAt, the bundle's Merkle root and the offer's nonce. The citizen's DID document lists that key under authentication, valid at grantedAt.",
             "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
-            "Disclosure copy verified: the IPFS document body matches the signed disclosureHash 0x8f026745aa816b932bf0d8cc5255acb4fe3dda0d36523d9c9793f06e4077257a.",
+            "Disclosure copy verified: the IPFS document served by https://ipfs.test/ipfs/ matches the signed disclosureHash 0x8f026745aa816b932bf0d8cc5255acb4fe3dda0d36523d9c9793f06e4077257a.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
             "consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record."
           ]
@@ -1379,7 +1345,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -1407,7 +1373,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -1434,7 +1400,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -1461,7 +1427,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -1489,7 +1455,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -1516,7 +1482,7 @@
             "Cell labels bound: the category/purpose labels sit inside the company-signed body, so the verified signature covers them. Mutating any item label breaks it.",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -1811,7 +1777,7 @@
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -2105,7 +2071,7 @@
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -2131,7 +2097,7 @@
             "Cell labels UNBOUND: the company signature over the body that carries the category/purpose labels did not verify, so the displayed labels are unproven (possibly tampered).",
             "disclosureCopy skipped: the receipt carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: pass an rpcUrl to check the on-chain document anchor.",
-            "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the withdrawal of a paper or telephone consent is not checked."
+            "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of this consent is not checked."
           ]
         }
       },
@@ -2282,7 +2248,9 @@
         "chain": {
           "chainId": 84532,
           "registryAddress": "0x3532a9dff3c910152543afca49de7c66113c5312",
-          "registryAnswer": "0x47f0c31bce13830b27277e6c13e48b7146cc1c7fbed4d19a1f0c75e04cacae36000000000000000000000000000000000000000000000000000000006adce8c0000000000000000000000000000000000000000000000000000000006ae088e000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000002349340"
+          "registryAnswer": "0x47f0c31bce13830b27277e6c13e48b7146cc1c7fbed4d19a1f0c75e04cacae36000000000000000000000000000000000000000000000000000000006adce8c0000000000000000000000000000000000000000000000000000000006ae088e000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000002349340",
+          "companyKeyOfAnswer": "0x000000000000000000000000000000000000000000000000000000006adbf500000000000000000000000000000000000000000000000000000000006adbf53c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "now": 1793000000
         },
         "expect": {
           "input": "bundle",
@@ -2327,6 +2295,30 @@
             "pending": 0,
             "unreadable": 0
           },
+          "companyKeyRegistry": "pass",
+          "companyKey": {
+            "verdict": "authentic",
+            "domain": "assurance-boreale.example",
+            "domainHash": "0x74be06c82bdc30f409a1a45dcf18558463664c980dbcface1297414e375e34f0",
+            "keyId": "0xa2a946771b18babb9008bb48691f8f429805626e1ce81e5c416d8a76004429a2",
+            "signedAt": 1792862044,
+            "boundedBy": 1792862400,
+            "notYetEffective": false,
+            "window": {
+              "validFrom": "1792800000",
+              "retiredAt": "0"
+            }
+          },
+          "citizenKeyChain": "skipped",
+          "citizenKey": {
+            "chainState": "notLinked",
+            "colour": "neutral",
+            "reason": "notLinked",
+            "keyOfRegistry": false,
+            "withholds": false,
+            "grantedAt": 1792862044,
+            "now": 1793000000
+          },
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -2335,7 +2327,9 @@
             "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
             "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: the receipt carries no document.ipfsCid to look up on-chain.",
-            "consentAnchor WITHDRAWN on chainId 84532 (3 cell(s): 0 active, 3 withdrawn, 0 not anchored yet, 0 unreadable). The chain records the consent under this bundle's Merkle root, anchored in block 37000000, and records its withdrawal: it is authentic, but it is no longer in force. This is NOT a forgery."
+            "consentAnchor WITHDRAWN on chainId 84532 (3 cell(s): 0 active, 3 withdrawn, 0 not anchored yet, 0 unreadable). The chain records the consent under this bundle's Merkle root, anchored in block 37000000, and records its withdrawal: it is authentic, but it is no longer in force. This is NOT a forgery.",
+            "Company key confirmed on chain: the key 0xa2a946771b18babb9008bb48691f8f429805626e1ce81e5c416d8a76004429a2 was in force on its domain at the instant it signed (assurance-boreale.example).",
+            "citizenKeyChain adds nothing (notLinked): the bundle carries no citizenKeySalt, so its key cannot be looked up on chain."
           ]
         }
       },
@@ -2346,7 +2340,9 @@
         "chain": {
           "chainId": 84532,
           "registryAddress": "0x3532a9dff3c910152543afca49de7c66113c5312",
-          "registryAnswer": "0x47f0c31bce13830b27277e6c13e48b7146cc1c7fbed4d19a1f0c75e04cacae36000000000000000000000000000000000000000000000000000000006adce8c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000002349340"
+          "registryAnswer": "0x47f0c31bce13830b27277e6c13e48b7146cc1c7fbed4d19a1f0c75e04cacae36000000000000000000000000000000000000000000000000000000006adce8c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000002349340",
+          "companyKeyOfAnswer": "0x000000000000000000000000000000000000000000000000000000006adbf500000000000000000000000000000000000000000000000000000000006adbf53c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "now": 1793000000
         },
         "expect": {
           "input": "bundle",
@@ -2383,6 +2379,30 @@
             "pending": 0,
             "unreadable": 1
           },
+          "companyKeyRegistry": "pass",
+          "companyKey": {
+            "verdict": "authentic",
+            "domain": "assurance-boreale.example",
+            "domainHash": "0x74be06c82bdc30f409a1a45dcf18558463664c980dbcface1297414e375e34f0",
+            "keyId": "0xa2a946771b18babb9008bb48691f8f429805626e1ce81e5c416d8a76004429a2",
+            "signedAt": 1792862044,
+            "boundedBy": 1792862400,
+            "notYetEffective": false,
+            "window": {
+              "validFrom": "1792800000",
+              "retiredAt": "0"
+            }
+          },
+          "citizenKeyChain": "skipped",
+          "citizenKey": {
+            "chainState": "notLinked",
+            "colour": "neutral",
+            "reason": "notLinked",
+            "keyOfRegistry": false,
+            "withholds": false,
+            "grantedAt": 1792862044,
+            "now": 1793000000
+          },
           "notes": [
             "Read as a verification bundle. Keys are resolved from the issuer and citizen DIDs (or your resolver), never taken from the bundle's own didDocuments, which anyone can write.",
             "Company signature over the signed offer verified against issuer DID did:web:app.agreely.ca:c:showcase-assurance-boreale (key did:web:app.agreely.ca:c:showcase-assurance-boreale#kms-1).",
@@ -2391,7 +2411,9 @@
             "Cell labels bound: every accepted and declined cell is an exact item of the company-signed offer.",
             "disclosureCopy skipped: the signed offer carries no document.ipfsCid + disclosureHash pair to fetch and compare.",
             "documentAnchor skipped: the receipt carries no document.ipfsCid to look up on-chain.",
-            "consentAnchor UNAVAILABLE on chainId 84532 (3 cell(s): 2 active, 0 withdrawn, 0 not anchored yet, 1 unreadable). The bundle names a consentRef for 2 of the receipt's 3 accepted cells, and no one signs that list: an unnamed cell counts as unreadable. Anchoring is asynchronous and an RPC can fail: this is NOT a contradiction."
+            "consentAnchor UNAVAILABLE on chainId 84532 (3 cell(s): 2 active, 0 withdrawn, 0 not anchored yet, 1 unreadable). The bundle names a consentRef for 2 of the receipt's 3 accepted cells, and no one signs that list: an unnamed cell counts as unreadable. Anchoring is asynchronous and an RPC can fail: this is NOT a contradiction.",
+            "Company key confirmed on chain: the key 0xa2a946771b18babb9008bb48691f8f429805626e1ce81e5c416d8a76004429a2 was in force on its domain at the instant it signed (assurance-boreale.example).",
+            "citizenKeyChain adds nothing (notLinked): the bundle carries no citizenKeySalt, so its key cannot be looked up on chain."
           ]
         }
       }

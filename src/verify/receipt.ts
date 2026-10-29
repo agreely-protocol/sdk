@@ -47,8 +47,35 @@ import {
 import { keccak256, keccak256Hex } from "../crypto/keccak.js";
 import { parseCoseKey, verifyEd25519, verifyWebAuthnAssertion } from "../crypto/verify.js";
 import { createHash } from "node:crypto";
+import {
+  CHAIN_WITHHOLDS,
+  citizenHalfReading,
+  citizenKeyChainState,
+  citizenKeyFingerprint,
+  decodeKeyRecord,
+  grantedAtSeconds,
+  keyOfCalldata,
+  parseCitizenKeySalt,
+  type CitizenKeyChainState,
+  type KeyRecord,
+} from "./citizenKeyChain.js";
+import {
+  companyDomainFromDoc,
+  companyKeyOfCalldata,
+  companyKeyStatusOf,
+  companyKeyVerdict,
+  decodeCompanyDid,
+  domainHashOf,
+  getCompanyDidCalldata,
+  receiptClockOf,
+  type ReceiptClock,
+} from "./companyKey.js";
+import { DEFAULT_IPFS_GATEWAYS, readPinnedFile, type IpfsGateway } from "./ipfs.js";
+import { recordedRootBinding, recordedShapeOf } from "./recorded.js";
 import type {
   CheckStatus,
+  CitizenKeyReading,
+  CompanyKeyReading,
   ConsentAnchorRecord,
   DidDocument,
   DocumentAnchorRecord,
@@ -72,7 +99,6 @@ const DEFAULT_COMPANY_HOST = "app.agreely.ca";
 // MODE=CITIZEN only, and api.agreely.ca 404s on it, which made every citizen assertion
 // resolve to "unavailable" by default.
 const DEFAULT_CITIZEN_BASE = "https://my.agreely.ca";
-const DEFAULT_IPFS_GATEWAY = "https://gateway.lighthouse.storage/ipfs/";
 // The AgreelyRegistry each chain is read from, by eth_call. EIP-55 checksummed.
 //
 // KEEP THIS IN SYNC WITH THE DEPLOYMENTS. It is pinned BY HAND (the SDK reads no config), so a
@@ -91,6 +117,10 @@ const REGISTRY_SELECTOR = keccak256Hex("registry(bytes32)").slice(0, 10);
 // rootOf(bytes32) -> (tag, anchoredAt, anchoredBlock, lane). A consent document is keyed keccak256(bytes(cid)),
 // lane 3, always untagged.
 const ROOT_OF_SELECTOR = keccak256Hex("rootOf(bytes32)").slice(0, 10);
+// AnchorBatch(bytes32 indexed merkleRoot, uint256 refCount, uint64 timestamp): one log per consent's anchor transaction.
+const ANCHOR_BATCH_TOPIC = keccak256Hex("AnchorBatch(bytes32,uint256,uint64)");
+// The clock skew a consent anchor allows a signing instant, in seconds (citizenKeyChain SKEW).
+const ANCHOR_SKEW_SECONDS = 300;
 const DOCUMENT_LANE = 3;
 const ROOT_LANES: Readonly<Record<number, string>> = { 1: "an audit-family root", 2: "a cookie consent root" };
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -146,6 +176,11 @@ type ChainSession = {
   documentRecord?: DocumentAnchorRecord;
   consentRecords?: ConsentAnchorRecord[];
   consentCounts?: ReceiptVerification["consentAnchorCounts"];
+  // The company key that verified proof[0], and the DID document it was resolved from.
+  signer?: { key: Uint8Array; doc: DidDocument };
+  // The consent anchor under the trusted root: its earliest and latest anchor times, when a cell matched it.
+  consentTiming?: { earliest: number; latest: number };
+  disclosureGateway?: string;
 };
 type NamedRegistry = { chainId: string; registry: string };
 
@@ -210,7 +245,7 @@ export class ReceiptVerifier {
     }
 
     if (type !== "citizen") {
-      return this.verifyRecorded(r, type, bundle !== null, notes, session);
+      return this.verifyRecorded(r, type, bundle, notes, session);
     }
     if (!bundle) return this.verifyBarePasskey(r, notes, session);
     const offer = bundle["signedOffer"];
@@ -230,43 +265,76 @@ export class ReceiptVerifier {
   private async verifyRecorded(
     r: Record<string, unknown>,
     type: "company_attested" | "company_documented",
-    fromBundle: boolean,
+    bundle: Record<string, unknown> | null,
     notes: string[],
     session: ChainSession,
   ): Promise<ReceiptVerification> {
-    const companySignature = await this.verifyCompanySignature(r, notes, type);
+    // verify-core.js receiptModeOf: a version this verifier does not read is refused unread, never judged.
+    const shape = recordedShapeOf(r, type);
+    if (shape.kind === "unknown-version") {
+      throw new MalformedInput(`the receipt's receiptVersion ${shape.version} is not a version this verifier reads`);
+    }
+    const companySignature = await this.verifyCompanySignature(r, notes, type, session);
     notes.push(
       type === "company_attested"
         ? "A company-attested receipt carries no citizen passkey assertion, so citizenAssertion is not applicable."
         : "A verbal (company-documented) receipt carries no citizen passkey assertion, so citizenAssertion is not applicable.",
     );
     // The signature is taken over the receipt body itself, so it IS the integrity check, except for the proof's own
-    // members, which nothing signs.
+    // members, which nothing signs, and a body its issuer never writes, which a valid signature does not make one.
     const proofFailure = recordedProofFailure(r);
     let receiptIntegrity = companySignature;
     if (proofFailure !== null) {
       receiptIntegrity = "fail";
       notes.push(`Receipt integrity FAILED: ${proofFailure}.`);
     }
+    if (shape.kind === "mismatch") {
+      receiptIntegrity = "fail";
+      notes.push(`Receipt integrity FAILED: ${shape.reason}, so it is not a receipt its issuer writes.`);
+    }
     const cellLabelBinding = assessRecordedCellLabels(companySignature, notes);
-    const disclosureCopy = await this.verifyRecordedDisclosureCopy(r, notes);
+    const disclosureCopy = await this.verifyRecordedDisclosureCopy(r, notes, session);
     const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
-    notes.push(
-      "consentAnchor skipped: this verifier reads a consent's on-chain record from a passkey bundle only, so the " +
-        "withdrawal of a paper or telephone consent is not checked.",
-    );
-    const consentAnchor: CheckStatus = "skipped";
+
+    // The issuer is judged FIRST, on its own date: a signed anchor never bounds the instant its own signer chose.
+    const company = this.opts.rpcUrl
+      ? await this.verifyCompanyKeyRegistry(r, { anchoredAt: null, issuerDatedOnly: true }, companySignature, notes, session)
+      : null;
+
+    let consentAnchor: CheckStatus = "skipped";
+    let signedAnchor: ReceiptVerification["signedAnchor"];
+    const binding = bundle && companySignature === "pass" && receiptIntegrity === "pass"
+      ? recordedRootBinding(r, bundle, collectConsentRefs(bundle))
+      : null;
+    if (r["receiptVersion"] !== "4") {
+      notes.push(
+        "consentAnchor skipped: a paper or telephone receipt signs no anchor before version 4, so the withdrawal of " +
+          "this consent is not checked.",
+      );
+    } else if (bundle === null) {
+      notes.push(
+        "consentAnchor skipped: a version 4 receipt's anchor is read with its verification bundle, which carries the " +
+          "merkleRoot and consentRefs beside it.",
+      );
+    } else if (binding === null || binding.binding === "preV4") {
+      notes.push("consentAnchor skipped: the company signature did not hold, so no signed anchor ties this receipt to the chain.");
+    } else {
+      signedAnchor = { binding: binding.binding, merkleRoot: binding.merkleRoot, consentRefs: binding.consentRefs };
+      consentAnchor = await this.verifySignedAnchor(r, signedAnchor, company, notes, session);
+    }
 
     let overall: ReceiptVerification["overall"];
-    if (companySignature === "fail" || receiptIntegrity === "fail" || disclosureCopy === "fail" || documentAnchor === "fail") {
-      overall = "failed";
+    const decisive = [companySignature, receiptIntegrity, disclosureCopy, documentAnchor, consentAnchor, company?.status];
+    if (decisive.includes("fail")) overall = "failed";
+    else if (companySignature === "unavailable" || session.registryRefused || (company !== null && company.status !== "pass")) {
+      overall = "unavailable";
     }
-    else if (companySignature === "unavailable" || session.registryRefused) overall = "unavailable";
     // A telephone receipt is the organisation's word, authenticated: never more than partial.
-    else overall = type === "company_attested" ? "verified" : "partial";
+    else if (type === "company_documented") overall = "partial";
+    else overall = consentAnchor === "withdrawn" ? "withdrawn" : "verified";
 
     return {
-      input: fromBundle ? "bundle" : "receipt",
+      input: bundle ? "bundle" : "receipt",
       receiptType: type,
       companySignature,
       receiptIntegrity,
@@ -276,10 +344,66 @@ export class ReceiptVerifier {
       consentAnchor,
       cellLabelBinding,
       overall,
-      withdrawal: "not_checked",
+      ...withdrawalOf(consentAnchor, session),
       ...anchorRecords(session),
+      ...(company ? { companyKeyRegistry: company.status, ...(company.reading ? { companyKey: company.reading } : {}) } : {}),
+      ...(signedAnchor ? { signedAnchor } : {}),
       notes,
     };
+  }
+
+  /**
+   * A version 4 recorded receipt's own anchor (ui.js consentChainRequest): a bundle that contradicts the signature
+   * fails with nothing read; a bound one is read on the SIGNED root and refs, and only once the registry confirms
+   * the company key that signed them. A matching anchor older than the signing instant is not this receipt's.
+   */
+  private async verifySignedAnchor(
+    r: Record<string, unknown>,
+    binding: { binding: "bound" | "contradicts" | "malformed"; merkleRoot: string; consentRefs: string[] },
+    company: CompanyKeyCheck | null,
+    notes: string[],
+    session: ChainSession,
+  ): Promise<CheckStatus> {
+    if (binding.binding === "contradicts") {
+      notes.push(
+        "consentAnchor FAILED: the receipt signs its anchor batch, and the bundle's own merkleRoot or consentRefs " +
+          "contradict it (another root, or a ref the signature does not carry). Nothing was read on chain.",
+      );
+      return "fail";
+    }
+    if (binding.binding === "malformed") {
+      notes.push(
+        "consentAnchor skipped: the version 4 receipt's signed anchor is missing or malformed, or the bundle carries " +
+          "no merkleRoot, so no anchor is tied to this receipt.",
+      );
+      return "skipped";
+    }
+    if (!this.opts.rpcUrl) {
+      notes.push("consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record.");
+      return "skipped";
+    }
+    if (company === null || company.reading?.verdict !== "authentic") {
+      notes.push(
+        "consentAnchor UNAVAILABLE: the receipt's anchor hangs on its company signature, and the registry did not " +
+          "confirm the company key at the instant it signed, so the signed root is not trusted and nothing was read.",
+      );
+      return "unavailable";
+    }
+    const status = await this.verifyConsentAnchor(binding.consentRefs, binding.merkleRoot, null, { cells: 0, countAnchoredRefs: false }, notes, session);
+    const signedAt = Date.parse(signingInstantOf(r) ?? "");
+    const timing = session.consentTiming;
+    if (
+      (status === "pass" || status === "withdrawn" || status === "unavailable") &&
+      timing !== undefined && Number.isFinite(signedAt) &&
+      timing.earliest < Math.floor(signedAt / 1000) - ANCHOR_SKEW_SECONDS
+    ) {
+      notes.push(
+        `consentAnchor FAILED: the chain anchored this root at ${String(timing.earliest)}, before the receipt was ` +
+          "signed: a version 4 receipt signs a root before it is anchored, so this anchor is not this receipt's.",
+      );
+      return "fail";
+    }
+    return status;
   }
 
   /** A passkey receipt WITHOUT its signed offer and Merkle root: nothing binds the assertion to the content. */
@@ -348,7 +472,7 @@ export class ReceiptVerifier {
     notes: string[],
     session: ChainSession,
   ): Promise<ReceiptVerification> {
-    const companySignature = await this.verifyOfferSignature(r, offer, notes);
+    const companySignature = await this.verifyOfferSignature(r, offer, notes, session);
     const fieldFailure = integrityFailure(r, offer);
     const fieldIntegrity: CheckStatus = fieldFailure === null ? "pass" : "fail";
     // The passkey signer chooses grantedAt, so only the company-signed offer's own window bounds it.
@@ -407,15 +531,70 @@ export class ReceiptVerifier {
       );
     }
 
-    const disclosureCopy = await this.verifyOfferDisclosureCopy(offer, companySignature, notes);
+    const disclosureCopy = await this.verifyOfferDisclosureCopy(offer, companySignature, notes, session);
     const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
-    const consentAnchor = await this.verifyConsentAnchor(r, bundle, merkleRoot, citizenAssertion, notes, session);
+
+    // The person's key on chain first: a registry that voids it, or places grantedAt outside its window, leaves the
+    // bundle's root untrusted, whatever the DID document says (ui.js receiptRootTrusted).
+    const rpcUrl = this.opts.rpcUrl;
+    const keyChain = rpcUrl && citizenAssertion === "pass" ? await this.readCitizenKeyChain(r, bundle, passkey.coseHex ?? "", session) : null;
+    const keyRefused = keyChain !== null && (keyChain.state === "voided" || keyChain.state === "notInForce");
+    const untrusted = citizenAssertion !== "pass"
+      ? "consentAnchor skipped: the bundle's Merkle root is not bound by a verified passkey assertion, so no on-chain " +
+        "record can be tied to this receipt."
+      : keyRefused
+        ? "consentAnchor skipped: the registry records the person's key as voided, or not in force at grantedAt, so " +
+          "the bundle's Merkle root is not trusted and no on-chain record can be tied to this receipt."
+        : null;
+    const consentAnchor = await this.verifyConsentAnchor(
+      collectConsentRefs(bundle), merkleRoot, untrusted, { cells: acceptedCellCount(r), countAnchoredRefs: true }, notes, session,
+    );
+
+    // The company key at grantedAt, bounded by the latest anchor holding the trusted root (issuer.js receiptClockOf).
+    const timing = session.consentTiming;
+    const clock = receiptClockOf(timing ? { rootMatches: true, anchoredAt: timing.latest } : null);
+    const company = rpcUrl ? await this.verifyCompanyKeyRegistry(r, clock, companySignature, notes, session) : null;
+
+    let citizenKeyChain: CheckStatus | undefined;
+    let citizenKey: CitizenKeyReading | undefined;
+    if (rpcUrl && keyChain === null) {
+      citizenKeyChain = "skipped";
+      notes.push("citizenKeyChain skipped: the person's assertion did not verify, so there is no key to look up on chain.");
+    } else if (keyChain !== null) {
+      const half = citizenHalfReading({
+        chainState: keyChain.state,
+        didStanding: "confirmed",
+        consentAnchor: timing ? { rootMatches: true, anchoredAt: timing.latest, earliestAnchoredAt: timing.earliest } : null,
+        G: keyChain.G,
+        keyOfRegistry: keyChain.keyOfRegistry,
+      });
+      citizenKey = {
+        chainState: keyChain.state,
+        colour: half.colour,
+        reason: half.reason,
+        keyOfRegistry: keyChain.keyOfRegistry,
+        withholds: half.colour === "amber" && CHAIN_WITHHOLDS.has(half.reason),
+        ...(keyChain.fp ? { fingerprint: keyChain.fp } : {}),
+        ...(keyChain.record ? { record: recordStrings(keyChain.record) } : {}),
+        grantedAt: keyChain.G,
+        now: keyChain.now,
+      };
+      citizenKeyChain =
+        half.colour === "green" ? "pass"
+        : half.colour === "red" ? "fail"
+        : half.colour === "neutral" && keyChain.state === "notLinked" ? "skipped"
+        : "unavailable";
+      notes.push(citizenKeyNote(citizenKey));
+    }
 
     let overall: ReceiptVerification["overall"];
-    const checks = [companySignature, receiptIntegrity, citizenAssertion, disclosureCopy, documentAnchor, consentAnchor];
+    const checks = [companySignature, receiptIntegrity, citizenAssertion, disclosureCopy, documentAnchor, consentAnchor, citizenKeyChain, company?.status];
     // A bundle that names a registry this SDK does not read is never verified, however sound its signatures.
     if (checks.includes("fail")) overall = "failed";
-    else if (companySignature === "pass" && receiptIntegrity === "pass" && citizenAssertion === "pass" && !session.registryRefused) {
+    else if (
+      companySignature === "pass" && receiptIntegrity === "pass" && citizenAssertion === "pass" && !session.registryRefused &&
+      (company === null || company.status === "pass") && citizenKey?.withholds !== true
+    ) {
       overall = consentAnchor === "withdrawn" ? "withdrawn" : "verified";
     } else overall = "unavailable";
 
@@ -432,8 +611,108 @@ export class ReceiptVerifier {
       overall,
       ...withdrawalOf(consentAnchor, session),
       ...anchorRecords(session),
+      ...(company ? { companyKeyRegistry: company.status, ...(company.reading ? { companyKey: company.reading } : {}) } : {}),
+      ...(citizenKeyChain ? { citizenKeyChain, ...(citizenKey ? { citizenKey } : {}) } : {}),
       notes,
     };
+  }
+
+  /**
+   * The person's key on chain: one keyOf(fingerprint) on the registry this verifier reads. The salt is the bundle's
+   * top-level citizenKeySalt; nothing else in the file chooses what is read or where. Never throws.
+   */
+  private async readCitizenKeyChain(
+    r: Record<string, unknown>,
+    bundle: Record<string, unknown>,
+    coseHex: string,
+    session: ChainSession,
+  ): Promise<{ state: CitizenKeyChainState; fp: string; record: KeyRecord | null; G: number | null; now: number; keyOfRegistry: boolean }> {
+    const consent = asObject(asObject(r["credentialSubject"])["consent"]);
+    const G = grantedAtSeconds(consent["grantedAt"]);
+    const saltField = Object.prototype.hasOwnProperty.call(bundle, "citizenKeySalt") ? bundle["citizenKeySalt"] : undefined;
+    const clock = this.opts.now ?? Date.now;
+    const now = Math.floor(clock() / 1000);
+    const target = this.registryToRead(session);
+    const known = REGISTRY_BY_CHAIN[this.chainId()];
+    const keyOfRegistry = target.ok && known !== undefined && target.address.toLowerCase() === known.toLowerCase();
+    const out = { state: citizenKeyChainState({ saltField, G }), fp: "", record: null, G, now, keyOfRegistry };
+    const salt = parseCitizenKeySalt(saltField);
+    if (salt.status !== "ok") return out;
+    let fp: string;
+    try {
+      fp = citizenKeyFingerprint(asString(asObject(r["credentialSubject"])["id"]), coseHex, salt.salt);
+    } catch {
+      return { ...out, state: "unreadable" };
+    }
+    if (!target.ok) return { ...out, fp, state: "unreachable" };
+    const call = await this.rpc(this.opts.rpcUrl!, "eth_call", [{ to: target.address, data: keyOfCalldata(fp) }, "latest"], session);
+    const record = call.ok ? decodeKeyRecord(call.result) : null;
+    return { ...out, fp, record, state: citizenKeyChainState({ saltField, record, rpcError: !call.ok, G, now }) };
+  }
+
+  /**
+   * The company key that verified proof[0], on the company's domain at the instant it signed: companyKeyOf for its
+   * window, getCompanyDid for the key the company holds today (issuer.js resolveIssuerAuthenticity). The domain and
+   * the key come from the RESOLVED issuer document, never from the bundle.
+   */
+  private async verifyCompanyKeyRegistry(
+    r: Record<string, unknown>,
+    clock: ReceiptClock,
+    companySignature: CheckStatus,
+    notes: string[],
+    session: ChainSession,
+  ): Promise<CompanyKeyCheck> {
+    const signer = session.signer;
+    if (companySignature !== "pass" || signer === undefined) {
+      notes.push("companyKeyRegistry skipped: no company key verified the signature, so there is no key to look up on chain.");
+      return { status: "skipped" };
+    }
+    const keyId = "0x" + createHash("sha256").update(signer.key).digest("hex");
+    const signedAtMs = Date.parse(signingInstantOf(r) ?? "");
+    const signedAt = Number.isFinite(signedAtMs) ? Math.floor(signedAtMs / 1000) : null;
+    const domain = companyDomainFromDoc(signer.doc);
+    const base = { keyId, signedAt, boundedBy: clock.anchoredAt, notYetEffective: false };
+    if (domain === null) {
+      notes.push(
+        "companyKeyRegistry UNAVAILABLE: the issuer DID document names no company domain (alsoKnownAs), so the " +
+          "company key cannot be looked up on chain.",
+      );
+      return { status: "unavailable", reading: { verdict: "no-domain", domain: "", domainHash: "", ...base } };
+    }
+    const domainHash = domainHashOf(domain);
+    const target = this.registryToRead(session);
+    if (!target.ok) {
+      notes.push(`companyKeyRegistry UNAVAILABLE: ${target.reason}`);
+      return { status: "unavailable" };
+    }
+    const rpcUrl = this.opts.rpcUrl!;
+    const [keyCall, didCall] = await Promise.all([
+      this.rpc(rpcUrl, "eth_call", [{ to: target.address, data: companyKeyOfCalldata(domainHash, keyId) }, "latest"], session),
+      this.rpc(rpcUrl, "eth_call", [{ to: target.address, data: getCompanyDidCalldata(domainHash) }, "latest"], session),
+    ]);
+    const record = keyCall.ok ? decodeKeyRecord(keyCall.result) : null;
+    if (record === null) {
+      notes.push(
+        `companyKeyRegistry UNAVAILABLE: the company key's window on ${domain} could not be read ` +
+          `(${keyCall.ok ? "the answer does not decode" : keyCall.reason}). This is NOT a refusal.`,
+      );
+      return { status: "unavailable", reading: { verdict: "unreachable", domain, domainHash, ...base } };
+    }
+    const pit = companyKeyVerdict(record, signedAt, clock);
+    const did = didCall.ok ? decodeCompanyDid(didCall.result) : null;
+    const rotated = pit.verdict === "authentic" && did !== null && did.keyId.toLowerCase() !== keyId;
+    const reading: CompanyKeyReading = {
+      verdict: pit.verdict,
+      domain,
+      domainHash,
+      ...base,
+      notYetEffective: pit.notYetEffective,
+      ...(pit.window ? { window: { validFrom: pit.window.validFrom.toString(), retiredAt: pit.window.retiredAt.toString() } } : {}),
+      ...(did ? { currentKeyId: did.keyId, rotated } : {}),
+    };
+    const status = companyKeyStatusOf(pit.verdict);
+    notes.push(companyKeyNote(reading));
+    return { status, reading };
   }
 
   /** RECORDED: verify the Ed25519 proof over the canonical receipt body. */
@@ -441,6 +720,7 @@ export class ReceiptVerifier {
     r: Record<string, unknown>,
     notes: string[],
     type: "company_attested" | "company_documented",
+    session: ChainSession,
   ): Promise<CheckStatus> {
     const issuer = asString(r["issuer"]);
     const proof = asObject(asArray(r["proof"])[0]);
@@ -475,6 +755,7 @@ export class ReceiptVerifier {
     const { key, vmId } = resolved;
 
     if (verifyEd25519(key, canonical, signature)) {
+      session.signer = { key, doc: resolved.doc };
       notes.push(`Company signature verified against issuer DID ${issuer} (key ${vmId}).`);
       if (type === "company_documented") {
         const scriptVersion = asString(asObject(r["evidence"])["scriptVersion"]);
@@ -503,6 +784,7 @@ export class ReceiptVerifier {
     r: Record<string, unknown>,
     offer: Record<string, unknown>,
     notes: string[],
+    session: ChainSession,
   ): Promise<CheckStatus> {
     const issuer = asString(r["issuer"]);
     const proof = asObject(asArray(r["proof"])[0]);
@@ -534,6 +816,7 @@ export class ReceiptVerifier {
     if (resolved.kind !== "key") return companyKeyRefused(resolved, issuer, vm, notes);
     const { key, vmId } = resolved;
     if (verifyEd25519(key, canonical, signature)) {
+      session.signer = { key, doc: resolved.doc };
       notes.push(`Company signature over the signed offer verified against issuer DID ${issuer} (key ${vmId}).`);
       return "pass";
     }
@@ -548,7 +831,7 @@ export class ReceiptVerifier {
   private async verifyPasskeySignature(
     r: Record<string, unknown>,
     notes: string[],
-  ): Promise<{ status: CheckStatus; vm: string; challenge: string; standing?: CitizenKeyStanding }> {
+  ): Promise<{ status: CheckStatus; vm: string; challenge: string; standing?: CitizenKeyStanding; coseHex?: string }> {
     const citizenDid = asString(asObject(r["credentialSubject"])["id"]);
     const proof = findWebAuthnProof(asArray(r["proof"]));
     if (!proof || !citizenDid) {
@@ -612,7 +895,7 @@ export class ReceiptVerifier {
       return { status: "fail", vm, challenge };
     }
     const grantedAt = asString(asObject(asObject(r["credentialSubject"])["consent"])["grantedAt"]);
-    return { status: "pass", vm: key.vmId, challenge, standing: citizenKeyStanding(doc, citizenDid, coseHex, grantedAt) };
+    return { status: "pass", vm: key.vmId, challenge, standing: citizenKeyStanding(doc, citizenDid, coseHex, grantedAt), coseHex };
   }
 
   /**
@@ -620,7 +903,7 @@ export class ReceiptVerifier {
    * receipt the disclosureHash and a v2 legalBasis sit inside the company-signed body. v2 hashes
    * {disclosure, legalBasis}; v1 (or absent) hashes the disclosure map alone.
    */
-  private async verifyRecordedDisclosureCopy(r: Record<string, unknown>, notes: string[]): Promise<CheckStatus> {
+  private async verifyRecordedDisclosureCopy(r: Record<string, unknown>, notes: string[], session: ChainSession): Promise<CheckStatus> {
     const consent = asObject(asObject(r["credentialSubject"])["consent"]);
     const cid = asString(asObject(consent["document"])["ipfsCid"]);
     const disclosureHash = asString(consent["disclosureHash"]);
@@ -656,7 +939,7 @@ export class ReceiptVerifier {
       );
       return "fail";
     }
-    return this.compareDisclosureCopy(cid, disclosureHash, version === "2" ? receiptBasis : undefined, notes);
+    return this.compareDisclosureCopy(cid, disclosureHash, version === "2" ? receiptBasis : undefined, notes, session);
   }
 
   /** PASSKEY BUNDLE: the copy is compared with the SIGNED offer's disclosureHash and legalBasis, never the receipt's. */
@@ -664,6 +947,7 @@ export class ReceiptVerifier {
     offer: Record<string, unknown>,
     companySignature: CheckStatus,
     notes: string[],
+    session: ChainSession,
   ): Promise<CheckStatus> {
     const cid = asString(asObject(offer["document"])["ipfsCid"]);
     const disclosureHash = asString(offer["disclosureHash"]);
@@ -684,65 +968,74 @@ export class ReceiptVerifier {
       return "skipped";
     }
     const basis = offer["legalBasis"];
-    return this.compareDisclosureCopy(cid, disclosureHash, basis === undefined || basis === null ? undefined : basis, notes);
+    return this.compareDisclosureCopy(cid, disclosureHash, basis === undefined || basis === null ? undefined : basis, notes, session);
   }
 
-  /** Fetch the IPFS body and compare sha256(JCS(preimage)) with `disclosureHash`. `basis` set = the v2 preimage. */
+  /**
+   * Fetch the IPFS document from the gateways in order and compare sha256(JCS(preimage)) with `disclosureHash`.
+   * `basis` set = the v2 preimage. Only bytes that re-encode to the CID are the document: a hash mismatch on them
+   * fails, and anything a gateway sends that is not the CID's file moves to the next gateway.
+   */
   private async compareDisclosureCopy(
     cid: string,
     disclosureHash: string,
     basis: unknown,
     notes: string[],
+    session: ChainSession,
   ): Promise<CheckStatus> {
-    const gateway = this.opts.ipfsGateway ?? ((c: string) => DEFAULT_IPFS_GATEWAY + c);
-    const fetchImpl = this.opts.fetch ?? globalThis.fetch;
-    let body: unknown;
-    try {
-      const res = await fetchImpl(gateway(cid), { signal: timeoutSignal(this.timeoutMs()) });
-      if (!res.ok) {
-        notes.push(
-          `disclosureCopy UNAVAILABLE: the IPFS gateway answered HTTP ${String(res.status)} for CID ${cid}. This is NOT a hash mismatch.`,
-        );
-        return "unavailable";
+    const gateways: IpfsGateway[] = [
+      ...(this.opts.ipfsGateway !== undefined ? [this.opts.ipfsGateway] : []),
+      ...(this.opts.ipfsGateways ?? DEFAULT_IPFS_GATEWAYS),
+    ];
+    if (gateways.length === 0) {
+      notes.push(`disclosureCopy UNAVAILABLE: no IPFS gateway is configured to fetch CID ${cid}. This is NOT a hash mismatch.`);
+      return "unavailable";
+    }
+    const label = basis !== undefined ? " (disclosureVersion 2: {disclosure, legalBasis})" : "";
+    const judge = (bytes: Uint8Array): { status: "pass" | "fail"; detail: string } => {
+      let body: unknown;
+      try {
+        body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+      } catch {
+        return { status: "fail", detail: "is not a JSON document, so it carries no disclosure to compare" };
       }
-      body = await res.json();
-    } catch {
+      // The pinned IPFS body wraps the disclosure map under `disclosure` and carries NO legalBasis today
+      // (IpfsDocumentService::canonicalPayload). If a body ever carries one, it must agree with the signed one.
+      const disclosure = asObject(asObject(body)["disclosure"]);
+      let computed: string;
+      try {
+        if (basis !== undefined) {
+          const bodyBasis = asObject(body)["legalBasis"];
+          if (bodyBasis !== undefined && canonicalize(bodyBasis) !== canonicalize(basis)) {
+            return { status: "fail", detail: "carries a legalBasis that differs from the signed one" };
+          }
+          computed = disclosureHashOf({ disclosure, legalBasis: basis });
+        } else {
+          computed = disclosureHashOf(disclosure);
+        }
+      } catch (err) {
+        return { status: "fail", detail: `or the legalBasis cannot be canonicalized (${errorMessage(err)}), so the copy cannot be checked` };
+      }
+      return computed === disclosureHash
+        ? { status: "pass", detail: `matches the signed disclosureHash ${disclosureHash}` }
+        : { status: "fail", detail: `hashes to ${computed}, not the signed disclosureHash ${disclosureHash}` };
+    };
+    const read = await readPinnedFile(cid, gateways, this.opts.fetch ?? globalThis.fetch, this.timeoutMs(), judge, (v) => v.status === "pass");
+    if (!read.delivered) {
+      const tried = read.attempts.map((a) => `${a.gateway} (${a.failure})`).join("; ");
       notes.push(
-        `disclosureCopy UNAVAILABLE: fetching the IPFS body for CID ${cid} failed or timed out. This is NOT a hash mismatch.`,
+        `disclosureCopy UNAVAILABLE: no IPFS gateway delivered the file of CID ${cid}: ${tried}. This is NOT a hash mismatch.`,
       );
       return "unavailable";
     }
-
-    // The pinned IPFS body wraps the disclosure map under `disclosure` and carries NO legalBasis today
-    // (IpfsDocumentService::canonicalPayload). If a body ever carries one, it must agree with the signed one.
-    const disclosure = asObject(asObject(body)["disclosure"]);
-    let computed: string;
-    try {
-      if (basis !== undefined) {
-        const bodyBasis = asObject(body)["legalBasis"];
-        if (bodyBasis !== undefined && canonicalize(bodyBasis) !== canonicalize(basis)) {
-          notes.push(
-            "disclosureCopy FAILED (disclosureVersion 2): the IPFS document body carries a legalBasis that differs from the signed one.",
-          );
-          return "fail";
-        }
-        computed = disclosureHashOf({ disclosure, legalBasis: basis });
-      } else {
-        computed = disclosureHashOf(disclosure);
-      }
-    } catch (err) {
-      notes.push(
-        `disclosureCopy FAILED: the IPFS document body or the legalBasis cannot be canonicalized (${errorMessage(err)}), so the copy cannot be checked.`,
-      );
-      return "fail";
-    }
-    const label = basis !== undefined ? " (disclosureVersion 2: {disclosure, legalBasis})" : "";
-    if (computed === disclosureHash) {
-      notes.push(`Disclosure copy verified${label}: the IPFS document body matches the signed disclosureHash ${disclosureHash}.`);
+    session.disclosureGateway = read.gateway;
+    if (read.verdict.status === "pass") {
+      notes.push(`Disclosure copy verified${label}: the IPFS document served by ${read.gateway} ${read.verdict.detail}.`);
       return "pass";
     }
     notes.push(
-      `disclosureCopy FAILED${label}: the IPFS document body hashes to ${computed}, not the signed disclosureHash ${disclosureHash}.`,
+      `disclosureCopy FAILED${label}: the IPFS document of CID ${cid}, served by ${read.gateway} and re-encoding to that ` +
+        `CID, ${read.verdict.detail}.`,
     );
     return "fail";
   }
@@ -811,10 +1104,10 @@ export class ReceiptVerifier {
    * counts, and one with no ref is unreadable: a floor, since the items are not proven exhaustive either.
    */
   private async verifyConsentAnchor(
-    r: Record<string, unknown>,
-    bundle: Record<string, unknown>,
+    refs: string[],
     merkleRoot: string,
-    citizenAssertion: CheckStatus,
+    untrusted: string | null,
+    expected: { cells: number; countAnchoredRefs: boolean },
     notes: string[],
     session: ChainSession,
   ): Promise<CheckStatus> {
@@ -823,16 +1116,12 @@ export class ReceiptVerifier {
       notes.push("consentAnchor skipped: pass an rpcUrl to read the consent's on-chain record.");
       return "skipped";
     }
-    const refs = collectConsentRefs(bundle);
     if (refs.length === 0) {
       notes.push("consentAnchor skipped: the bundle carries no consentRef to read on chain.");
       return "skipped";
     }
-    if (citizenAssertion !== "pass") {
-      notes.push(
-        "consentAnchor skipped: the bundle's Merkle root is not bound by a verified passkey assertion, so no on-chain " +
-          "record can be tied to this receipt.",
-      );
+    if (untrusted !== null) {
+      notes.push(untrusted);
       return "skipped";
     }
     const chainId = this.chainId();
@@ -844,7 +1133,7 @@ export class ReceiptVerifier {
 
     const root = stripHex(merkleRoot).toLowerCase();
     const records: ConsentAnchorRecord[] = [];
-    const cells = Math.max(refs.length, acceptedCellCount(r));
+    let cells = Math.max(refs.length, expected.cells);
     let active = 0;
     let withdrawn = 0;
     let pending = 0;
@@ -867,7 +1156,11 @@ export class ReceiptVerifier {
         records.push({ consentRef: ref, state: revoked ? "withdrawn" : "active", anchoredAt: rec.anchoredAt, revokedAt: rec.revokedAt, anchoredBlock: rec.anchoredBlock });
       }
     }
-    if (records.length > 0) session.consentRecords = records;
+    if (records.length > 0) {
+      session.consentRecords = records;
+      const times = records.map((rec) => rec.anchoredAt);
+      session.consentTiming = { earliest: Math.min(...times), latest: Math.max(...times) };
+    }
 
     if (foreign.length > 0) {
       notes.push(
@@ -876,9 +1169,23 @@ export class ReceiptVerifier {
       );
       return "fail";
     }
+    // How many refs the consent's own anchor wrote: the bundle's ref list and its items are signed by no one, the
+    // AnchorBatch log of the trusted root is (chain.js readAnchoredRefCount). Unknown is never in force.
+    let batchRefs: number | null = null;
+    let countUnknown = false;
+    if (expected.countAnchoredRefs && records.length > 0) {
+      batchRefs = await this.readAnchorBatchCount(rpcUrl, target.address, "0x" + root, records.map((rec) => rec.anchoredBlock), session);
+      if (batchRefs === null) countUnknown = true;
+      else {
+        // Only a ref the chain records under the trusted root fills a slot. TRAP: never subtract what the bundle
+        // names: it can pad its list with refs that were never anchored.
+        cells = Math.max(cells, batchRefs);
+        unread = Math.max(0, cells - active - withdrawn - pending);
+      }
+    }
     const counts = `${String(cells)} cell(s): ${String(active)} active, ${String(withdrawn)} withdrawn, ` +
       `${String(pending)} not anchored yet, ${String(unread)} unreadable`;
-    session.consentCounts = { cells, active, withdrawn, pending, unreadable: unread };
+    session.consentCounts = { cells, active, withdrawn, pending, unreadable: unread, ...(batchRefs !== null ? { anchorBatchRefs: batchRefs } : {}) };
     const blocks = [...new Set(records.map((rec) => rec.anchoredBlock))].join(", ");
     if (withdrawn > 0) {
       notes.push(
@@ -889,13 +1196,24 @@ export class ReceiptVerifier {
       return "withdrawn";
     }
     if (active !== cells) {
-      const unnamed = cells > refs.length
-        ? ` The bundle names a consentRef for ${String(refs.length)} of the receipt's ${String(cells)} accepted cells, and ` +
-          "no one signs that list: an unnamed cell counts as unreadable."
-        : "";
+      const unnamed = batchRefs !== null && batchRefs > refs.length
+        ? ` The consent's anchor wrote ${String(batchRefs)} refs and the bundle names ${String(refs.length)}: an unnamed ` +
+          "ref counts as unreadable."
+        : cells > refs.length
+          ? ` The bundle names a consentRef for ${String(refs.length)} of the receipt's ${String(cells)} accepted cells, and ` +
+            "no one signs that list: an unnamed cell counts as unreadable."
+          : "";
       notes.push(
         `consentAnchor UNAVAILABLE on chainId ${String(chainId)} (${counts}).${unnamed} Anchoring is asynchronous and an ` +
           "RPC can fail: this is NOT a contradiction.",
+      );
+      return "unavailable";
+    }
+    if (countUnknown) {
+      notes.push(
+        `consentAnchor UNAVAILABLE on chainId ${String(chainId)} (${counts}): how many refs the consent's anchor wrote ` +
+          "could not be read (no single AnchorBatch log of this root at the one block its refs sit in), so the consent " +
+          "is not shown in force. This is NOT a contradiction.",
       );
       return "unavailable";
     }
@@ -904,6 +1222,48 @@ export class ReceiptVerifier {
         `block ${blocks}.`,
     );
     return "pass";
+  }
+
+  /**
+   * The refCount of the ONE AnchorBatch log for `root` at the ONE block every matching ref sits in, read with a
+   * single-block eth_getLogs on the registry read. Null (unknown) when the refs sit at more than one block, on a read
+   * failure, or when anything but exactly one log of that root, from that address, at that block answers.
+   * TRAP: never sum across blocks. One consent is one transaction; refs at two blocks mean a second batch.
+   */
+  private async readAnchorBatchCount(
+    rpcUrl: string,
+    address: string,
+    root: string,
+    blocks: number[],
+    session: ChainSession,
+  ): Promise<number | null> {
+    const distinct = [...new Set(blocks)];
+    if (distinct.length !== 1) return null;
+    const block = distinct[0]!;
+    if (!Number.isSafeInteger(block) || block < 0) return null;
+    const at = "0x" + block.toString(16);
+    const topic = root.toLowerCase();
+    const want = address.toLowerCase();
+    const call = await this.rpc(rpcUrl, "eth_getLogs", [{ address, topics: [ANCHOR_BATCH_TOPIC, topic], fromBlock: at, toBlock: at }], session);
+    if (!call.ok || !Array.isArray(call.result)) return null;
+    const ours = call.result.filter((entry): boolean => {
+      const l = asObject(entry);
+      const topics = asArray(l["topics"]);
+      return (
+        l["removed"] !== true &&
+        asString(l["address"]).toLowerCase() === want &&
+        asString(topics[0]).toLowerCase() === ANCHOR_BATCH_TOPIC &&
+        asString(topics[1]).toLowerCase() === topic &&
+        typeof l["blockNumber"] === "string" &&
+        /^0x[0-9a-fA-F]+$/.test(l["blockNumber"]) &&
+        parseInt(l["blockNumber"], 16) === block
+      );
+    });
+    if (ours.length !== 1) return null;
+    const data = stripHex(asString(asObject(ours[0])["data"])).toLowerCase();
+    if (!/^[0-9a-f]{128}$/.test(data)) return null;
+    const count = Number.parseInt(data.slice(0, 64), 16);
+    return Number.isSafeInteger(count) && count > 0 ? count : null;
   }
 
   /** Resolve `slug` to the company did:web document (primitive). */
@@ -984,7 +1344,7 @@ export class ReceiptVerifier {
     const vm = companyKeyMethod(doc, issuer, vmId);
     if (!vm) return { kind: "unlisted" };
     try {
-      return { kind: "key", key: decodeEd25519PublicKeyMultibase(vm.publicKeyMultibase), vmId: vm.id };
+      return { kind: "key", key: decodeEd25519PublicKeyMultibase(vm.publicKeyMultibase), vmId: vm.id, doc };
     } catch {
       return { kind: "unlisted" };
     }
@@ -1110,7 +1470,10 @@ function recordedProofFailure(r: Record<string, unknown>): string | null {
   return null;
 }
 
-type CompanyKey = { kind: "unresolved" } | { kind: "unlisted" } | { kind: "key"; key: Uint8Array; vmId: string };
+type CompanyKey = { kind: "unresolved" } | { kind: "unlisted" } | { kind: "key"; key: Uint8Array; vmId: string; doc: DidDocument };
+
+/** The companyKeyRegistry check and, when a key was looked up, what the registry said. */
+type CompanyKeyCheck = { status: CheckStatus; reading?: CompanyKeyReading };
 
 /** The note and verdict when no key checks proof[0]: an unresolved document is inconclusive, an unlisted key fails. */
 function companyKeyRefused(
@@ -1386,6 +1749,76 @@ function passkeyFieldOutsideFormat(r: Record<string, unknown>): string | null {
   return null;
 }
 
+/**
+ * The instant the company key signed (issuer.js signingInstantOf): a recorded receipt of version 2 to 4 was signed when
+ * the organisation recorded it, a version 1 recorded receipt and a passkey receipt at grantedAt. A version 2 to 4
+ * without recordedAt yields null.
+ */
+function signingInstantOf(r: Record<string, unknown>): string | null {
+  const consent = asObject(asObject(r["credentialSubject"])["consent"]);
+  const v = r["receiptVersion"];
+  const at = v === "2" || v === "3" || v === "4" ? consent["recordedAt"] : consent["grantedAt"];
+  return typeof at === "string" ? at : null;
+}
+
+function recordStrings(rec: KeyRecord): { validFrom: string; anchoredAt: string; retiredAt: string; voidedAt: string } {
+  return {
+    validFrom: rec.validFrom.toString(),
+    anchoredAt: rec.anchoredAt.toString(),
+    retiredAt: rec.retiredAt.toString(),
+    voidedAt: rec.voidedAt.toString(),
+  };
+}
+
+const CITIZEN_KEY_NOTES: Record<string, string> = {
+  chainConfirmed: "the registry records the person's key in force at grantedAt, and the consent's anchor bounds that date",
+  notInForce: "the registry records the person's key as NOT in force at grantedAt (not valid yet, or retired)",
+  conflict: "the registry and the person's DID document disagree about the key",
+  didRefused: "the person's DID document refuses the key",
+  grantedAfterConsentAnchor: "grantedAt is later than the consent's own anchor allows, so the date is contradicted",
+  recordedLate: "the registry recorded the key's window more than 72 hours after grantedAt",
+  voided: "the registry records the person's key as voided",
+  consentRecordedLate: "grantedAt falls more than 72 hours before the consent's earliest anchor",
+  consentNotAnchored: "the key is in force at grantedAt, but no anchor of this consent bounds that date yet",
+  didNotConsulted: "the key is in force at grantedAt, but its DID document standing was not read",
+  notLinked: "the bundle carries no citizenKeySalt, so its key cannot be looked up on chain",
+  pending: "the registry has no record of the key yet, and anchoring takes up to 72 hours after grantedAt",
+  unreachable: "the registry could not be read",
+  notRecorded: "the registry still has no record of the key 72 hours after grantedAt",
+  unreadable: "the bundle's citizenKeySalt or the registry's answer cannot be read",
+};
+
+function citizenKeyNote(k: CitizenKeyReading): string {
+  const head =
+    k.colour === "green" ? "Citizen key confirmed on chain"
+    : k.colour === "red" ? "citizenKeyChain FAILED"
+    : k.withholds ? "citizenKeyChain UNAVAILABLE, and the person's key is withheld"
+    : k.colour === "amber" ? "citizenKeyChain UNAVAILABLE"
+    : "citizenKeyChain adds nothing";
+  return `${head} (${k.chainState}): ${CITIZEN_KEY_NOTES[k.reason] ?? k.reason}.`;
+}
+
+const COMPANY_KEY_NOTES: Record<string, string> = {
+  authentic: "was in force on its domain at the instant it signed",
+  "key-not-authorised": "was NOT in force on its domain at the instant it signed",
+  "signed-after-anchor": "signed later than the consent's own anchor allows, so the signing date is contradicted",
+  voided: "has a window the registry records as voided",
+  pending: "has no window on its domain in the registry yet",
+  "recorded-late": "was recorded on its domain more than 72 hours after the instant it signed",
+  "retired-issuer-dated": "has since been retired, and the instant it signed is the issuer's own date, which no anchor bounds",
+  unknown: "has a window that cannot be judged at the instant it signed",
+};
+
+function companyKeyNote(k: CompanyKeyReading): string {
+  const head =
+    k.verdict === "authentic" ? "Company key confirmed on chain"
+    : k.verdict === "key-not-authorised" || k.verdict === "signed-after-anchor" || k.verdict === "voided"
+      ? "companyKeyRegistry FAILED"
+      : "companyKeyRegistry UNAVAILABLE";
+  const rotated = k.rotated === true ? ` The company has since rotated to the key ${k.currentKeyId ?? ""}.` : "";
+  return `${head}: the key ${k.keyId} ${COMPANY_KEY_NOTES[k.verdict] ?? k.verdict} (${k.domain}).${rotated}`;
+}
+
 /** Accepted cells the receipt lists: one consentRef each. */
 function acceptedCellCount(r: Record<string, unknown>): number {
   return asArray(asObject(asObject(r["credentialSubject"])["consent"])["items"]).length;
@@ -1550,12 +1983,13 @@ function namedRegistryOf(bundle: Record<string, unknown>): NamedRegistry | null 
 /** The anchor records, consent tally and registry refusal a verification read, for its result: absent when none. */
 function anchorRecords(
   session: ChainSession,
-): Pick<ReceiptVerification, "documentAnchorRecord" | "consentAnchorRecords" | "consentAnchorCounts" | "registryRefused"> {
+): Pick<ReceiptVerification, "documentAnchorRecord" | "consentAnchorRecords" | "consentAnchorCounts" | "registryRefused" | "disclosureGateway"> {
   return {
     ...(session.documentRecord ? { documentAnchorRecord: session.documentRecord } : {}),
     ...(session.consentRecords ? { consentAnchorRecords: session.consentRecords } : {}),
     ...(session.consentCounts ? { consentAnchorCounts: session.consentCounts } : {}),
     ...(session.registryRefused ? { registryRefused: true } : {}),
+    ...(session.disclosureGateway !== undefined ? { disclosureGateway: session.disclosureGateway } : {}),
   };
 }
 

@@ -5,7 +5,7 @@ import { Agreely } from "../../src/index.js";
 import { canonicalize } from "../../src/crypto/jcs.js";
 import type { DidDocument, ReceiptVerification, VerifyReceiptOptions } from "../../src/verify/types.js";
 import { testIssuer } from "./signing.js";
-import { anchorWord, onReadableRegistry } from "./registry.js";
+import { A1V1_ANCHORED_AT, KEY_IN_FORCE, anchorBatchLog, anchorWord, chainFetch, onReadableRegistry } from "./registry.js";
 
 // The citizen-key rule of the web verifier (citizen-key.js), the offer window, and a partial consent-anchor read.
 // The crafted citizen documents are QA's (qa-ver1r3): one bundle, re-signed on the citizen side with a passkey of
@@ -205,15 +205,12 @@ describe("a partial consent-anchor read is unavailable, never pass", () => {
     const docs = vectorFile("receipts/did-documents.json") as Record<string, DidDocument>;
     const root = String(bundle["merkleRoot"]).replace(/^0x/, "");
     let calls = 0;
-    const fetchImpl = (async (_url: string | URL, init?: RequestInit) => {
-      const req = JSON.parse(String(init?.body)) as { method: string };
-      if (req.method !== "eth_call") return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [] }));
-      calls++;
-      if (calls > 1) return new Response("down", { status: 503 });
-      const result = anchorWord(root, 1760000000);
-      return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result }));
-    }) as unknown as typeof fetch;
-    const result = await verify(bundle, { resolver: (did) => docs[did] ?? null, rpcUrl: "https://rpc.test", chainId: 84532, fetch: fetchImpl });
+    const rpc = chainFetch({
+      registry: () => (++calls > 1 ? new Response("down", { status: 503 }) : anchorWord(root, A1V1_ANCHORED_AT)),
+      companyKeyOf: () => KEY_IN_FORCE,
+      logs: () => [anchorBatchLog(root, 3)],
+    });
+    const result = await verify(bundle, { resolver: (did) => docs[did] ?? null, rpcUrl: "https://rpc.test", chainId: 84532, fetch: rpc.fetch });
     expect(calls).toBe(3);
     expect(result.consentAnchor).toBe("unavailable");
     expect(result.notes.join("\n")).toContain("1 active, 0 withdrawn, 0 not anchored yet, 2 unreadable");
@@ -229,14 +226,12 @@ describe("the consent anchor passes only once every cell is recorded under the b
     const docs = vectorFile("receipts/did-documents.json") as Record<string, DidDocument>;
     const root = String(bundle["merkleRoot"]).replace(/^0x/, "");
     let calls = 0;
-    const fetchImpl = (async (_url: string | URL, init?: RequestInit) => {
-      const req = JSON.parse(String(init?.body)) as { method: string };
-      if (req.method !== "eth_call") return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: [] }));
-      calls++;
-      const result = calls <= anchored ? anchorWord(root, 1760000000) : anchorWord("0x" + "00".repeat(32), 0, 0, 0);
-      return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result }));
-    }) as unknown as typeof fetch;
-    const result = await verify(bundle, { resolver: (did) => docs[did] ?? null, rpcUrl: "https://rpc.test", chainId: 84532, fetch: fetchImpl });
+    const rpc = chainFetch({
+      registry: () => (++calls <= anchored ? anchorWord(root, A1V1_ANCHORED_AT) : anchorWord("0x" + "00".repeat(32), 0, 0, 0)),
+      companyKeyOf: () => KEY_IN_FORCE,
+      logs: () => [anchorBatchLog(root, 3)],
+    });
+    const result = await verify(bundle, { resolver: (did) => docs[did] ?? null, rpcUrl: "https://rpc.test", chainId: 84532, fetch: rpc.fetch });
     expect(result.consentAnchor).toBe(status);
     expect(result.notes.join("\n")).toContain(counts);
   });

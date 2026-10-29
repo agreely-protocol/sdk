@@ -65,12 +65,13 @@ describe("a hostile receipt never throws (N9)", () => {
     expect(result.notes.join("\n")).toContain("cannot be canonicalized");
   });
 
-  it("an IPFS body nested 3000 deep is a failed copy, never a throw", async () => {
+  it("an IPFS body nested 3000 deep, not the CID's bytes, is no copy at all and never a throw", async () => {
     const bundle = artefact("cidv1.bundle");
     const fetchImpl = (async () => new Response(JSON.stringify({ disclosure: nested(3000) }))) as unknown as typeof fetch;
     const result = await verify(bundle, { verifyDisclosure: true, fetch: fetchImpl });
-    expect(result.disclosureCopy).toBe("fail");
-    expect(result.overall).toBe("failed");
+    expect(result.disclosureCopy).toBe("unavailable");
+    // A gateway serving bytes that are not the file says nothing about the receipt.
+    expect(result.overall).toBe("verified");
   });
 
   it("a resolved DID document whose verificationMethod holds a null fails, never a throw", async () => {
@@ -240,7 +241,9 @@ describe("an overall deadline on the RPC sequence (R13)", () => {
     expect(elapsed).toBeLessThan(2000);
     expect(result.documentAnchor).toBe("unavailable");
     expect(result.consentAnchor).toBe("unavailable");
-    expect(result.overall).toBe("verified");
+    expect(result.companyKeyRegistry).toBe("unavailable");
+    // A company key the registry did not confirm is never verified (the web verifier's keyUnconfirmed).
+    expect(result.overall).toBe("unavailable");
     // The first call hangs to the deadline; every call after it is refused without a request.
     expect(rpc.calls).toHaveLength(1);
   });

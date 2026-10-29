@@ -3,7 +3,19 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { Agreely, isVerificationBundle } from "../../src/index.js";
 import type { DidDocument, ReceiptVerification, VerifyReceiptOptions } from "../../src/verify/types.js";
-import { MAINNET_REGISTRY, SEPOLIA_REGISTRY, anchorWord, onReadableRegistry, rootWord } from "./registry.js";
+import {
+  A1V1_ANCHORED_AT,
+  CIDV1_ANCHORED_AT,
+  KEY_IN_FORCE,
+  MAINNET_REGISTRY,
+  SEPOLIA_REGISTRY,
+  anchorBatchLog,
+  anchorWord,
+  chainFetch,
+  onReadableRegistry,
+  rootWord,
+  salted,
+} from "./registry.js";
 
 // Real artefacts issued by the app (qa-ver1): genuine A1 passkey bundles, recorded A3 paper and A4 phone
 // receipts, and the forgeries F1 to F11 that SDK 0.5.0 called "verified".
@@ -155,8 +167,8 @@ describe("the document anchor is one eth_call rootOf(keccak256(cid)) (N6)", () =
   });
 
   it("an absent record is UNAVAILABLE, not fail, and leaves a verified bundle verified (R13)", async () => {
-    const rpc = rpcFetch((m, params) => (m === "eth_call" && (params[0] as { data: string }).data.startsWith("0x6d6f398e") ? rootWord(0) : null));
-    const result = await verify(cidBundle(), { ...SEPOLIA, fetch: rpc.fetch });
+    const rpc = chainFetch({ rootOf: () => rootWord(0), keyOf: () => KEY_IN_FORCE, companyKeyOf: () => KEY_IN_FORCE });
+    const result = await verify(salted(cidBundle()), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.documentAnchor).toBe("unavailable");
     expect(result.overall).toBe("verified");
   });
@@ -235,19 +247,21 @@ describe("a recorded paper receipt whose bundle names another registry is refuse
 describe("the consent anchor is read with eth_call registry(consentRef) (N6)", () => {
   const bundle = () => onReadableRegistry(artefact("a1v1.bundle"));
   const root = () => String(bundle()["merkleRoot"]);
+  /** Both keys in force and the anchor's own log: only the consent record is left to decide. */
+  const keysInForce = { keyOf: () => KEY_IN_FORCE, companyKeyOf: () => KEY_IN_FORCE, logs: () => [anchorBatchLog(root(), 3)] };
 
   it("a record under the bundle's Merkle root passes, read with the registry(bytes32) selector, its block exposed", async () => {
-    const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000) : null));
-    const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
+    const rpc = chainFetch({ ...keysInForce, registry: () => anchorWord(root(), A1V1_ANCHORED_AT) });
+    const result = await verify(salted(bundle()), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.consentAnchor).toBe("pass");
     expect(result.overall).toBe("verified");
-    const call = rpc.calls.find((c) => c.method === "eth_call")!;
     const refs = bundle()["consentRefs"] as string[];
-    expect((call.params[0] as { data: string; to: string }).data).toBe("0x7ef50298" + refs[0]!.slice(2));
-    expect((call.params[0] as { to: string }).to).toBe(SEPOLIA_REGISTRY);
+    const call = rpc.calls.find((c) => (c.params[0] as { data?: string }).data === "0x7ef50298" + refs[0]!.slice(2));
+    expect(call).toBeDefined();
+    expect((call!.params[0] as { to: string }).to).toBe(SEPOLIA_REGISTRY);
     expect(result.consentAnchorRecords).toHaveLength(refs.length);
     expect(result.consentAnchorRecords![0]).toEqual({
-      consentRef: refs[0], state: "active", anchoredAt: 1760000000, revokedAt: 0, anchoredBlock: 53000000,
+      consentRef: refs[0], state: "active", anchoredAt: A1V1_ANCHORED_AT, revokedAt: 0, anchoredBlock: 53000000,
     });
     expect(result.notes.join("\n")).toContain("anchored in block 53000000");
   });
@@ -267,8 +281,8 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
   });
 
   it("an authentic withdrawn consent reads overall withdrawn, only when every other decisive check verified", async () => {
-    const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000, 1760000600, 2) : null));
-    const result = await verify(bundle(), { ...SEPOLIA, fetch: rpc.fetch });
+    const rpc = chainFetch({ ...keysInForce, registry: () => anchorWord(root(), A1V1_ANCHORED_AT, A1V1_ANCHORED_AT + 600, 2) });
+    const result = await verify(salted(bundle()), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.companySignature).toBe("pass");
     expect(result.citizenAssertion).toBe("pass");
     expect(result.overall).toBe("withdrawn");
@@ -291,12 +305,13 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
   it("a withdrawn consent next to an unavailable document anchor stays withdrawn: an RPC outage never downgrades a verified receipt (R13)", async () => {
     const bundleWithCid = onReadableRegistry(artefact("cidv1.bundle"));
     const cidRoot = String(bundleWithCid["merkleRoot"]);
-    const rpc = rpcFetch((m, params) => {
-      if (m !== "eth_call") return null;
-      const data = (params[0] as { data: string }).data;
-      return data.startsWith("0x6d6f398e") ? new Response("down", { status: 503 }) : anchorWord(cidRoot, 1760000000, 1760000600, 2);
+    const rpc = chainFetch({
+      rootOf: () => new Response("down", { status: 503 }),
+      registry: () => anchorWord(cidRoot, CIDV1_ANCHORED_AT, CIDV1_ANCHORED_AT + 600, 2),
+      keyOf: () => KEY_IN_FORCE,
+      companyKeyOf: () => KEY_IN_FORCE,
     });
-    const result = await verify(bundleWithCid, { ...SEPOLIA, fetch: rpc.fetch });
+    const result = await verify(salted(bundleWithCid), { ...SEPOLIA, fetch: rpc.fetch });
     expect(result.documentAnchor).toBe("unavailable");
     expect(result.consentAnchor).toBe("withdrawn");
     expect(result.overall).toBe("withdrawn");
@@ -306,12 +321,16 @@ describe("the consent anchor is read with eth_call registry(consentRef) (N6)", (
     const named = structuredClone(bundle()) as { didDocuments: { issuer: { delegation: { body: Record<string, unknown> } } } };
     named.didDocuments.issuer.delegation.body["registry"] = MAINNET_REGISTRY.toLowerCase();
     named.didDocuments.issuer.delegation.body["chainId"] = "8453";
-    const rpc = rpcFetch((m) => (m === "eth_call" ? anchorWord(root(), 1760000000) : null));
-    const result = await verify(named, { rpcUrl: "https://rpc.test", chainId: 8453, fetch: rpc.fetch });
+    const rpc = chainFetch({
+      ...keysInForce,
+      registry: () => anchorWord(root(), A1V1_ANCHORED_AT),
+      logs: () => [anchorBatchLog(root(), 3, 53000000, MAINNET_REGISTRY.toLowerCase())],
+    });
+    const result = await verify(salted(named), { rpcUrl: "https://rpc.test", chainId: 8453, fetch: rpc.fetch });
     expect(result.consentAnchor).toBe("pass");
     expect(result.overall).toBe("verified");
-    const call = rpc.calls.find((c) => c.method === "eth_call")!;
-    expect((call.params[0] as { to: string }).to).toBe(MAINNET_REGISTRY);
+    expect(rpc.refs).toHaveLength(3);
+    for (const call of rpc.calls) expect((call.params[0] as { to?: string; address?: string }).to ?? (call.params[0] as { address: string }).address).toBe(MAINNET_REGISTRY);
   });
 
   it("a four-word answer is unreadable, never a record", async () => {

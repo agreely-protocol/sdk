@@ -99,7 +99,8 @@ const bundleVectors = JSON.parse(
       file: string;
       resolveDids: boolean | "none";
       ipfsBody?: unknown;
-      chain?: { chainId: number; registryAddress: string; registryAnswer: string };
+      ipfsFile?: string;
+      chain?: { chainId: number; registryAddress: string; registryAnswer: string; companyKeyOfAnswer: string; now: number };
       expect: unknown;
     }>;
   };
@@ -115,13 +116,19 @@ function numbersAsStrings(value: unknown): unknown {
   return value;
 }
 
-/** The chain a vector case states: every eth_call registry(bytes32) answers `registryAnswer`, any other call is refused. */
-function registryFetch(registryAnswer: string): typeof fetch {
+/**
+ * The chain a vector case states, by selector: registry(bytes32) answers `registryAnswer`, companyKeyOf(bytes32,bytes32)
+ * `companyKeyOfAnswer`, and any other call is refused.
+ */
+function registryFetch(chain: { registryAnswer: string; companyKeyOfAnswer: string }): typeof fetch {
   return (async (_input: string | URL, init?: RequestInit) => {
     const req = JSON.parse(String(init?.body ?? "{}")) as { method?: string; params?: Array<{ data?: string }> };
     const data = req.params?.[0]?.data ?? "";
-    const body = req.method === "eth_call" && data.startsWith("0x7ef50298")
-      ? { jsonrpc: "2.0", id: 1, result: registryAnswer }
+    const result = req.method !== "eth_call"
+      ? undefined
+      : data.startsWith("0x7ef50298") ? chain.registryAnswer : data.startsWith("0x25597a89") ? chain.companyKeyOfAnswer : undefined;
+    const body = result !== undefined
+      ? { jsonrpc: "2.0", id: 1, result }
       : { jsonrpc: "2.0", id: 1, error: { message: "not served by this vector" } };
     return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
   }) as unknown as typeof fetch;
@@ -139,17 +146,23 @@ describe("Agreely.verifyReceipt on genuine and forged receipts and bundles (gold
       const opts: VerifyReceiptOptions = {
         resolver: c.resolveDids === "none" ? () => null : (did: string) => docs[did] ?? null,
       };
-      if (c.ipfsBody !== undefined) {
+      if (c.ipfsFile !== undefined || c.ipfsBody !== undefined) {
+        // The exact pinned bytes, so they re-encode to the CID; an ipfsBody is never fetched by a case that reads it.
+        const bytes = c.ipfsFile !== undefined
+          ? readFileSync(fileURLToPath(new URL(`../../vectors/${c.ipfsFile}`, import.meta.url)))
+          : Buffer.from(JSON.stringify(c.ipfsBody));
         opts.verifyDisclosure = true;
-        opts.ipfsGateway = (cid: string) => `https://ipfs.test/${cid}`;
-        opts.fetch = (async () =>
-          new Response(JSON.stringify(c.ipfsBody), { headers: { "Content-Type": "application/json" } })) as unknown as typeof fetch;
+        opts.ipfsGateway = "https://ipfs.test/ipfs/";
+        opts.ipfsGateways = [];
+        opts.fetch = (async () => new Response(bytes)) as unknown as typeof fetch;
       }
       if (c.chain !== undefined) {
+        const now = c.chain.now;
         opts.rpcUrl = "https://rpc.test";
         opts.chainId = c.chain.chainId;
         opts.registryAddress = c.chain.registryAddress;
-        opts.fetch = registryFetch(c.chain.registryAnswer);
+        opts.now = () => now * 1000;
+        opts.fetch = registryFetch(c.chain);
       }
       const result = await Agreely.verifyReceipt(vectorFile(c.file), opts);
       expect(canonicalize(numbersAsStrings(result))).toBe(canonicalize(numbersAsStrings(c.expect)));

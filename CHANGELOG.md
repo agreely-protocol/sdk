@@ -3,6 +3,54 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## 0.7.0 - Unreleased
+
+### Added
+
+- **The company key on chain: `companyKeyRegistry` and `companyKey`.** With
+  `rpcUrl`, the company key that verified the signature is looked up on the
+  company's domain with `companyKeyOf` and judged at the instant it signed
+  (`grantedAt`, or `recordedAt` from version 2 of a paper or telephone receipt). On a
+  passkey bundle, the consent's anchor bounds that instant. `getCompanyDid` names the
+  key the company holds today (`companyKey.rotated`).
+- **The person's key on chain: `citizenKeyChain` and `citizenKey`.** With `rpcUrl`,
+  a passkey bundle's `citizenKeySalt` gives the fingerprint of the person's key, read
+  with one `keyOf` call. The reading is in force, pending, not recorded 72 hours
+  after `grantedAt`, voided, not in force or recorded late, combined with the
+  consent's own anchor. A bundle without a salt reads `notLinked`.
+- **The `now` option** pins the verifier's clock.
+- **Version 4 paper and telephone receipts: `signedAnchor`.** A version 4 receipt
+  signs its anchor batch. In its bundle, the root and refs it ships are held to that
+  signature (`bound` or `contradicts`), and with `rpcUrl` the consent's records
+  are read on the signed refs once the company key is confirmed, which sets
+  `consentAnchor` and `withdrawal`.
+- **`consentAnchorCounts.anchorBatchRefs`**: how many refs the consent's anchor
+  wrote, from the one `AnchorBatch` log of its root at the block its records name.
+- **`ipfsGateways` and `disclosureGateway`.** The disclosure copy is asked of each
+  gateway in order (default: Lighthouse). `disclosureGateway` names the gateway that
+  delivered, and when none did the note names each gateway tried.
+- **The `guardian_consent_missing` status of `/v1/check`** (deny, with
+  `consentRef`) in the `Status` type.
+
+### Changed
+
+- **With `rpcUrl`, `overall` reads `verified` or `withdrawn` only once the company
+  key is confirmed on chain** and, on a passkey bundle, once the person's key reading
+  does not withhold it; otherwise it reads `unavailable`. A refusal on chain reads
+  `failed`. Without `rpcUrl`, no result changes.
+- **The consent anchor passes once the anchor's own count is read.** A ref the
+  anchor wrote that the bundle does not name counts as unreadable, and a count that
+  cannot be read leaves `consentAnchor` `unavailable`.
+- **A gateway's bytes count only once they re-encode to the CID.** Bytes that are
+  not the file move to the next gateway, and `disclosureCopy` reads `unavailable`
+  when no gateway delivers. Under a CID this verifier cannot recompute, only a copy
+  whose hash matches is believed.
+- **`ipfsGateway` is asked first, then `ipfsGateways`.** It also accepts a prefix or
+  a `{cid}` template. To ask it alone, pass `ipfsGateways: []`.
+- **A paper or telephone receipt holds exactly the members of its
+  `receiptVersion`.** A version 3 carrying an anchor fails `receiptIntegrity`, and a
+  version this verifier does not read is `malformed`.
+
 ## 0.6.1 - 2026-10-27
 
 ### Added

@@ -174,4 +174,8 @@ export type {
   DidVerificationMethod,
   DidResolver,
   VerifyReceiptOptions,
+  CompanyKeyReading,
+  CompanyKeyVerdict,
+  CitizenKeyReading,
+  SignedAnchorReading,
 } from "./verify/types.js";

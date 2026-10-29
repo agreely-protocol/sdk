@@ -932,13 +932,16 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   document reads `unavailable`. An acceptance date outside the offer's window
   fails the receipt's integrity and leaves the passkey assertion `unavailable`:
   the person's key is not evaluated at that date. With `rpcUrl`, the on-chain
-  checks read the AgreelyRegistry by `eth_call`: the document anchor passes on a
-  `rootOf` record in the consent-document lane, and the consent anchor passes once
-  every cell's record was read under the bundle's Merkle root and is in force. A
+  checks read the AgreelyRegistry by `eth_call`, plus one single-block `eth_getLogs`:
+  the document anchor passes on a `rootOf` record in the consent-document lane, and the
+  consent anchor passes once every cell's record was read under the bundle's Merkle root
+  and is in force, and the anchor's own `AnchorBatch` log, read at the one block those
+  records name, says how many refs it wrote (`consentAnchorCounts.anchorBatchRefs`). A
   withdrawn cell reads `withdrawn`, with its `revokedAt`: the consent is authentic but
   no longer in force, so `overall` reads `withdrawn` (never a forgery). A cell not yet
-  recorded reads `unavailable`, and so does a cell the receipt accepts whose ref the
-  bundle does not name (no one signs that list). On a chain other than Base mainnet and Base Sepolia, pass
+  recorded reads `unavailable`, and so does a cell the receipt accepts, or a ref the
+  anchor wrote, that the bundle does not name (no one signs that list), and so does an
+  anchor whose count could not be read. On a chain other than Base mainnet and Base Sepolia, pass
   `registryAddress`, or the anchor checks read `unavailable`. With `rpcUrl`, a bundle whose
   issuer key delegation names a registry or chain other than the one read is refused before
   any RPC call when an anchor check would read the chain: a receipt with a `document.ipfsCid`
@@ -959,20 +962,74 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   writes, nesting past 64 levels) reads `malformed`, never a throw. The on-chain
   checks (`rpcUrl`) share one deadline, `rpcDeadlineMs` (default 30000), past which
   they read `unavailable`.
+- **Keys on chain (`rpcUrl`).** Two more reads, as the Agreely `/verify` page makes
+  them. `companyKeyRegistry`: the company key that verified the signature, looked up
+  on the company's domain (the first `alsoKnownAs` of the issuer document) with
+  `companyKeyOf(keccak256(domain), sha256(key))`, and judged at the instant it signed:
+  `grantedAt` on a passkey receipt and a paper receipt without a `receiptVersion`,
+  `recordedAt` from version 2. On a passkey bundle the consent's anchor bounds that
+  instant, so a key that signed more than 300 seconds after the anchor of its root
+  reads `fail`; on a paper or telephone receipt the instant is the issuer's own date,
+  so a key retired since reads `unavailable`. `companyKey` carries the verdict, the
+  window and, from `getCompanyDid`, the key the company holds today (`rotated: true`
+  after a rotation, which leaves the verdict unchanged). `citizenKeyChain`, on a
+  passkey bundle: the person's key, read with one `keyOf` call on the fingerprint
+  `keccak256(JCS({did, domain, keyThumbprint}) || citizenKeySalt)`; `citizenKey`
+  carries the reading (`chainState`, `colour`, `reason`, `withholds`). A key not in
+  force at `grantedAt`, or a consent granted after its own anchor, reads `fail`. A key
+  never recorded reads `pending` until 72 hours after `grantedAt` and `notRecorded`
+  from then on (`now` pins the clock). A bundle without `citizenKeySalt` reads
+  `notLinked`, which holds the receipt back only on a registry that serves `keyOf`
+  (the known Base mainnet and Base Sepolia registries).
+- **`overall` with `rpcUrl`.** Without `rpcUrl` nothing on chain is read and no
+  result changes. With it, any check that reads `fail` makes `overall` `failed`. A
+  passkey bundle reads `verified` (or `withdrawn`) only once the company key is
+  confirmed (`companyKeyRegistry: "pass"`) and the person's key reading does not
+  withhold it: a voided record, a key never recorded 72 hours on, an unreadable record
+  or salt, no salt on a registry that serves `keyOf`, or a consent anchored more than
+  72 hours after `grantedAt` (`citizenKey.withholds`). Otherwise it reads
+  `unavailable`. A paper or telephone receipt reads `unavailable` until the company key
+  is confirmed, and a telephone receipt stays at most `partial`. A read that fails is
+  `unavailable`, never a refusal.
+- **Version 4 paper and telephone receipts.** A recorded receipt holds exactly the
+  members its `receiptVersion` writes (versions 1 to 4). A version 3 carrying an anchor
+  fails `receiptIntegrity`, and a version this verifier does not read is `malformed`.
+  A version 4 signs its anchor batch (`merkleRoot`, `consentRefs`). In its bundle,
+  `signedAnchor.binding` reads `bound` when the bundle's root is the signed root and
+  every ref it names is signed, and `contradicts` otherwise, which fails
+  `consentAnchor`, offline too. With `rpcUrl`, the chain is read on the SIGNED refs,
+  and only once `companyKeyRegistry` confirms the company key at `recordedAt`; an
+  anchor older than `recordedAt` less 300 seconds is not this receipt's (`fail`).
+- **The disclosure copy.** `verifyDisclosure: true` asks IPFS gateways in order:
+  `ipfsGateway` first when you name one, then `ipfsGateways` (default:
+  `https://gateway.lighthouse.storage/ipfs/`), each a prefix, a `{cid}` template or,
+  for `ipfsGateway`, a function of the CID (pass `ipfsGateways: []` to ask yours
+  alone). A gateway's bytes count only once they
+  re-encode to the CID (a CIDv0, or a base32 CIDv1 over sha2-256, of a one-block
+  file). An HTTP error, a timeout, a body over 262144 bytes or bytes that are not the
+  file move to the next gateway. `disclosureGateway` names the gateway that
+  delivered; when none did, the copy reads `unavailable` and the note names each one
+  tried. Bytes that are the file decide: `pass` when their hash is the signed one,
+  `fail` otherwise. Under a CID this verifier cannot recompute, only a copy whose hash
+  matches is believed.
 - **Withdrawal.** `overall` judges the receipt; `withdrawal` says whether the
   consent is still in force. It reads `active` once every accepted cell was read on
   chain under the bundle's Merkle root and none is withdrawn, `withdrawn` when the
   chain records a cell's withdrawal (`withdrawnAt` gives the latest, in unix seconds,
   when the record carries it), and `not_checked` otherwise. Without `rpcUrl` nothing
   reads it: a withdrawn consent verified offline reads `overall: "verified"` and
-  `withdrawal: "not_checked"`. A paper or telephone receipt and a bare passkey receipt
-  always read `not_checked`, because this SDK reads the consent's on-chain record from
-  a passkey bundle only; the Agreely `/verify` page reads it for a version 4 paper or
-  telephone receipt. To accept a consent only while it is in force:
+  `withdrawal: "not_checked"`. A bare passkey receipt, and a paper or telephone receipt
+  before version 4, always read `not_checked`: only a passkey bundle and a version 4
+  paper or telephone receipt in its bundle tie a root to the chain. To accept a consent
+  only while it is in force, with both keys confirmed on chain:
 
   ```ts
   const result = await Agreely.verifyReceipt(bundle, { rpcUrl: "https://base-rpc.publicnode.com" });
   const inForce = result.overall === "verified" && result.withdrawal === "active";
+  if (result.overall === "unavailable") {
+    // Not a refusal: something could not be confirmed on chain, and these fields say what.
+    console.log(result.companyKey?.verdict, result.citizenKey?.reason, result.consentAnchorCounts);
+  }
   ```
 
 ## Open and auditable
@@ -984,9 +1041,9 @@ MIT-licensed and built to be provable, not just trusted:
   network call is in the source.
 - **Only the endpoints you configure.** The client contacts your configured
   Agreely API base URL (default `https://api.agreely.ca`). The opt-in receipt
-  verifier additionally contacts a chain RPC you pass in (on-chain anchor) and an
-  IPFS gateway (default `gateway.lighthouse.storage`, overridable) for the opt-in
-  disclosure-copy check; its `did:web` resolver fetches the issuer host named in
+  verifier additionally contacts a chain RPC you pass in (anchors and keys on chain)
+  and IPFS gateways (default `gateway.lighthouse.storage`; `ipfsGateway` and
+  `ipfsGateways` precede or replace it) for the opt-in disclosure-copy check; its `did:web` resolver fetches the issuer host named in
   the receipt over HTTPS (inject your own `resolver` for untrusted receipts).
   Resolving a citizen DID calls the Agreely CITIZEN tier (default
   `https://my.agreely.ca/did/{did}`), and `resolveCompanyDid` calls the Agreely WEB

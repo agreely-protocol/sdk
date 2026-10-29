@@ -29,7 +29,31 @@ const LEGAL_BASIS = {
 // The TS formula must reproduce this byte for byte, which is what proves cross-language parity.
 const PHP_V2_DISCLOSURE_HASH = "0xa589592c89690e3cb2cb8ee4bcf2599fb0ba776372db0203d5463860ffa968bc";
 
+// A CID this verifier cannot recompute: a copy served under it is believed only when its hash matches.
 const CID = "bafkreiv2000000000000000000000000000000000000000000000000000001";
+
+/** The CIDv1 (raw, sha2-256, base32) of the bytes the stub gateway serves for `body`: under it, that body IS the pinned file. */
+function cidOf(body: unknown): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz234567";
+  const digest = createHash("sha256").update(JSON.stringify(body)).digest();
+  let out = "b";
+  let value = 0;
+  let bits = 0;
+  for (const byte of [0x01, 0x55, 0x12, 0x20, ...digest]) {
+    value = ((value << 8) | byte) & 0xffff;
+    bits += 8;
+    while (bits >= 5) {
+      out += alphabet[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  return bits > 0 ? out + alphabet[(value << (5 - bits)) & 31] : out;
+}
+
+/** The v2 offer naming the CID of `body`, so the copy served is the one the company pinned. */
+const offerPinning = (body: unknown) => offer((o) => {
+  (o["document"] as Record<string, unknown>)["ipfsCid"] = cidOf(body);
+});
 
 // The pinned IPFS body, as IpfsDocumentService::canonicalPayload writes it: the disclosure map, and no legalBasis.
 const IPFS_BODY = {
@@ -147,16 +171,26 @@ describe("disclosureCopy of a passkey bundle is checked against the SIGNED offer
     expect(result.notes.join("\n")).toContain("disclosureVersion 2");
   });
 
-  it("a v2 bundle whose IPFS disclosure was tampered FAILS", async () => {
+  it("a v2 bundle whose pinned IPFS disclosure differs from the signed one FAILS", async () => {
+    const tampered = structuredClone(IPFS_BODY);
+    tampered.disclosure.purpose.en = "Marketing, shared with partners.";
+    const result = await verifyWithCopy(bundleOf(offerPinning(tampered)), tampered);
+    expect(result.disclosureCopy).toBe("fail");
+    expect(result.disclosureGateway).toBe("https://ipfs.test");
+  });
+
+  it("a tampered body under a CID this verifier cannot recompute is never a pass, nor a fail: no gateway delivered the file", async () => {
     const tampered = structuredClone(IPFS_BODY);
     tampered.disclosure.purpose.en = "Marketing, shared with partners.";
     const result = await verifyWithCopy(bundleOf(offer()), tampered);
-    expect(result.disclosureCopy).toBe("fail");
+    expect(result.disclosureCopy).toBe("unavailable");
+    expect(result).not.toHaveProperty("disclosureGateway");
+    expect(result.notes.join("\n")).toContain("This is NOT a hash mismatch");
   });
 
   it("an IPFS body carrying a legalBasis that differs from the signed one FAILS", async () => {
     const body = { ...IPFS_BODY, legalBasis: { "0x01": { basis: "consent", justificationFr: "" } } };
-    const result = await verifyWithCopy(bundleOf(offer()), body);
+    const result = await verifyWithCopy(bundleOf(offerPinning(body)), body);
     expect(result.disclosureCopy).toBe("fail");
     expect(result.notes.join("\n")).toContain("differs from the signed one");
   });
@@ -200,9 +234,19 @@ describe("disclosureCopy of a passkey bundle is checked against the SIGNED offer
   });
 
   it("an IPFS body whose disclosure holds a number FAILS, and does not throw", async () => {
-    const result = await verifyWithCopy(bundleOf(offer()), { ...IPFS_BODY, disclosure: { ...DISCLOSURE, copies: 3 } });
+    const body = { ...IPFS_BODY, disclosure: { ...DISCLOSURE, copies: 3 } };
+    const result = await verifyWithCopy(bundleOf(offerPinning(body)), body);
     expect(result.disclosureCopy).toBe("fail");
     expect(result.notes.join("\n")).toContain("cannot be canonicalized");
+  });
+
+  it("an IPFS body nested 3000 deep under its own CID FAILS, and does not throw", async () => {
+    let deep: unknown = "x";
+    for (let i = 0; i < 3000; i++) deep = { d: deep };
+    const body = { ...IPFS_BODY, disclosure: deep };
+    const result = await verifyWithCopy(bundleOf(offerPinning(body)), body);
+    expect(result.disclosureCopy).toBe("fail");
+    expect(result.overall).toBe("failed");
   });
 });
 
