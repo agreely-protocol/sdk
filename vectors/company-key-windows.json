@@ -1,0 +1,573 @@
+{
+  "schemaVersion": 1,
+  "frozen": true,
+  "description": "The company key's window on its domain, judged at the instant the key signed (companyKeyOf(domainHash, sha256(raw Ed25519 key)) -> validFrom, anchoredAt, retiredAt, voidedAt), as the web verifier judges it. windows: record (null = unreadable) at G (null = no signing instant) under clock (anchoredAt: the consent anchor that holds the receipt's trusted root, issuerDatedOnly: no such anchor, the date is the issuer's own; both null/false = a chain instant, an epoch). expect.window is the window an authentic key was in force over. receiptClock: the clock a receipt's consent anchor gives. statusOf: the companyKeyRegistry check status of each verdict. LAG 259200 and SKEW 300 seconds. All integers travel as decimal strings.",
+  "windows": [
+    {
+      "name": "k1 in force inside its window",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "2000",
+        "voidedAt": "0"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "authentic",
+        "notYetEffective": false,
+        "window": {
+          "validFrom": "1000",
+          "retiredAt": "2000"
+        }
+      }
+    },
+    {
+      "name": "k1 at its retirement",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "2000",
+        "voidedAt": "0"
+      },
+      "G": "2000",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "key-not-authorised",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "k2 during the relay overlap",
+      "record": {
+        "validFrom": "1990",
+        "anchoredAt": "2000",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "1995",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "authentic",
+        "notYetEffective": false,
+        "window": {
+          "validFrom": "1990",
+          "retiredAt": "0"
+        }
+      }
+    },
+    {
+      "name": "k2 before its validFrom",
+      "record": {
+        "validFrom": "1990",
+        "anchoredAt": "2000",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "key-not-authorised",
+        "notYetEffective": true,
+        "window": null
+      }
+    },
+    {
+      "name": "no window on this domain",
+      "record": {
+        "validFrom": "0",
+        "anchoredAt": "0",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "pending",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "voided, before the window",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "0",
+        "voidedAt": "1200"
+      },
+      "G": "999",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "voided",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "voided, at validFrom",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "0",
+        "voidedAt": "1200"
+      },
+      "G": "1000",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "voided",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "voided, inside",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "0",
+        "voidedAt": "1200"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "voided",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "voided, long after",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "0",
+        "voidedAt": "1200"
+      },
+      "G": "5000",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "voided",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "a void after a retirement",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "1100",
+        "voidedAt": "1200"
+      },
+      "G": "1050",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "voided",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "recorded more than LAG after G",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "260300",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "1050",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "recorded-late",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "recorded within LAG of G",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "260300",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "1200",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "authentic",
+        "notYetEffective": false,
+        "window": {
+          "validFrom": "1000",
+          "retiredAt": "0"
+        }
+      }
+    },
+    {
+      "name": "an unreadable record",
+      "record": null,
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "unknown",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "no signing instant",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": null,
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "unknown",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "signed after the consent anchor",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "5000",
+      "clock": {
+        "anchoredAt": "4000",
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "signed-after-anchor",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "signed inside the skew of the consent anchor",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "4300",
+      "clock": {
+        "anchoredAt": "4000",
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "authentic",
+        "notYetEffective": false,
+        "window": {
+          "validFrom": "1000",
+          "retiredAt": "0"
+        }
+      }
+    },
+    {
+      "name": "no consent anchor, no bound",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "5000",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "authentic",
+        "notYetEffective": false,
+        "window": {
+          "validFrom": "1000",
+          "retiredAt": "0"
+        }
+      }
+    },
+    {
+      "name": "a retired key stays refused whatever the anchor",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "2000",
+        "voidedAt": "0"
+      },
+      "G": "5000",
+      "clock": {
+        "anchoredAt": "4000",
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "key-not-authorised",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "a retired key on the issuer's own date",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1000",
+        "retiredAt": "2000",
+        "voidedAt": "0"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": true
+      },
+      "expect": {
+        "verdict": "retired-issuer-dated",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "a retired key dated by a consent anchor",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1000",
+        "retiredAt": "2000",
+        "voidedAt": "0"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": "1600",
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "authentic",
+        "notYetEffective": false,
+        "window": {
+          "validFrom": "1000",
+          "retiredAt": "2000"
+        }
+      }
+    },
+    {
+      "name": "an open key on the issuer's own date",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1000",
+        "retiredAt": "0",
+        "voidedAt": "0"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": true
+      },
+      "expect": {
+        "verdict": "authentic",
+        "notYetEffective": false,
+        "window": {
+          "validFrom": "1000",
+          "retiredAt": "0"
+        }
+      }
+    },
+    {
+      "name": "a retired key at a chain instant",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1000",
+        "retiredAt": "2000",
+        "voidedAt": "0"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "authentic",
+        "notYetEffective": false,
+        "window": {
+          "validFrom": "1000",
+          "retiredAt": "2000"
+        }
+      }
+    },
+    {
+      "name": "a retired key dated after its retirement",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1000",
+        "retiredAt": "2000",
+        "voidedAt": "0"
+      },
+      "G": "2500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": true
+      },
+      "expect": {
+        "verdict": "key-not-authorised",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "a retired then voided key on the issuer's own date",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1000",
+        "retiredAt": "2000",
+        "voidedAt": "2500"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": true
+      },
+      "expect": {
+        "verdict": "voided",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "an open voided key dated by a consent anchor",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1000",
+        "retiredAt": "0",
+        "voidedAt": "2500"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": "1600",
+        "issuerDatedOnly": false
+      },
+      "expect": {
+        "verdict": "voided",
+        "notYetEffective": false,
+        "window": null
+      }
+    },
+    {
+      "name": "a retiredAt above 2^53 stays exact",
+      "record": {
+        "validFrom": "1000",
+        "anchoredAt": "1010",
+        "retiredAt": "18446744073709551615",
+        "voidedAt": "0"
+      },
+      "G": "1500",
+      "clock": {
+        "anchoredAt": null,
+        "issuerDatedOnly": true
+      },
+      "expect": {
+        "verdict": "retired-issuer-dated",
+        "notYetEffective": false,
+        "window": null
+      }
+    }
+  ],
+  "receiptClock": [
+    {
+      "name": "no consent anchor",
+      "consentAnchor": null,
+      "expect": {
+        "anchoredAt": null,
+        "issuerDatedOnly": true
+      }
+    },
+    {
+      "name": "an anchor not tied to the receipt",
+      "consentAnchor": {
+        "rootMatches": null,
+        "anchoredAt": "1600"
+      },
+      "expect": {
+        "anchoredAt": null,
+        "issuerDatedOnly": true
+      }
+    },
+    {
+      "name": "an anchor holding the receipt's trusted root",
+      "consentAnchor": {
+        "rootMatches": true,
+        "anchoredAt": "1600"
+      },
+      "expect": {
+        "anchoredAt": "1600",
+        "issuerDatedOnly": false
+      }
+    },
+    {
+      "name": "a matching root with no anchor time",
+      "consentAnchor": {
+        "rootMatches": true,
+        "anchoredAt": "0"
+      },
+      "expect": {
+        "anchoredAt": null,
+        "issuerDatedOnly": true
+      }
+    }
+  ],
+  "statusOf": {
+    "authentic": "pass",
+    "key-not-authorised": "fail",
+    "signed-after-anchor": "fail",
+    "voided": "fail",
+    "pending": "unavailable",
+    "recorded-late": "unavailable",
+    "retired-issuer-dated": "unavailable",
+    "unknown": "unavailable"
+  }
+}

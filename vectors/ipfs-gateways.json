@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "description": "The IPFS copy of a consent document, fetched from a list of gateways in order (each a prefix to which the CID is appended, or a template carrying {cid}). The default list is defaultGateways; ipfsGateways replaces it; ipfsGateway, a gateway the user names, is asked first, before the list. A gateway is trusted for nothing: its bytes count only once they re-encode to the CID (a CIDv0 is base58btc(0x12 0x20 sha256(the one dag-pb node whose UnixFS File data is the whole file)), and a body over 262144 bytes, an HTTP error, a network error or bytes that do not re-encode move to the next gateway. Bytes that re-encode are the document: the disclosure hash decides, pass or fail, and no further gateway is asked. The bundle is receipts/cidv1.bundle.json (resolver = receipts/did-documents.json, verifyDisclosure true, no rpcUrl); its document CID is `cid`, whose pinned bytes are `file`, exactly. An answer body is pinned (those bytes), html (an HTML page), other-json ({\"disclosure\":{}}) or oversize (262145 bytes of spaces); a URL with no answer is a network error. disclosureGateway is result.disclosureGateway (absent when no gateway delivered); tried lists the URLs fetched, in order.",
+  "defaultGateways": [
+    "https://gateway.lighthouse.storage/ipfs/"
+  ],
+  "measured": "2026-10-29, server-side from Montreal with curl, file bytes re-encoded to the CID: only gateway.lighthouse.storage served them. ipfs.io, dweb.link, w3s.link and nftstorage.link answered 429 (service-worker gateways only); gw3.io answered 200 with a parked-domain HTML page; trustless-gateway.link answered 526; 4everland.io, ipfs.filebase.io, gateway.pinata.cloud and hardbin.com timed out; cloudflare-ipfs.com, cf-ipfs.com, ipfs.runfission.com and ipfs.eth.aragon.network did not resolve.",
+  "cid": "QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+  "file": "ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+  "bundle": "receipts/cidv1.bundle.json",
+  "cases": [
+    {
+      "name": "the default gateway serves the pinned bytes",
+      "options": {},
+      "answers": {
+        "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "pinned"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "pass",
+        "disclosureGateway": "https://gateway.lighthouse.storage/ipfs/",
+        "tried": [
+          "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "the first gateway errors, the second serves the file",
+      "options": {
+        "ipfsGateways": [
+          "https://ipfs.example.org/ipfs/",
+          "https://gateway.lighthouse.storage/ipfs/"
+        ]
+      },
+      "answers": {
+        "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 502
+        },
+        "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "pinned"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "pass",
+        "disclosureGateway": "https://gateway.lighthouse.storage/ipfs/",
+        "tried": [
+          "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+          "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "the first gateway does not answer, the second serves the file",
+      "options": {
+        "ipfsGateways": [
+          "https://ipfs.example.org/ipfs/",
+          "https://gateway.lighthouse.storage/ipfs/"
+        ]
+      },
+      "answers": {
+        "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "network": "error"
+        },
+        "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "pinned"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "pass",
+        "disclosureGateway": "https://gateway.lighthouse.storage/ipfs/",
+        "tried": [
+          "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+          "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "the first gateway answers 200 with a page of its own: bytes that are not the CID's are not the document",
+      "options": {
+        "ipfsGateways": [
+          "https://ipfs.example.org/ipfs/",
+          "https://gateway.lighthouse.storage/ipfs/"
+        ]
+      },
+      "answers": {
+        "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "html"
+        },
+        "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "pinned"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "pass",
+        "disclosureGateway": "https://gateway.lighthouse.storage/ipfs/",
+        "tried": [
+          "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+          "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "the first gateway serves valid JSON that is not the CID's bytes: never a fail",
+      "options": {
+        "ipfsGateways": [
+          "https://ipfs.example.org/ipfs/",
+          "https://gateway.lighthouse.storage/ipfs/"
+        ]
+      },
+      "answers": {
+        "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "other-json"
+        },
+        "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "pinned"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "pass",
+        "disclosureGateway": "https://gateway.lighthouse.storage/ipfs/",
+        "tried": [
+          "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+          "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "the first gateway sends more than one block: the next is asked",
+      "options": {
+        "ipfsGateways": [
+          "https://ipfs.example.org/ipfs/",
+          "https://gateway.lighthouse.storage/ipfs/"
+        ]
+      },
+      "answers": {
+        "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "oversize"
+        },
+        "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "pinned"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "pass",
+        "disclosureGateway": "https://gateway.lighthouse.storage/ipfs/",
+        "tried": [
+          "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+          "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "a gateway named by the user is asked first, then the list",
+      "options": {
+        "ipfsGateway": "https://gw.example.net/ipfs/{cid}?download=false"
+      },
+      "answers": {
+        "https://gw.example.net/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs?download=false": {
+          "status": 200,
+          "body": "html"
+        },
+        "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "pinned"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "pass",
+        "disclosureGateway": "https://gateway.lighthouse.storage/ipfs/",
+        "tried": [
+          "https://gw.example.net/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs?download=false",
+          "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "a gateway named by the user that serves the file answers alone",
+      "options": {
+        "ipfsGateway": "https://ipfs.example.org/ipfs/"
+      },
+      "answers": {
+        "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 200,
+          "body": "pinned"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "pass",
+        "disclosureGateway": "https://ipfs.example.org/ipfs/",
+        "tried": [
+          "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "every gateway fails: unavailable, and the note names each one",
+      "options": {
+        "ipfsGateway": "https://ipfs.example.org/ipfs/"
+      },
+      "answers": {
+        "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "status": 429
+        },
+        "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs": {
+          "network": "error"
+        }
+      },
+      "expect": {
+        "disclosureCopy": "unavailable",
+        "tried": [
+          "https://ipfs.example.org/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs",
+          "https://gateway.lighthouse.storage/ipfs/QmR6KGNkVKxGakwLiAFt1ASQXd3H28fv9Y5HRhPsJqrghs"
+        ]
+      }
+    },
+    {
+      "name": "an empty list and no named gateway: unavailable, nothing fetched",
+      "options": {
+        "ipfsGateways": []
+      },
+      "answers": {},
+      "expect": {
+        "disclosureCopy": "unavailable",
+        "tried": []
+      }
+    }
+  ]
+}

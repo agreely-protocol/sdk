@@ -1,0 +1,943 @@
+{
+    "schemaVersion": 1,
+    "generator": "fingerprints from PHP (App\\Models\\Crypto\\CitizenKeyFingerprint); the truth tables written by hand from docs/citizen-key-fingerprint.md",
+    "frozen": true,
+    "description": "The citizen-key fingerprint anchored by AgreelyCitizenKeys, the salt as it travels in a bundle, the keyOf read and the verifier rule. Spec: docs/citizen-key-fingerprint.md. Reproduced by PHP (tests/Unit/Crypto/CitizenKeyFingerprintVectorsTest.php, fingerprint and saltParse) and JS (tests/js/verify-citizen-key-chain.test.js, every section). All integers travel as decimal strings.",
+    "constants": {
+        "domain": "agreely:citizen-key:v1",
+        "LAG": "259200",
+        "SKEW": "300",
+        "keyOfSignature": "keyOf(bytes32)",
+        "keyOfSelector": "0xdf78bce2"
+    },
+    "fingerprint": [
+        {
+            "name": "fixture-key",
+            "note": "the DID and COSE_Key of tests/fixtures/citizen-assertion.json",
+            "did": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+            "keyCose": "0xa5010203262001215820ea19ebeadb5484561ab93d508de2ddb29c9a08401a04075600b8317a81ab59a12258209d276dffc1a08229bd21e2a42fdb2b9adab5809d5f250870a774b9af39e84e7b",
+            "claim": {
+                "did": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+                "domain": "agreely:citizen-key:v1",
+                "keyThumbprint": "0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11"
+            },
+            "canonicalString": "{\"did\":\"did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08\",\"domain\":\"agreely:citizen-key:v1\",\"keyThumbprint\":\"0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11\"}",
+            "keyThumbprint": "0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11",
+            "salt": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "fingerprint": "0x40603692e4b135a4c4793d0467cfef86009fd96861efc70ec7cddec85de7fa45"
+        },
+        {
+            "name": "second-did-second-key",
+            "note": "another DID with another key",
+            "did": "did:agreely:citizen:01JB8YQ3N6T9W2X4Z7C5D0E1FG",
+            "keyCose": "0xa501020326200121582011111111111111111111111111111111111111111111111111111111111111112258202222222222222222222222222222222222222222222222222222222222222222",
+            "claim": {
+                "did": "did:agreely:citizen:01JB8YQ3N6T9W2X4Z7C5D0E1FG",
+                "domain": "agreely:citizen-key:v1",
+                "keyThumbprint": "0xd4ec4bf11dc113d630e1ca8529c7c1f93224cefa07190d784d46370f62ba467a"
+            },
+            "canonicalString": "{\"did\":\"did:agreely:citizen:01JB8YQ3N6T9W2X4Z7C5D0E1FG\",\"domain\":\"agreely:citizen-key:v1\",\"keyThumbprint\":\"0xd4ec4bf11dc113d630e1ca8529c7c1f93224cefa07190d784d46370f62ba467a\"}",
+            "keyThumbprint": "0xd4ec4bf11dc113d630e1ca8529c7c1f93224cefa07190d784d46370f62ba467a",
+            "salt": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "fingerprint": "0x4e1b64e4b270686cdc610a284bb1de739d800cd52c1a22f48eb6046003ac8e7e"
+        },
+        {
+            "name": "fixture-key-zero-salt",
+            "note": "the fixture key under an all-zero salt",
+            "did": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+            "keyCose": "0xa5010203262001215820ea19ebeadb5484561ab93d508de2ddb29c9a08401a04075600b8317a81ab59a12258209d276dffc1a08229bd21e2a42fdb2b9adab5809d5f250870a774b9af39e84e7b",
+            "claim": {
+                "did": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+                "domain": "agreely:citizen-key:v1",
+                "keyThumbprint": "0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11"
+            },
+            "canonicalString": "{\"did\":\"did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08\",\"domain\":\"agreely:citizen-key:v1\",\"keyThumbprint\":\"0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11\"}",
+            "keyThumbprint": "0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11",
+            "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "fingerprint": "0xf31c21d11bffa99349dcbdcee6993658cbb96b34f3127f6c4d6fcd89e3a42c8e"
+        },
+        {
+            "name": "fixture-key-salt-one-byte-off",
+            "note": "the fixture key, the salt of fixture-key with its last byte changed",
+            "did": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+            "keyCose": "0xa5010203262001215820ea19ebeadb5484561ab93d508de2ddb29c9a08401a04075600b8317a81ab59a12258209d276dffc1a08229bd21e2a42fdb2b9adab5809d5f250870a774b9af39e84e7b",
+            "claim": {
+                "did": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+                "domain": "agreely:citizen-key:v1",
+                "keyThumbprint": "0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11"
+            },
+            "canonicalString": "{\"did\":\"did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08\",\"domain\":\"agreely:citizen-key:v1\",\"keyThumbprint\":\"0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11\"}",
+            "keyThumbprint": "0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11",
+            "salt": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e9f",
+            "fingerprint": "0x3819b0b1d2c09a49028595b9a096fc17a7979cc8039b845198e3905dc718b7b1"
+        },
+        {
+            "name": "fixture-key-under-second-did",
+            "note": "the same key under another DID: another fingerprint",
+            "did": "did:agreely:citizen:01JB8YQ3N6T9W2X4Z7C5D0E1FG",
+            "keyCose": "0xa5010203262001215820ea19ebeadb5484561ab93d508de2ddb29c9a08401a04075600b8317a81ab59a12258209d276dffc1a08229bd21e2a42fdb2b9adab5809d5f250870a774b9af39e84e7b",
+            "claim": {
+                "did": "did:agreely:citizen:01JB8YQ3N6T9W2X4Z7C5D0E1FG",
+                "domain": "agreely:citizen-key:v1",
+                "keyThumbprint": "0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11"
+            },
+            "canonicalString": "{\"did\":\"did:agreely:citizen:01JB8YQ3N6T9W2X4Z7C5D0E1FG\",\"domain\":\"agreely:citizen-key:v1\",\"keyThumbprint\":\"0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11\"}",
+            "keyThumbprint": "0x70ad1eeb98870eb27651568288fd4daaae6ab9d79af6f87532cd19db19da5f11",
+            "salt": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "fingerprint": "0x3375a78c73f3e6ecb9e329e340b302e21007c0a99b9d38d341c11d19fe4ded63"
+        },
+        {
+            "name": "fixture-key-reencoded",
+            "note": "the fixture point re-encoded (map entries reordered): another thumbprint, another fingerprint",
+            "did": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+            "keyCose": "0xa5032601022001215820ea19ebeadb5484561ab93d508de2ddb29c9a08401a04075600b8317a81ab59a12258209d276dffc1a08229bd21e2a42fdb2b9adab5809d5f250870a774b9af39e84e7b",
+            "claim": {
+                "did": "did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08",
+                "domain": "agreely:citizen-key:v1",
+                "keyThumbprint": "0x4f12043175a78952d69e1d5cda1a4723f1e09ac211039e85233d49b46097024f"
+            },
+            "canonicalString": "{\"did\":\"did:agreely:citizen:BXZMTST2EGHYNQ62Q8AJWH8Q08\",\"domain\":\"agreely:citizen-key:v1\",\"keyThumbprint\":\"0x4f12043175a78952d69e1d5cda1a4723f1e09ac211039e85233d49b46097024f\"}",
+            "keyThumbprint": "0x4f12043175a78952d69e1d5cda1a4723f1e09ac211039e85233d49b46097024f",
+            "salt": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "fingerprint": "0xe428ed80d138deccd8572072e829e75b5253c145966e38866219b34f2808bbd8"
+        }
+    ],
+    "saltParse": [
+        {
+            "name": "valid",
+            "field": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "expect": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+        },
+        {
+            "name": "all-zero",
+            "field": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "expect": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+            "name": "uppercase-hex",
+            "field": "0x000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F",
+            "expect": null
+        },
+        {
+            "name": "uppercase-prefix",
+            "field": "0X000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "expect": null
+        },
+        {
+            "name": "no-prefix",
+            "field": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "expect": null
+        },
+        {
+            "name": "31-bytes",
+            "field": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e",
+            "expect": null
+        },
+        {
+            "name": "33-bytes",
+            "field": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1fff",
+            "expect": null
+        },
+        {
+            "name": "non-hex",
+            "field": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1g",
+            "expect": null
+        },
+        {
+            "name": "trailing-newline",
+            "field": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\n",
+            "expect": null
+        },
+        {
+            "name": "empty",
+            "field": "",
+            "expect": null
+        },
+        {
+            "name": "null",
+            "field": null,
+            "expect": null
+        }
+    ],
+    "keyOfCalldata": [
+        {
+            "name": "fixture-key",
+            "fingerprint": "0x40603692e4b135a4c4793d0467cfef86009fd96861efc70ec7cddec85de7fa45",
+            "calldata": "0xdf78bce240603692e4b135a4c4793d0467cfef86009fd96861efc70ec7cddec85de7fa45"
+        }
+    ],
+    "keyOfDecode": [
+        {
+            "name": "record",
+            "data": "0x000000000000000000000000000000000000000000000000000000006abda280000000000000000000000000000000000000000000000000000000006abdb090000000000000000000000000000000000000000000000000000000006abf02100000000000000000000000000000000000000000000000000000000000000000",
+            "expect": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "1790902800",
+                "voidedAt": "0"
+            }
+        },
+        {
+            "name": "all-zero",
+            "data": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "expect": {
+                "validFrom": "0",
+                "anchoredAt": "0",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            }
+        },
+        {
+            "name": "uint64-max",
+            "data": "0x000000000000000000000000000000000000000000000000ffffffffffffffff000000000000000000000000000000000000000000000000000000006abdb09000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "expect": {
+                "validFrom": "18446744073709551615",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            }
+        },
+        {
+            "name": "uppercase-digits",
+            "data": "0x000000000000000000000000000000000000000000000000000000006ABDA280000000000000000000000000000000000000000000000000000000006ABDB09000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "expect": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            }
+        },
+        {
+            "name": "96-bytes",
+            "data": "0x000000000000000000000000000000000000000000000000000000006abda280000000000000000000000000000000000000000000000000000000006abdb0900000000000000000000000000000000000000000000000000000000000000000",
+            "expect": null
+        },
+        {
+            "name": "160-bytes",
+            "data": "0x000000000000000000000000000000000000000000000000000000006abda280000000000000000000000000000000000000000000000000000000006abdb090000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "expect": null
+        },
+        {
+            "name": "dirty-high-byte",
+            "data": "0x010000000000000000000000000000000000000000000000000000006abda280000000000000000000000000000000000000000000000000000000006abdb09000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "expect": null
+        },
+        {
+            "name": "dirty-byte-24",
+            "data": "0x000000000000000000000000000000000000000000000000000000006abda280000000000000000000000000000000000000000000000000000000006abdb09000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000",
+            "expect": null
+        },
+        {
+            "name": "empty-answer",
+            "data": "0x",
+            "expect": null
+        },
+        {
+            "name": "no-prefix",
+            "data": "000000000000000000000000000000000000000000000000000000006abda280000000000000000000000000000000000000000000000000000000006abdb09000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "expect": null
+        }
+    ],
+    "grantedAtSeconds": [
+        {
+            "name": "whole-second",
+            "grantedAt": "2026-10-01T00:00:00Z",
+            "G": "1790812800"
+        },
+        {
+            "name": "fractional-floors",
+            "grantedAt": "2026-10-01T00:00:00.999999Z",
+            "G": "1790812800"
+        },
+        {
+            "name": "offset",
+            "grantedAt": "2026-09-30T20:00:00-04:00",
+            "G": "1790812800"
+        },
+        {
+            "name": "no-offset",
+            "grantedAt": "2026-10-01T00:00:00",
+            "G": null
+        },
+        {
+            "name": "space-separator",
+            "grantedAt": "2026-10-01 00:00:00Z",
+            "G": null
+        },
+        {
+            "name": "impossible-date",
+            "grantedAt": "2026-02-30T00:00:00Z",
+            "G": null
+        },
+        {
+            "name": "not-a-string",
+            "grantedAt": null,
+            "G": null
+        }
+    ],
+    "chainState": [
+        {
+            "name": "no-salt",
+            "saltAbsent": true,
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "notLinked"
+        },
+        {
+            "name": "no-salt-beats-rpc-error",
+            "saltAbsent": true,
+            "record": null,
+            "rpcError": true,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "notLinked"
+        },
+        {
+            "name": "salt-uppercase",
+            "saltField": "0x000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "unreadable"
+        },
+        {
+            "name": "salt-null",
+            "saltField": null,
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "unreadable"
+        },
+        {
+            "name": "salt-unreadable-beats-rpc-error",
+            "saltField": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": null,
+            "rpcError": true,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "unreadable"
+        },
+        {
+            "name": "rpc-error",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": null,
+            "rpcError": true,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "unreachable"
+        },
+        {
+            "name": "record-undecodable",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": null,
+            "rpcError": false,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "unreadable"
+        },
+        {
+            "name": "granted-at-unparseable",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01 00:01:00Z",
+            "G": null,
+            "expect": "unreadable"
+        },
+        {
+            "name": "not-anchored",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "0",
+                "anchoredAt": "0",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "pending"
+        },
+        {
+            "name": "voided",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "1790816500"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01T00:01:00Z",
+            "G": "1790812860",
+            "expect": "voided"
+        },
+        {
+            "name": "voided-beats-not-in-force",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "1790816410",
+                "voidedAt": "1790816500"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01T01:00:20Z",
+            "G": "1790816420",
+            "expect": "voided"
+        },
+        {
+            "name": "one-second-before-valid-from",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-09-30T23:59:59Z",
+            "G": "1790812799",
+            "expect": "notInForce"
+        },
+        {
+            "name": "at-valid-from",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01T00:00:00Z",
+            "G": "1790812800",
+            "expect": "inForce"
+        },
+        {
+            "name": "fractional-at-valid-from",
+            "note": "G is floored: the .999 never rounds up",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-01T00:00:00.999Z",
+            "G": "1790812800",
+            "expect": "inForce"
+        },
+        {
+            "name": "fractional-one-second-before-valid-from",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-09-30T23:59:59.999Z",
+            "G": "1790812799",
+            "expect": "notInForce"
+        },
+        {
+            "name": "offset-at-valid-from",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-09-30T20:00:00-04:00",
+            "G": "1790812800",
+            "expect": "inForce"
+        },
+        {
+            "name": "one-second-before-retired",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "1790902800",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-02T00:59:59Z",
+            "G": "1790902799",
+            "expect": "inForce"
+        },
+        {
+            "name": "at-retired",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "1790902800",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-02T01:00:00Z",
+            "G": "1790902800",
+            "expect": "notInForce"
+        },
+        {
+            "name": "after-retired",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "1790902800",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-03T01:00:00Z",
+            "G": "1790989200",
+            "expect": "notInForce"
+        },
+        {
+            "name": "one-second-before-lag",
+            "note": "validFrom declared five days before the anchor block",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790384400",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-09-28T00:59:59Z",
+            "G": "1790557199",
+            "expect": "recordedLate"
+        },
+        {
+            "name": "at-lag",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790384400",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-09-28T01:00:00Z",
+            "G": "1790557200",
+            "expect": "inForce"
+        },
+        {
+            "name": "one-second-after-lag",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790384400",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-09-28T01:00:01Z",
+            "G": "1790557201",
+            "expect": "inForce"
+        },
+        {
+            "name": "not-in-force-beats-recorded-late",
+            "note": "before validFrom AND more than LAG before the anchor: rule 5 wins",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790384400",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-09-26T00:59:59Z",
+            "G": "1790384399",
+            "expect": "notInForce"
+        },
+        {
+            "name": "in-force",
+            "saltField": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "record": {
+                "validFrom": "1790812800",
+                "anchoredAt": "1790816400",
+                "retiredAt": "0",
+                "voidedAt": "0"
+            },
+            "rpcError": false,
+            "grantedAt": "2026-10-31T01:00:00Z",
+            "G": "1793408400",
+            "expect": "inForce"
+        }
+    ],
+    "halfReading": [
+        {
+            "name": "chain-not-in-force",
+            "chainState": "notInForce",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "notInForce"
+            }
+        },
+        {
+            "name": "chain-not-in-force-beats-did-refused",
+            "chainState": "notInForce",
+            "didStanding": "refused",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "notInForce"
+            }
+        },
+        {
+            "name": "conflict",
+            "chainState": "inForce",
+            "didStanding": "refused",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "conflict"
+            }
+        },
+        {
+            "name": "conflict-without-consent-anchor",
+            "chainState": "inForce",
+            "didStanding": "refused",
+            "consentAnchor": null,
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "conflict"
+            }
+        },
+        {
+            "name": "did-refused-chain-pending",
+            "chainState": "pending",
+            "didStanding": "refused",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "didRefused"
+            }
+        },
+        {
+            "name": "did-refused-not-linked",
+            "chainState": "notLinked",
+            "didStanding": "refused",
+            "consentAnchor": null,
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "didRefused"
+            }
+        },
+        {
+            "name": "did-refused-chain-unreachable",
+            "chainState": "unreachable",
+            "didStanding": "refused",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "didRefused"
+            }
+        },
+        {
+            "name": "granted-one-second-past-skew",
+            "chainState": "inForce",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790816699"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "grantedAfterConsentAnchor"
+            }
+        },
+        {
+            "name": "granted-at-skew",
+            "chainState": "inForce",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790816700"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "green",
+                "reason": "chainConfirmed"
+            }
+        },
+        {
+            "name": "granted-past-skew-not-linked",
+            "note": "the consent anchor is a refusal on its own, whatever the chain says about the key",
+            "chainState": "notLinked",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790816699"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "red",
+                "reason": "grantedAfterConsentAnchor"
+            }
+        },
+        {
+            "name": "root-mismatch-ignores-its-time",
+            "chainState": "inForce",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": false,
+                "anchoredAt": "1790807000"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "consentNotAnchored"
+            }
+        },
+        {
+            "name": "green-did-confirmed",
+            "chainState": "inForce",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "green",
+                "reason": "chainConfirmed"
+            }
+        },
+        {
+            "name": "green-did-unknown-identity",
+            "chainState": "inForce",
+            "didStanding": "unknownIdentity",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "green",
+                "reason": "chainConfirmed"
+            }
+        },
+        {
+            "name": "green-did-unreachable",
+            "chainState": "inForce",
+            "didStanding": "unreachable",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "green",
+                "reason": "chainConfirmed"
+            }
+        },
+        {
+            "name": "in-force-did-offline",
+            "chainState": "inForce",
+            "didStanding": "offline",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "didNotConsulted"
+            }
+        },
+        {
+            "name": "in-force-did-not-configured",
+            "chainState": "inForce",
+            "didStanding": "notConfigured",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "didNotConsulted"
+            }
+        },
+        {
+            "name": "in-force-did-not-agreely-identity",
+            "chainState": "inForce",
+            "didStanding": "notAgreelyIdentity",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "didNotConsulted"
+            }
+        },
+        {
+            "name": "in-force-did-not-consulted",
+            "chainState": "inForce",
+            "didStanding": "notConsulted",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "didNotConsulted"
+            }
+        },
+        {
+            "name": "in-force-consent-not-anchored",
+            "chainState": "inForce",
+            "didStanding": "confirmed",
+            "consentAnchor": null,
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "consentNotAnchored"
+            }
+        },
+        {
+            "name": "not-linked",
+            "chainState": "notLinked",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "neutral",
+                "reason": "notLinked"
+            }
+        },
+        {
+            "name": "pending",
+            "chainState": "pending",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "neutral",
+                "reason": "pending"
+            }
+        },
+        {
+            "name": "chain-unreachable",
+            "chainState": "unreachable",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "neutral",
+                "reason": "unreachable"
+            }
+        },
+        {
+            "name": "recorded-late",
+            "chainState": "recordedLate",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "recordedLate"
+            }
+        },
+        {
+            "name": "voided",
+            "chainState": "voided",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "voided"
+            }
+        },
+        {
+            "name": "unreadable",
+            "chainState": "unreadable",
+            "didStanding": "confirmed",
+            "consentAnchor": {
+                "rootMatches": true,
+                "anchoredAt": "1790817120"
+            },
+            "G": "1790817000",
+            "expect": {
+                "colour": "amber",
+                "reason": "unreadable"
+            }
+        }
+    ]
+}

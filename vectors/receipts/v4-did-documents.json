@@ -1,0 +1,26 @@
+{
+  "did:web:verify.agreely.ca:c:demo-co": {
+    "@context": [
+      "https://www.w3.org/ns/did/v1",
+      "https://w3id.org/security/data-integrity/v2"
+    ],
+    "id": "did:web:verify.agreely.ca:c:demo-co",
+    "alsoKnownAs": [
+      "did:web:demo-co.example"
+    ],
+    "verificationMethod": [
+      {
+        "id": "did:web:verify.agreely.ca:c:demo-co#kms-1",
+        "type": "Multikey",
+        "controller": "did:web:verify.agreely.ca:c:demo-co",
+        "publicKeyMultibase": "z6Mkm91wmcNTuKS85bCFvkJuSPRNTBNj9ndxbknTQRVKm7Lq"
+      }
+    ],
+    "assertionMethod": [
+      "did:web:verify.agreely.ca:c:demo-co#kms-1"
+    ],
+    "authentication": [
+      "did:web:verify.agreely.ca:c:demo-co#kms-1"
+    ]
+  }
+}

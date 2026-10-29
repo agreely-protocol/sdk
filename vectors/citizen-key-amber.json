@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 1,
+  "frozen": true,
+  "description": "The #679 rule both SDKs share with the web verifier, frozen from the web verifier's own table: a salt absent reads amber only when the verifier's own configured registry serves keyOf (keyOfRegistry), a key never recorded reads pending until now reaches G + LAG and notRecorded from then on, an unreachable registry stays neutral, and a grantedAt more than LAG before the EARLIEST matching consent anchor reads consentRecordedLate. chain is the input of the chain state (saltAbsent or saltField, the decoded keyOf record or null, rpcError, now in unix seconds or null); half is the input of the person's half reading with chainState taken from the first step. All integers travel as decimal strings. Run with citizen-key-fingerprint.json's constants (LAG 259200, SKEW 300).",
+  "G": "1790812860",
+  "cases": [
+    {
+      "name": "salt absent, keyOf registry consulted",
+      "chain": {
+        "saltAbsent": true,
+        "record": {
+          "validFrom": "1790812800",
+          "anchoredAt": "1790816400",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": null
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1790812920",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "notLinked",
+        "colour": "amber",
+        "reason": "notLinked"
+      }
+    },
+    {
+      "name": "salt absent, no keyOf registry consulted",
+      "chain": {
+        "saltAbsent": true,
+        "record": {
+          "validFrom": "1790812800",
+          "anchoredAt": "1790816400",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": null
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": false,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1790812920",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "notLinked",
+        "colour": "neutral",
+        "reason": "notLinked"
+      }
+    },
+    {
+      "name": "salt malformed",
+      "chain": {
+        "saltField": "0X5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "1790812800",
+          "anchoredAt": "1790816400",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": null
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1790812920",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "unreadable",
+        "colour": "amber",
+        "reason": "unreadable"
+      }
+    },
+    {
+      "name": "unknown fp, now one second before G + LAG",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "0",
+          "anchoredAt": "0",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": "1791072059"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1790812920",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "pending",
+        "colour": "neutral",
+        "reason": "pending"
+      }
+    },
+    {
+      "name": "unknown fp, now at G + LAG",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "0",
+          "anchoredAt": "0",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": "1791072060"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1790812920",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "notRecorded",
+        "colour": "amber",
+        "reason": "notRecorded"
+      }
+    },
+    {
+      "name": "unknown fp, now long after G + LAG",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "0",
+          "anchoredAt": "0",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": "1893456000"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1790812920",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "notRecorded",
+        "colour": "amber",
+        "reason": "notRecorded"
+      }
+    },
+    {
+      "name": "unreachable, now long after G + LAG",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": null,
+        "rpcError": true,
+        "now": "1893456000"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1790812920",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "unreachable",
+        "colour": "neutral",
+        "reason": "unreachable"
+      }
+    },
+    {
+      "name": "G more than LAG before the earliest consent anchor",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "1790812800",
+          "anchoredAt": "1790816400",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": "1893456000"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1791112860",
+          "earliestAnchoredAt": "1791072061"
+        }
+      },
+      "expect": {
+        "chainState": "inForce",
+        "colour": "amber",
+        "reason": "consentRecordedLate"
+      }
+    },
+    {
+      "name": "G exactly LAG before the earliest consent anchor",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "1790812800",
+          "anchoredAt": "1790816400",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": "1893456000"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1791112860",
+          "earliestAnchoredAt": "1791072060"
+        }
+      },
+      "expect": {
+        "chainState": "inForce",
+        "colour": "green",
+        "reason": "chainConfirmed"
+      }
+    },
+    {
+      "name": "the latest anchor is late but the earliest is not",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "1790812800",
+          "anchoredAt": "1790816400",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": "1893456000"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1791712860",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "inForce",
+        "colour": "green",
+        "reason": "chainConfirmed"
+      }
+    },
+    {
+      "name": "consent recorded late under a pending key",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "0",
+          "anchoredAt": "0",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": "1790812920"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1791072061",
+          "earliestAnchoredAt": "1791072061"
+        }
+      },
+      "expect": {
+        "chainState": "pending",
+        "colour": "amber",
+        "reason": "consentRecordedLate"
+      }
+    },
+    {
+      "name": "a genuine anchored key, unchanged",
+      "chain": {
+        "saltField": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+        "record": {
+          "validFrom": "1790812800",
+          "anchoredAt": "1790816400",
+          "retiredAt": "0",
+          "voidedAt": "0"
+        },
+        "rpcError": false,
+        "now": "1893456000"
+      },
+      "half": {
+        "didStanding": "confirmed",
+        "keyOfRegistry": true,
+        "consentAnchor": {
+          "rootMatches": true,
+          "anchoredAt": "1790812920",
+          "earliestAnchoredAt": "1790812920"
+        }
+      },
+      "expect": {
+        "chainState": "inForce",
+        "colour": "green",
+        "reason": "chainConfirmed"
+      }
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "version": "1",
+  "receipt": {
+    "receiptVersion": "4",
+    "@context": [
+      "https://www.w3.org/ns/credentials/v2",
+      "https://agreely.ca/credentials/consent/v1"
+    ],
+    "type": [
+      "VerifiableCredential",
+      "ConsentReceipt",
+      "CompanyAttestedConsentReceipt"
+    ],
+    "id": "urn:agreely:receipt:66666666-7777-4888-8999-aaaaaaaaaaaa",
+    "issuer": "did:web:verify.agreely.ca:c:demo-co",
+    "assuranceLevel": "company_attested",
+    "validFrom": "2026-06-01",
+    "validUntil": "2031-06-01T15:00:00Z",
+    "credentialSubject": {
+      "consent": {
+        "action": "grant",
+        "items": [
+          {
+            "itemId": "0x01",
+            "category": "Email address",
+            "purpose": "Product updates"
+          },
+          {
+            "itemId": "0x02",
+            "category": "Phone number",
+            "purpose": "Account security"
+          }
+        ],
+        "documentVersion": "docver-1",
+        "document": {
+          "code": "consent-terms",
+          "name": "Conditions de consentement",
+          "version": "1.0",
+          "effectiveDate": "2026-01-01"
+        },
+        "effectiveDate": "2026-06-01",
+        "grantedAt": "2026-06-01",
+        "recordedAt": "2026-06-02T09:00:00Z",
+        "issuerDeclaration": {
+          "items": [
+            {
+              "itemId": "0x01",
+              "consentedBy": "self"
+            }
+          ]
+        },
+        "merkleRoot": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e",
+        "consentRefs": [
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+        ]
+      }
+    },
+    "evidence": {
+      "type": "HandSignedPaperConsent",
+      "pdfHash": "0x97363fbdbf957f8ce6dd644e130b3d8d63d90e7b3fb3ae1f2ba51649b0d30d9a",
+      "pdfHeldBy": "company",
+      "documentVersion": "docver-1"
+    },
+    "proof": [
+      {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-06-02T09:00:00Z",
+        "verificationMethod": "did:web:verify.agreely.ca:c:demo-co#kms-1",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5y2j83aBDyJYSHrztbgyWTtPn89eUzC77sq3SoXhHJsDwbKh12v8vdXj582hnSj4ijKCZAGtyRyQgchjGm5RQf7x"
+      }
+    ]
+  },
+  "merkleRoot": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e",
+  "consentRef": "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+  "consentRefs": [
+    "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+  ],
+  "didDocuments": {
+    "issuer": {
+      "@context": [
+        "https://www.w3.org/ns/did/v1",
+        "https://w3id.org/security/data-integrity/v2"
+      ],
+      "id": "did:web:verify.agreely.ca:c:demo-co",
+      "alsoKnownAs": [
+        "did:web:demo-co.example"
+      ],
+      "verificationMethod": [
+        {
+          "id": "did:web:verify.agreely.ca:c:demo-co#kms-1",
+          "type": "Multikey",
+          "controller": "did:web:verify.agreely.ca:c:demo-co",
+          "publicKeyMultibase": "z6Mkm91wmcNTuKS85bCFvkJuSPRNTBNj9ndxbknTQRVKm7Lq"
+        }
+      ],
+      "assertionMethod": [
+        "did:web:verify.agreely.ca:c:demo-co#kms-1"
+      ],
+      "authentication": [
+        "did:web:verify.agreely.ca:c:demo-co#kms-1"
+      ]
+    }
+  }
+}
