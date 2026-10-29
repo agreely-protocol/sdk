@@ -36,7 +36,7 @@ if (await agreely.check("cust_8812", "Phone number", "Billing")) {
 ```ts
 const d = await agreely.checkDetailed("cust_8812", "Phone number", "Billing");
 // { decision: "allow" | "deny",
-//   status: Status,            // the nine values below
+//   status: Status,            // the eleven values below
 //   consentRef?: "0x…",        // absent for "none" and for "necessity"
 //   assurance?: "citizen_signed" | "company_attested" | "company_documented",
 //   tier?: "full" | "manual" | "verbal",  // the same proof, present exactly when assurance is
@@ -57,7 +57,7 @@ its `validUntil`, a withdrawal can land at any moment.
 
 ### The status vocabulary
 
-Two statuses allow, eight deny:
+Two statuses allow, nine deny:
 
 | status | decision | what it means |
 | --- | --- | --- |
@@ -67,6 +67,7 @@ Two statuses allow, eight deny:
 | `revoked` | deny | the consent was withdrawn (art. 14) |
 | `expired` | deny | the consent lifespan elapsed (art. 14 al. 3) |
 | `relationship_ended` | deny | the company attested the purposes are accomplished (art. 23). A relationship-level stop: the per-cell consent stays truthfully active, it was never withdrawn. |
+| `purpose_ended` | deny | the company declared it no longer pursues this purpose (a cell a later consent document removed), and this consent was given at or before that declaration; a consent given after it answers on its own state. Carries `consentRef`, `assurance`, `tier` and `validUntil`: the consent was never withdrawn and is not reported as withdrawn. |
 | `requires_depersonalization` | deny | the cell declares a ground the act carries only for depersonalized information (A-2.1 art. 65.1 al. 2 (4°)), which cannot be met for a named customer. Not "no consent": do not answer it by collecting one. |
 | `basis_not_in_regime` | deny | the cell declares a ground the tenant's act does not carry at all (usually left over from a sector change). The tenant re-declares the cell. |
 | `guardian_consent_missing` | deny | the recorded consent concerns a minor under 14 and does not carry the consent of the person having parental authority or of the tutor, so it is without effect. Carries `consentRef`, `assurance`, `tier` and `validUntil`: the record stays on file as recorded. A lapsed one answers `expired`, a withdrawn one `revoked`. |
