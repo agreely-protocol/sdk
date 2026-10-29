@@ -227,6 +227,7 @@ describe("the documented status vocabulary and the `basis` field survive decode"
       "relationship_ended",
       "requires_depersonalization",
       "basis_not_in_regime",
+      "guardian_consent_missing",
     ];
     const bases: Basis[] = [
       "contract",
@@ -244,7 +245,7 @@ describe("the documented status vocabulary and the `basis` field survive decode"
     ];
     const assurances: Assurance[] = ["citizen_signed", "company_attested", "company_documented"];
     const tiers: Tier[] = ["full", "manual", "verbal"];
-    expect(statuses).toHaveLength(9);
+    expect(statuses).toHaveLength(10);
     expect(bases).toHaveLength(12);
     expect(assurances).toHaveLength(3);
     expect(tiers).toHaveLength(3);

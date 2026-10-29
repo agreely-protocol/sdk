@@ -57,7 +57,7 @@ its `validUntil`, a withdrawal can land at any moment.
 
 ### The status vocabulary
 
-Two statuses allow, seven deny:
+Two statuses allow, eight deny:
 
 | status | decision | what it means |
 | --- | --- | --- |
@@ -69,6 +69,7 @@ Two statuses allow, seven deny:
 | `relationship_ended` | deny | the company attested the purposes are accomplished (art. 23). A relationship-level stop: the per-cell consent stays truthfully active, it was never withdrawn. |
 | `requires_depersonalization` | deny | the cell declares a ground the act carries only for depersonalized information (A-2.1 art. 65.1 al. 2 (4°)), which cannot be met for a named customer. Not "no consent": do not answer it by collecting one. |
 | `basis_not_in_regime` | deny | the cell declares a ground the tenant's act does not carry at all (usually left over from a sector change). The tenant re-declares the cell. |
+| `guardian_consent_missing` | deny | the recorded consent concerns a minor under 14 and does not carry the consent of the person having parental authority or of the tutor, so it is without effect. Carries `consentRef`, `assurance`, `tier` and `validUntil`: the record stays on file as recorded. A lapsed one answers `expired`, a withdrawn one `revoked`. |
 | `erased` | deny | listed by `openapi.yaml`, **not currently emitted**. Erasure crypto-shreds the record, so an erased cell reads back as `none`. |
 
 `sensitive_requires_consent` is **gone** (removed in 0.4.0; the API stopped

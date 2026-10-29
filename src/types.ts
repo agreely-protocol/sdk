@@ -80,7 +80,7 @@ export type Assurance = "citizen_signed" | "company_attested" | "company_documen
 export type Tier = "full" | "manual" | "verbal";
 
 /**
- * The resolved status of an enforcement cell: the NINE-value vocabulary of
+ * The resolved status of an enforcement cell: the TEN-value vocabulary of
  * openapi.yaml (CheckDecision.status / BatchDecision.status).
  *
  * ALLOW:
@@ -117,6 +117,12 @@ export type Tier = "full" | "manual" | "verbal";
  *   "basis_not_in_regime" -> the cell declares a ground the tenant's act does not carry
  *     at all (typically left in the other sector's vocabulary after a sector change).
  *     The fix is a catalog re-declaration by the tenant.
+ *   "guardian_consent_missing" -> the recorded consent concerns a minor under 14 and
+ *     does not carry the consent of the person having parental authority or of the
+ *     tutor, so it is without effect. The record exists and stays on file as recorded:
+ *     consentRef, assurance, tier and validUntil are present. A lapsed one answers
+ *     "expired" and a withdrawn one "revoked" instead. A minor of 14 and over is never
+ *     refused on this ground.
  *
  * REMOVED in 0.4.0: "sensitive_requires_consent". The API stopped emitting it on
  * 2026-09-28; a sensitive cell now answers by its declared basis (see "necessity").
@@ -134,7 +140,8 @@ export type Status =
   | "erased"
   | "relationship_ended"
   | "requires_depersonalization"
-  | "basis_not_in_regime";
+  | "basis_not_in_regime"
+  | "guardian_consent_missing";
 
 /**
  * The DECLARED non-consent ground behind a `status: "necessity"` allow. Present
