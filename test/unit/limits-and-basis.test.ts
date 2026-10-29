@@ -215,7 +215,9 @@ describe("the documented status vocabulary and the `basis` field survive decode"
 
   // A compile-time assertion, not a runtime one: every status openapi.yaml declares must
   // be assignable to Status, and every basis to Basis. If either union drifts from the
-  // spec, `npm run typecheck` fails here.
+  // spec, `npm run typecheck` fails here. The status list is the enum of /v1/check in
+  // openapi.yaml 1.3.0 (CheckDecision.status), plus "erased", which the spec describes but
+  // never sends.
   it("types every status and basis openapi.yaml declares", () => {
     const statuses: Status[] = [
       "active",
@@ -225,6 +227,7 @@ describe("the documented status vocabulary and the `basis` field survive decode"
       "expired",
       "erased",
       "relationship_ended",
+      "purpose_ended",
       "requires_depersonalization",
       "basis_not_in_regime",
       "guardian_consent_missing",
@@ -245,7 +248,7 @@ describe("the documented status vocabulary and the `basis` field survive decode"
     ];
     const assurances: Assurance[] = ["citizen_signed", "company_attested", "company_documented"];
     const tiers: Tier[] = ["full", "manual", "verbal"];
-    expect(statuses).toHaveLength(10);
+    expect(statuses).toHaveLength(11);
     expect(bases).toHaveLength(12);
     expect(assurances).toHaveLength(3);
     expect(tiers).toHaveLength(3);

@@ -80,7 +80,7 @@ export type Assurance = "citizen_signed" | "company_attested" | "company_documen
 export type Tier = "full" | "manual" | "verbal";
 
 /**
- * The resolved status of an enforcement cell: the TEN-value vocabulary of
+ * The resolved status of an enforcement cell: the ELEVEN-value vocabulary of
  * openapi.yaml (CheckDecision.status / BatchDecision.status).
  *
  * ALLOW:
@@ -110,6 +110,12 @@ export type Tier = "full" | "manual" | "verbal";
  *   "relationship_ended" -> the company attested the relationship is over (art. 23), a
  *     prospective relationship-level stop; the per-cell consent stays truthfully active
  *     (it was never withdrawn), which is why this is its own status.
+ *   "purpose_ended" -> the company declared it no longer pursues this purpose (a cell a
+ *     later consent document removed). A consent given at or before that declaration
+ *     answers deny "purpose_ended"; a consent given strictly after it answers on its own
+ *     state. consentRef, assurance, tier and validUntil are present, as on
+ *     "relationship_ended". The consent was never withdrawn and is not reported as
+ *     withdrawn.
  *   "requires_depersonalization" -> the cell declares a ground the tenant's act carries
  *     ONLY for depersonalized information (A-2.1 art. 65.1 al. 2 (4 deg)), which cannot be
  *     met for a named customer at the gate. It is NOT "no consent on record", and it
@@ -121,8 +127,9 @@ export type Tier = "full" | "manual" | "verbal";
  *     does not carry the consent of the person having parental authority or of the
  *     tutor, so it is without effect. The record exists and stays on file as recorded:
  *     consentRef, assurance, tier and validUntil are present. A lapsed one answers
- *     "expired" and a withdrawn one "revoked" instead. A minor of 14 and over is never
- *     refused on this ground.
+ *     "expired" and a withdrawn one "revoked" instead. This status comes before
+ *     "purpose_ended" and "relationship_ended". A minor of 14 and over is never refused
+ *     on this ground.
  *
  * REMOVED in 0.4.0: "sensitive_requires_consent". The API stopped emitting it on
  * 2026-09-28; a sensitive cell now answers by its declared basis (see "necessity").
@@ -139,6 +146,7 @@ export type Status =
   | "expired"
   | "erased"
   | "relationship_ended"
+  | "purpose_ended"
   | "requires_depersonalization"
   | "basis_not_in_regime"
   | "guardian_consent_missing";

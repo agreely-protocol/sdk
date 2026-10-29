@@ -31,6 +31,8 @@ to [Semantic Versioning](https://semver.org/).
   delivered, and when none did the note names each gateway tried.
 - **The `guardian_consent_missing` status of `/v1/check`** (deny, with
   `consentRef`) in the `Status` type.
+- **The `purpose_ended` status of `/v1/check`** (deny, with `consentRef`) in the
+  `Status` type.
 
 ### Changed
 
