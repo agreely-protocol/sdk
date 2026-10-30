@@ -3,7 +3,7 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
-## 0.8.0 - Unreleased
+## 0.8.0 - 2026-10-30
 
 ### Added
 
