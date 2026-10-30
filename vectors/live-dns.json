@@ -1,0 +1,896 @@
+{
+  "schemaVersion": 1,
+  "description": "The company domain's live DNS declaration, as the /verify page reads it: with an rpcUrl, once companyKeyOf and getCompanyDid both decoded, one DNS-over-HTTPS GET of resolver + '?name=' + encodeURIComponent('_agreely.' + domain) + '&type=TXT' with accept: application/dns-json (default resolver: defaultResolver), compared with the keyId getCompanyDid names TODAY (not the signing key). The answer's Answer records of type 16 (or '16') are TXT; each data string loses one leading and one trailing quote, and its inner '\" \"' joins are removed. No TXT: not-resolvable. A TXT matching /key\\s*=\\s*([0-9a-fA-F]{64})/ whose hex, lowercased, is the keyId without 0x: confirmed. Else not-declared. An HTTP error, a network error or a body that is not JSON: unreachable, never a negative. liveDns never changes overall or any check. Absent without an rpcUrl, with checkDns false, when getCompanyDid did not answer, and when the receipt is dated after its issuer's purge (the registry is not asked). statusOf: the JSON answer against keyId. cases: receipts/a3v4.bundle.json with resolver receipts/v4-did-documents.json, `answers` and `http` as in issuer-departure.json (getCompanyDid's returnData here encodes the did, the keyId named, status Active), `options` passed as is, asked: every GET URL in order.",
+  "defaultResolver": "https://cloudflare-dns.com/dns-query",
+  "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+  "queryUrl": [
+    {
+      "resolver": "https://cloudflare-dns.com/dns-query",
+      "domain": "demo-co.example",
+      "url": "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+    },
+    {
+      "resolver": "https://dns.google/resolve",
+      "domain": "assurance-boreale.example",
+      "url": "https://dns.google/resolve?name=_agreely.assurance-boreale.example&type=TXT"
+    }
+  ],
+  "statusOf": [
+    {
+      "name": "the declaration as Agreely writes it",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+          }
+        ]
+      },
+      "expect": "confirmed"
+    },
+    {
+      "name": "the key in upper case",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431EB35C74E0C41A3D452ABED0BB8314F36AF2F25FDCCF27637CFEF46450\""
+          }
+        ]
+      },
+      "expect": "confirmed"
+    },
+    {
+      "name": "a TXT split into two strings is joined",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0\" \"bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+          }
+        ]
+      },
+      "expect": "confirmed"
+    },
+    {
+      "name": "the type as a string",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": "16",
+            "TTL": 3600,
+            "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+          }
+        ]
+      },
+      "expect": "confirmed"
+    },
+    {
+      "name": "the key in a second TXT record",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": "\"v=spf1 -all\""
+          },
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+          }
+        ]
+      },
+      "expect": "confirmed"
+    },
+    {
+      "name": "another key",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=abababababababababababababababababababababababababababababababab\""
+          }
+        ]
+      },
+      "expect": "not-declared"
+    },
+    {
+      "name": "a TXT without a key",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co\""
+          }
+        ]
+      },
+      "expect": "not-declared"
+    },
+    {
+      "name": "a key written with 0x is not the declaration's form",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450\""
+          }
+        ]
+      },
+      "expect": "not-declared"
+    },
+    {
+      "name": "a TXT whose data is not a string still answers",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16,
+            "TTL": 3600,
+            "data": 16
+          }
+        ]
+      },
+      "expect": "not-declared"
+    },
+    {
+      "name": "only a CNAME answers",
+      "body": {
+        "Status": 0,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ],
+        "Answer": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 5,
+            "TTL": 3600,
+            "data": "alias.example."
+          }
+        ]
+      },
+      "expect": "not-resolvable"
+    },
+    {
+      "name": "the name does not exist",
+      "body": {
+        "Status": 3,
+        "TC": false,
+        "RD": true,
+        "RA": true,
+        "AD": false,
+        "CD": false,
+        "Question": [
+          {
+            "name": "_agreely.demo-co.example",
+            "type": 16
+          }
+        ]
+      },
+      "expect": "not-resolvable"
+    },
+    {
+      "name": "an empty Answer",
+      "body": {
+        "Status": 0,
+        "Answer": []
+      },
+      "expect": "not-resolvable"
+    },
+    {
+      "name": "a JSON null",
+      "body": null,
+      "expect": "not-resolvable"
+    }
+  ],
+  "cases": [
+    {
+      "name": "the zone declares the key the registry names: confirmed",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "companyKeyRegistry": "pass",
+        "liveDns": {
+          "status": "confirmed",
+          "domain": "demo-co.example",
+          "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "the zone declares another key: not-declared, the verdict stands",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=abababababababababababababababababababababababababababababababab\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "companyKeyRegistry": "pass",
+        "liveDns": {
+          "status": "not-declared",
+          "domain": "demo-co.example",
+          "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "no TXT record: not-resolvable",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 3,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ]
+          }
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "liveDns": {
+          "status": "not-resolvable",
+          "domain": "demo-co.example",
+          "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "the resolver answers an HTTP error: unreachable",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 400,
+          "text": ""
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "liveDns": {
+          "status": "unreachable",
+          "domain": "demo-co.example",
+          "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "the resolver cannot be reached: unreachable",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {},
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "companyKeyRegistry": "pass",
+        "liveDns": {
+          "status": "unreachable",
+          "domain": "demo-co.example",
+          "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "the resolver answers something that is not JSON: unreachable",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "text": "<html>blocked</html>"
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "liveDns": {
+          "status": "unreachable",
+          "domain": "demo-co.example",
+          "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "after a rotation, the zone is compared with the key the registry names today",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001009f72ea0cf49536e3c66c787f705186df9a4378083753ae9536d65b3ad7fcddc4000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=9f72ea0cf49536e3c66c787f705186df9a4378083753ae9536d65b3ad7fcddc4\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "companyKeyRotated": true,
+        "liveDns": {
+          "status": "confirmed",
+          "domain": "demo-co.example",
+          "keyId": "0x9f72ea0cf49536e3c66c787f705186df9a4378083753ae9536d65b3ad7fcddc4",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "after a rotation, a zone still declaring the signing key: not-declared",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001009f72ea0cf49536e3c66c787f705186df9a4378083753ae9536d65b3ad7fcddc4000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "companyKeyRotated": true,
+        "liveDns": {
+          "status": "not-declared",
+          "domain": "demo-co.example",
+          "keyId": "0x9f72ea0cf49536e3c66c787f705186df9a4378083753ae9536d65b3ad7fcddc4",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "the zone is read whatever the window says, and never decides",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba0000000000000000000000000000000000000000000000000000000006a1e9b8f0000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "failed",
+        "companyKeyRegistry": "fail",
+        "liveDns": {
+          "status": "confirmed",
+          "domain": "demo-co.example",
+          "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+          "resolver": "https://cloudflare-dns.com/dns-query"
+        }
+      },
+      "asked": [
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    },
+    {
+      "name": "getCompanyDid does not answer: no DNS read",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "companyKeyRegistry": "pass",
+        "absent": [
+          "liveDns"
+        ]
+      },
+      "asked": []
+    },
+    {
+      "name": "checkDns false asks for nothing",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "checkDns": false
+      },
+      "expect": {
+        "overall": "verified",
+        "companyKeyRegistry": "pass",
+        "absent": [
+          "liveDns"
+        ]
+      },
+      "asked": []
+    },
+    {
+      "name": "no rpcUrl: nothing is read",
+      "answers": null,
+      "http": {
+        "https://cloudflare-dns.com/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {},
+      "expect": {
+        "overall": "verified",
+        "absent": [
+          "liveDns",
+          "companyKeyRegistry"
+        ]
+      },
+      "asked": []
+    },
+    {
+      "name": "dohUrl names the resolver",
+      "answers": {
+        "registry": {
+          "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380",
+          "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": "0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e000000000000000000000000000000000000000000000000000000006a1ea9a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000001c9c380"
+        },
+        "companyKeyOf": "0x000000000000000000000000000000000000000000000000000000006a1d4a10000000000000000000000000000000000000000000000000000000006a1d4ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "getCompanyDid": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001003780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000006a18a5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011f44c68a9877b052c5de168e499e05573f8db8000000000000000000000000000000000000000000000000000000000000000236469643a7765623a7665726966792e61677265656c792e63613a633a64656d6f2d636f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002011111111111111111111111111111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "http": {
+        "https://dns.example/dns-query?name=_agreely.demo-co.example&type=TXT": {
+          "status": 200,
+          "body": {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16
+              }
+            ],
+            "Answer": [
+              {
+                "name": "_agreely.demo-co.example",
+                "type": 16,
+                "TTL": 3600,
+                "data": "\"agreely-did=did:web:verify.agreely.ca:c:demo-co; key=3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450; root=0x5151515151515151515151515151515151515151515151515151515151515151\""
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "dohUrl": "https://dns.example/dns-query"
+      },
+      "expect": {
+        "overall": "verified",
+        "liveDns": {
+          "status": "confirmed",
+          "domain": "demo-co.example",
+          "keyId": "0x3780431eb35c74e0c41a3d452abed0bb8314f36af2f25fdccf27637cfef46450",
+          "resolver": "https://dns.example/dns-query"
+        }
+      },
+      "asked": [
+        "https://dns.example/dns-query?name=_agreely.demo-co.example&type=TXT"
+      ]
+    }
+  ]
+}

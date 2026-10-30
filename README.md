@@ -1001,6 +1001,43 @@ new Agreely({ apiKey, maxDegradeWindow: "12h" }); // default "24h"
   `consentAnchor`, offline too. With `rpcUrl`, the chain is read on the SIGNED refs,
   and only once `companyKeyRegistry` confirms the company key at `recordedAt`; an
   anchor older than `recordedAt` less 300 seconds is not this receipt's (`fail`).
+- **The issuer's departure (`issuerDeparture`, `departure`).** As the Agreely `/verify`
+  page reads it. Once the company signature held and the issuer's DID document says
+  `deactivated: true`, the verifier asks for the departure record beside that document:
+  `https://<host>/c/<slug>/departure.json` for an issuer `did:web:<host>:c:<slug>`. Any
+  other DID has none, and a live issuer asks for nothing: both fields are then absent.
+  The record counts only when it names this exact issuer DID, says `status: "purged"`
+  and carries two real days, `sealedOn` and `purgedOn`, in order. `departure.phase`
+  places the signing instant (`grantedAt`, or `recordedAt` from version 2 of a paper or
+  telephone receipt) on its UTC day: `before` the seal day, `during` the departure (the
+  day after `purgedOn` included, so that no time zone reads a receipt signed before the
+  purge as after it), `after` from two days past `purgedOn`, `unknown` when the instant
+  does not parse. Before and during, the signature still stands
+  (`issuerDeparture: "pass"`). After, the receipt is dated after Agreely stopped signing
+  on the company's behalf: `issuerDeparture: "fail"`, `overall: "failed"`, and the
+  company key registry is not asked (`companyKeyRegistry: "skipped"`). A departure also
+  stops a consent read in force from reading `withdrawal: "active"` (`not_checked`: the
+  chain can no longer tell whether it is still in force) when it is `after`, or once
+  `companyKeyRegistry` confirmed the key, since the record and the document come from
+  the issuer's own host. A record that cannot be read (an HTTP error, a 404 included, a
+  network error, a body that is not JSON) reads `departure.state: "unreachable"`, and
+  one that does not establish a departure reads `"unreadable"`: both are
+  `issuerDeparture: "unavailable"`, change nothing else, and are never a reading that
+  the issuer stayed. `checkDeparture: false` asks for nothing.
+- **The domain's live DNS declaration (`liveDns`).** With `rpcUrl`, once
+  `getCompanyDid` names the key the company holds today, the verifier reads the TXT
+  record at `_agreely.<domain>` over DNS-over-HTTPS (`dohUrl`, default
+  `https://cloudflare-dns.com/dns-query`, asked for `accept: application/dns-json`) and
+  compares it with that key, as the `/verify` page does. `liveDns.status` reads
+  `confirmed` when a TXT record declares `key=<that key>`, `not-declared` when TXT
+  records answer and none declares it, `not-resolvable` when no TXT record answers, and
+  `unreachable` when the resolver could not be read, which is never a negative. It is
+  the zone today against the key today (after a rotation, not the key that signed), so
+  it never changes `overall` or any check. It is absent without `rpcUrl`, with
+  `checkDns: false`, and when the receipt is dated after its issuer's departure.
+- **Verifying offline.** Without `rpcUrl`, nothing on chain and nothing in DNS is
+  read. `checkDeparture: false` leaves the departure record unasked too. A read that
+  fails never turns a result amber or red: it reads `unavailable` or `unreachable`.
 - **The disclosure copy.** `verifyDisclosure: true` asks IPFS gateways in order:
   `ipfsGateway` first when you name one, then `ipfsGateways` (default:
   `https://gateway.lighthouse.storage/ipfs/`), each a prefix, a `{cid}` template or,
@@ -1046,6 +1083,10 @@ MIT-licensed and built to be provable, not just trusted:
   and IPFS gateways (default `gateway.lighthouse.storage`; `ipfsGateway` and
   `ipfsGateways` precede or replace it) for the opt-in disclosure-copy check; its `did:web` resolver fetches the issuer host named in
   the receipt over HTTPS (inject your own `resolver` for untrusted receipts).
+  When that issuer's DID document says it is deactivated, the verifier asks the same
+  host for its departure record (`checkDeparture: false` removes it); with `rpcUrl`, it
+  reads the company domain's `_agreely` TXT record from a DNS-over-HTTPS resolver
+  (default `cloudflare-dns.com`; `dohUrl` replaces it, `checkDns: false` removes it).
   Resolving a citizen DID calls the Agreely CITIZEN tier (default
   `https://my.agreely.ca/did/{did}`), and `resolveCompanyDid` calls the Agreely WEB
   tier (default `https://app.agreely.ca/c/{slug}/did.json`); both are overridable,

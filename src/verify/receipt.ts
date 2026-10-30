@@ -71,6 +71,15 @@ import {
   type ReceiptClock,
 } from "./companyKey.js";
 import { DEFAULT_IPFS_GATEWAYS, readPinnedFile, type IpfsGateway } from "./ipfs.js";
+import {
+  DEFAULT_DOH_URL,
+  departureCounts,
+  departurePhaseOf,
+  departureRecordOf,
+  departureUrlOf,
+  liveDnsQueryUrl,
+  liveDnsStatusOf,
+} from "./issuerLive.js";
 import { recordedRootBinding, recordedShapeOf } from "./recorded.js";
 import type {
   CheckStatus,
@@ -80,6 +89,9 @@ import type {
   DidDocument,
   DocumentAnchorRecord,
   DidVerificationMethod,
+  IssuerDepartureReading,
+  LiveDnsReading,
+  LiveDnsStatus,
   ReceiptType,
   ReceiptVerification,
   VerifyReceiptOptions,
@@ -295,11 +307,14 @@ export class ReceiptVerifier {
     const cellLabelBinding = assessRecordedCellLabels(companySignature, notes);
     const disclosureCopy = await this.verifyRecordedDisclosureCopy(r, notes, session);
     const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
+    const departure = await this.readIssuerDeparture(r, companySignature === "pass" && receiptIntegrity === "pass", notes, session);
 
     // The issuer is judged FIRST, on its own date: a signed anchor never bounds the instant its own signer chose.
-    const company = this.opts.rpcUrl
-      ? await this.verifyCompanyKeyRegistry(r, { anchoredAt: null, issuerDatedOnly: true }, companySignature, notes, session)
-      : null;
+    const company = !this.opts.rpcUrl
+      ? null
+      : departure?.reading.phase === "after"
+        ? companyKeyAfterDeparture(notes)
+        : await this.verifyCompanyKeyRegistry(r, { anchoredAt: null, issuerDatedOnly: true }, companySignature, notes, session);
 
     let consentAnchor: CheckStatus = "skipped";
     let signedAnchor: ReceiptVerification["signedAnchor"];
@@ -323,8 +338,10 @@ export class ReceiptVerifier {
       consentAnchor = await this.verifySignedAnchor(r, signedAnchor, company, notes, session);
     }
 
+    const stopped = departureStopsWithdrawal(departure, company, consentAnchor, notes);
+
     let overall: ReceiptVerification["overall"];
-    const decisive = [companySignature, receiptIntegrity, disclosureCopy, documentAnchor, consentAnchor, company?.status];
+    const decisive = [companySignature, receiptIntegrity, disclosureCopy, documentAnchor, consentAnchor, company?.status, departure?.status];
     if (decisive.includes("fail")) overall = "failed";
     else if (companySignature === "unavailable" || session.registryRefused || (company !== null && company.status !== "pass")) {
       overall = "unavailable";
@@ -344,10 +361,11 @@ export class ReceiptVerifier {
       consentAnchor,
       cellLabelBinding,
       overall,
-      ...withdrawalOf(consentAnchor, session),
+      ...withdrawalOf(consentAnchor, session, stopped),
       ...anchorRecords(session),
       ...(company ? { companyKeyRegistry: company.status, ...(company.reading ? { companyKey: company.reading } : {}) } : {}),
       ...(signedAnchor ? { signedAnchor } : {}),
+      ...issuerLiveFields(departure, company),
       notes,
     };
   }
@@ -533,6 +551,7 @@ export class ReceiptVerifier {
 
     const disclosureCopy = await this.verifyOfferDisclosureCopy(offer, companySignature, notes, session);
     const documentAnchor = await this.verifyDocumentAnchor(r, notes, session);
+    const departure = await this.readIssuerDeparture(r, companySignature === "pass" && receiptIntegrity === "pass", notes, session);
 
     // The person's key on chain first: a registry that voids it, or places grantedAt outside its window, leaves the
     // bundle's root untrusted, whatever the DID document says (ui.js receiptRootTrusted).
@@ -553,7 +572,11 @@ export class ReceiptVerifier {
     // The company key at grantedAt, bounded by the latest anchor holding the trusted root (issuer.js receiptClockOf).
     const timing = session.consentTiming;
     const clock = receiptClockOf(timing ? { rootMatches: true, anchoredAt: timing.latest } : null);
-    const company = rpcUrl ? await this.verifyCompanyKeyRegistry(r, clock, companySignature, notes, session) : null;
+    const company = !rpcUrl
+      ? null
+      : departure?.reading.phase === "after"
+        ? companyKeyAfterDeparture(notes)
+        : await this.verifyCompanyKeyRegistry(r, clock, companySignature, notes, session);
 
     let citizenKeyChain: CheckStatus | undefined;
     let citizenKey: CitizenKeyReading | undefined;
@@ -587,8 +610,13 @@ export class ReceiptVerifier {
       notes.push(citizenKeyNote(citizenKey));
     }
 
+    const stopped = departureStopsWithdrawal(departure, company, consentAnchor, notes);
+
     let overall: ReceiptVerification["overall"];
-    const checks = [companySignature, receiptIntegrity, citizenAssertion, disclosureCopy, documentAnchor, consentAnchor, citizenKeyChain, company?.status];
+    const checks = [
+      companySignature, receiptIntegrity, citizenAssertion, disclosureCopy, documentAnchor, consentAnchor, citizenKeyChain,
+      company?.status, departure?.status,
+    ];
     // A bundle that names a registry this SDK does not read is never verified, however sound its signatures.
     if (checks.includes("fail")) overall = "failed";
     else if (
@@ -609,10 +637,11 @@ export class ReceiptVerifier {
       consentAnchor,
       cellLabelBinding,
       overall,
-      ...withdrawalOf(consentAnchor, session),
+      ...withdrawalOf(consentAnchor, session, stopped),
       ...anchorRecords(session),
       ...(company ? { companyKeyRegistry: company.status, ...(company.reading ? { companyKey: company.reading } : {}) } : {}),
       ...(citizenKeyChain ? { citizenKeyChain, ...(citizenKey ? { citizenKey } : {}) } : {}),
+      ...issuerLiveFields(departure, company),
       notes,
     };
   }
@@ -712,7 +741,82 @@ export class ReceiptVerifier {
     };
     const status = companyKeyStatusOf(pit.verdict);
     notes.push(companyKeyNote(reading));
-    return { status, reading };
+    const dns = did !== null && this.opts.checkDns !== false ? await this.readLiveDns(domain, did.keyId, notes) : null;
+    return { status, reading, ...(dns ? { dns } : {}) };
+  }
+
+  /**
+   * The issuer's departure (did.js readIssuerDeparture): asked only once the signature held, of an Agreely company DID
+   * whose document, as the resolver returned it, says deactivated, so a live issuer costs no request. A read that fails
+   * is "unavailable", never a reading that the issuer stayed.
+   */
+  private async readIssuerDeparture(
+    r: Record<string, unknown>,
+    held: boolean,
+    notes: string[],
+    session: ChainSession,
+  ): Promise<DepartureCheck | null> {
+    const doc = session.signer?.doc;
+    if (!held || doc === undefined || this.opts.checkDeparture === false || doc["deactivated"] !== true) return null;
+    const issuer = asString(r["issuer"]);
+    const url = departureUrlOf(issuer);
+    if (url === null) return null;
+    if (doc.id !== issuer) {
+      notes.push(
+        `issuerDeparture UNAVAILABLE: the issuer's deactivated DID document names another DID, so it establishes no ` +
+          `departure of ${issuer}. Nothing changes.`,
+      );
+      return { status: "unavailable", reading: { state: "unreadable", url } };
+    }
+    const fetchImpl = this.opts.fetch ?? globalThis.fetch;
+    let body: unknown;
+    try {
+      const res = await fetchImpl(url, { signal: timeoutSignal(this.timeoutMs()) });
+      if (!res.ok) throw new Error("HTTP error");
+      body = await res.json();
+    } catch {
+      notes.push(
+        `issuerDeparture UNAVAILABLE: the issuer's DID document is deactivated, and its departure record (${url}) could ` +
+          "not be read. This is NOT a reading that the issuer stayed, and nothing changes.",
+      );
+      return { status: "unavailable", reading: { state: "unreachable", url } };
+    }
+    const record = departureRecordOf(body, issuer);
+    if (record === null) {
+      notes.push(
+        `issuerDeparture UNAVAILABLE: the issuer's DID document is deactivated, and its departure record (${url}) does ` +
+          `not establish a departure of ${issuer} (another DID, not purged, or days that are not real dates in order). ` +
+          "Nothing changes.",
+      );
+      return { status: "unavailable", reading: { state: "unreadable", url } };
+    }
+    const phase = departurePhaseOf(record, Date.parse(signingInstantOf(r) ?? ""));
+    const reading: IssuerDepartureReading = { state: "departed", url, ...record, phase };
+    notes.push(departureNote(reading));
+    return { status: phase === "after" ? "fail" : phase === "unknown" ? "unavailable" : "pass", reading };
+  }
+
+  /**
+   * The company domain's live DNS declaration (issuer.js liveDnsRecheck): one DNS-over-HTTPS read of the TXT record at
+   * _agreely.<domain>, compared with the key the registry names today. A resolver that cannot be read is
+   * "unreachable", never a negative.
+   */
+  private async readLiveDns(domain: string, keyId: string, notes: string[]): Promise<LiveDnsReading> {
+    const resolver = this.opts.dohUrl ?? DEFAULT_DOH_URL;
+    const fetchImpl = this.opts.fetch ?? globalThis.fetch;
+    let status: LiveDnsStatus;
+    try {
+      const res = await fetchImpl(liveDnsQueryUrl(resolver, domain), {
+        headers: { accept: "application/dns-json" },
+        signal: timeoutSignal(this.timeoutMs()),
+      });
+      status = res.ok ? liveDnsStatusOf(await res.json(), keyId) : "unreachable";
+    } catch {
+      status = "unreachable";
+    }
+    const reading: LiveDnsReading = { status, domain, keyId, resolver };
+    notes.push(liveDnsNote(reading));
+    return reading;
   }
 
   /** RECORDED: verify the Ed25519 proof over the canonical receipt body. */
@@ -1473,7 +1577,84 @@ function recordedProofFailure(r: Record<string, unknown>): string | null {
 type CompanyKey = { kind: "unresolved" } | { kind: "unlisted" } | { kind: "key"; key: Uint8Array; vmId: string; doc: DidDocument };
 
 /** The companyKeyRegistry check and, when a key was looked up, what the registry said. */
-type CompanyKeyCheck = { status: CheckStatus; reading?: CompanyKeyReading };
+type CompanyKeyCheck = { status: CheckStatus; reading?: CompanyKeyReading; dns?: LiveDnsReading };
+type DepartureCheck = { status: CheckStatus; reading: IssuerDepartureReading };
+
+/** A receipt dated after its issuer's purge: the registry is not asked to vouch for it (ui.js renderIssuerSection). */
+function companyKeyAfterDeparture(notes: string[]): CompanyKeyCheck {
+  notes.push("companyKeyRegistry skipped: the receipt is dated after its issuer left Agreely, so the registry is not asked to vouch for it.");
+  return { status: "skipped" };
+}
+
+/**
+ * An issuer that left inscribes no further withdrawal, so a consent read in force stops reading "active" once the
+ * departure counts ({@link departureCounts}); a withdrawal recorded before it stays a fact (ui.js buildChainCard).
+ */
+function departureStopsWithdrawal(
+  departure: DepartureCheck | null,
+  company: CompanyKeyCheck | null,
+  consentAnchor: CheckStatus,
+  notes: string[],
+): boolean {
+  if (departure === null || departure.reading.state !== "departed") return false;
+  if (!departureCounts(departure.reading, company?.reading?.verdict)) {
+    notes.push(
+      "Issuer departure NOT COUNTED: the departure record and the deactivated DID document come from the issuer's own " +
+        "host, so a departure before or during this receipt speaks for the issuer only once companyKeyRegistry " +
+        "confirms its key (rpcUrl).",
+    );
+    return false;
+  }
+  if (consentAnchor === "pass") {
+    notes.push(
+      "withdrawal not checked: the issuer left Agreely and inscribes no further withdrawal, so the chain can no longer " +
+        "tell whether this consent is still in force. A withdrawal made directly with the issuer does not appear there.",
+    );
+  }
+  return true;
+}
+
+function issuerLiveFields(
+  departure: DepartureCheck | null,
+  company: CompanyKeyCheck | null,
+): Pick<ReceiptVerification, "issuerDeparture" | "departure" | "liveDns"> {
+  return {
+    ...(departure ? { issuerDeparture: departure.status, departure: departure.reading } : {}),
+    ...(company?.dns ? { liveDns: company.dns } : {}),
+  };
+}
+
+function departureNote(d: IssuerDepartureReading): string {
+  const left = `the issuer left Agreely on ${d.sealedOn ?? ""} and its workspace was destroyed on ${d.purgedOn ?? ""}`;
+  if (d.phase === "before") {
+    return `Issuer departure: ${left}. This receipt was signed before that departure: its signature remains authentic.`;
+  }
+  if (d.phase === "during") {
+    return `Issuer departure: ${left}. This receipt was signed during that departure, before its workspace was ` +
+      "destroyed: its signature remains authentic.";
+  }
+  if (d.phase === "after") {
+    return `issuerDeparture FAILED: this receipt is dated after its issuer left Agreely: the issuer's workspace was ` +
+      `destroyed on ${d.purgedOn ?? ""}, and Agreely has not issued receipts on its behalf since.`;
+  }
+  return `issuerDeparture UNAVAILABLE: ${left}, and the receipt's signing instant does not parse, so it cannot be placed ` +
+    "against that departure.";
+}
+
+function liveDnsNote(d: LiveDnsReading): string {
+  const name = `_agreely.${d.domain}`;
+  if (d.status === "confirmed") {
+    return `Live DNS: ${name} still declares the key the registry names for ${d.domain} today (${d.keyId}).`;
+  }
+  if (d.status === "not-declared") {
+    return `Live DNS: ${name} no longer declares the key the registry names for ${d.domain} today (${d.keyId}). ` +
+      "Information only: it does not change the verdict.";
+  }
+  if (d.status === "not-resolvable") {
+    return `Live DNS not confirmed: the resolver (${d.resolver}) returns no TXT record at ${name}. Information only.`;
+  }
+  return `Live DNS not checked: the DNS-over-HTTPS resolver (${d.resolver}) could not be read. This is NOT a negative.`;
+}
 
 /** The note and verdict when no key checks proof[0]: an unresolved document is inconclusive, an unlisted key fails. */
 function companyKeyRefused(
@@ -1825,8 +2006,12 @@ function acceptedCellCount(r: Record<string, unknown>): number {
 }
 
 /** What the consent anchor read says about the consent being in force. Only a complete read says "active". */
-function withdrawalOf(consentAnchor: CheckStatus, session: ChainSession): Pick<ReceiptVerification, "withdrawal" | "withdrawnAt"> {
-  if (consentAnchor === "pass") return { withdrawal: "active" };
+function withdrawalOf(
+  consentAnchor: CheckStatus,
+  session: ChainSession,
+  stopped: boolean,
+): Pick<ReceiptVerification, "withdrawal" | "withdrawnAt"> {
+  if (consentAnchor === "pass") return { withdrawal: stopped ? "not_checked" : "active" };
   if (consentAnchor !== "withdrawn") return { withdrawal: "not_checked" };
   const latest = Math.max(0, ...(session.consentRecords ?? []).filter((rec) => rec.state === "withdrawn").map((rec) => rec.revokedAt));
   return latest > 0 ? { withdrawal: "withdrawn", withdrawnAt: latest } : { withdrawal: "withdrawn" };

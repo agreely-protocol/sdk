@@ -34,7 +34,8 @@ export type CheckStatus = "pass" | "fail" | "unavailable" | "unbound" | "skipped
  *                  verified: the organisation's word, authenticated.
  *   - incomplete   a bare passkey receipt: it cannot be verified on its own. Verify
  *                  the bundle issued with it. Never a pass, never a tamper.
- *   - failed       a check ACTIVELY failed (a tamper / wrong key / contradiction).
+ *   - failed       a check ACTIVELY failed (a tamper / wrong key / contradiction), or the receipt is dated after
+ *                  its issuer left Agreely (`issuerDeparture`).
  *   - unavailable  a decisive check could NOT be completed (the DID could not be
  *                  resolved). Verification is inconclusive, NOT a forgery. Also given,
  *                  with an rpcUrl, when the bundle names a registry or chain other than
@@ -70,8 +71,10 @@ export type OverallStatus = "verified" | "partial" | "incomplete" | "failed" | "
  *                  before version 4 (it signs no anchor) or one outside its bundle; a root no verified
  *                  signature binds, or a version 4 receipt whose company key the registry did not confirm at
  *                  the instant it signed; or a read that did not cover every cell (an RPC failure, a cell not
- *                  anchored yet, an unknown anchor count, a refused registry, a contradicting record). The
- *                  consent may have been withdrawn.
+ *                  anchored yet, an unknown anchor count, a refused registry, a contradicting record); or an
+ *                  issuer that left Agreely (`departure`, once it counts): it inscribes no further withdrawal, so
+ *                  the chain can no longer tell whether the consent is still in force. The consent may have been
+ *                  withdrawn.
  *
  * Says nothing about the receipt's authenticity: read `overall` first.
  */
@@ -193,6 +196,24 @@ export interface ReceiptVerification {
   signedAnchor?: SignedAnchorReading;
   /** The gateway that delivered the IPFS document, as configured (or the origin of a function's URL). */
   disclosureGateway?: string;
+  /**
+   * Present when the signature held and the issuer DID document the resolver returned is deactivated (the issuer left
+   * Agreely): was this receipt issued while its issuer was there? pass (signed before or during the departure: the
+   * signature stands), fail (dated after the issuer's workspace was destroyed: never authentic, `overall` reads
+   * `failed`), unavailable (the departure record could not be read or does not establish a departure, or the signing
+   * instant does not parse: nothing changes). Absent for an issuer whose document is not deactivated, a DID that is
+   * not an Agreely company DID, with `checkDeparture: false`, and when the signature did not hold.
+   */
+  issuerDeparture?: CheckStatus;
+  /** What the issuer's departure record said, beside `issuerDeparture`. */
+  departure?: IssuerDepartureReading;
+  /**
+   * With an `rpcUrl`, once `getCompanyDid` answered: the company domain's live DNS declaration, compared with the key
+   * the registry names for that domain today. Information only: it never changes `overall`, and it speaks for the
+   * issuer only beside `companyKeyRegistry: "pass"`. Absent without an `rpcUrl`, with `checkDns: false`, and when
+   * the registry was not read.
+   */
+  liveDns?: LiveDnsReading;
   /** Plain-language notes stating what each result proves vs trusts. */
   notes: string[];
 }
@@ -233,6 +254,53 @@ export interface CompanyKeyReading {
   currentKeyId?: string;
   /** An authentic key the company has since rotated away from. */
   rotated?: boolean;
+}
+
+/**
+ * An issuer's departure record (`/c/{slug}/departure.json`, beside its did.json), read because its DID document is
+ * deactivated.
+ *
+ *   - departed     the record names this issuer as purged, with two real days in order.
+ *   - unreachable  the record could not be read: a network error, a timeout, an HTTP error (a 404 included) or a body
+ *                  that is not JSON. Never a reading that the issuer stayed.
+ *   - unreadable   the record does not establish this issuer's departure (another DID, a status other than purged,
+ *                  a day that is not real, days reversed), or the deactivated document names another DID.
+ */
+export interface IssuerDepartureReading {
+  state: "departed" | "unreachable" | "unreadable";
+  /** The record's URL. */
+  url: string;
+  /** When departed: the day the issuer left Agreely (its workspace sealed). */
+  sealedOn?: string;
+  /** When departed: the day its workspace was destroyed. */
+  purgedOn?: string;
+  /**
+   * When departed: where the signing instant falls, read on its UTC day. before (the day precedes sealedOn), during,
+   * after (strictly after purgedOn plus one day: a receipt signed before the purge cannot reach it from any time
+   * zone), unknown (the instant does not parse).
+   */
+  phase?: "before" | "during" | "after" | "unknown";
+}
+
+/**
+ * The live DNS declaration of the company domain:
+ *
+ *   - confirmed       a TXT record at `_agreely.<domain>` declares `key=` the key the registry names today.
+ *   - not-declared    TXT records answer, and none declares that key.
+ *   - not-resolvable  no TXT record answers (the name does not resolve, or holds none).
+ *   - unreachable     the resolver could not be read (a network error, a timeout, an HTTP error, a body that is not
+ *                     JSON). Never a negative.
+ */
+export type LiveDnsStatus = "confirmed" | "not-declared" | "not-resolvable" | "unreachable";
+
+export interface LiveDnsReading {
+  status: LiveDnsStatus;
+  /** The company domain (the first alsoKnownAs of the issuer document). */
+  domain: string;
+  /** The key compared: the one getCompanyDid names today (companyKey.currentKeyId), not necessarily the signing key. */
+  keyId: string;
+  /** The DNS-over-HTTPS resolver asked (`dohUrl`). */
+  resolver: string;
 }
 
 export interface CitizenKeyReading {
@@ -390,7 +458,22 @@ export interface VerifyReceiptOptions {
   registryAddress?: string;
   /** Chain id for the anchor checks. Default 8453 (Base mainnet); pass 84532 to test on Base Sepolia. */
   chainId?: number;
-  /** Timeout of each RPC, IPFS and DID call, in milliseconds. Default 10000. */
+  /**
+   * Read the issuer's departure record (`/c/{slug}/departure.json`, beside its did.json) once the signature held and
+   * the issuer DID document the resolver returned says deactivated. Default true. A live issuer costs no request.
+   */
+  checkDeparture?: boolean;
+  /**
+   * With `rpcUrl`, once `getCompanyDid` answered: read the TXT record at `_agreely.<domain>` over DNS-over-HTTPS
+   * (`dohUrl`). Default true.
+   */
+  checkDns?: boolean;
+  /**
+   * The DNS-over-HTTPS JSON resolver: asked `?name=_agreely.<domain>&type=TXT` with `accept: application/dns-json`.
+   * Default `https://cloudflare-dns.com/dns-query`, the resolver the /verify page asks.
+   */
+  dohUrl?: string;
+  /** Timeout of each RPC, IPFS, DID, departure and DNS call, in milliseconds. Default 10000. */
   timeoutMs?: number;
   /**
    * Deadline for the whole on-chain sequence of one verification, in milliseconds, from

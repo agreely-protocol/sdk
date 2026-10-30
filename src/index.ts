@@ -178,4 +178,7 @@ export type {
   CompanyKeyVerdict,
   CitizenKeyReading,
   SignedAnchorReading,
+  IssuerDepartureReading,
+  LiveDnsReading,
+  LiveDnsStatus,
 } from "./verify/types.js";

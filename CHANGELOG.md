@@ -3,6 +3,29 @@
 All notable changes to `@agreely/sdk` are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0 - Unreleased
+
+### Added
+
+- **The issuer's departure: `issuerDeparture` and `departure`.** When the issuer's
+  DID document says it is deactivated, the verifier reads the departure record beside
+  it (`/c/{slug}/departure.json`), as the Agreely `/verify` page does, and places the
+  signing instant `before`, `during` or `after` the departure. Before and during, the
+  signature stands (`pass`). A receipt dated after the departure reads `fail`, which
+  makes `overall` `failed`, and the company key registry is not asked. A departure
+  that speaks for the issuer stops a consent read in force from reading `withdrawal`
+  `active`. A record that cannot be read reads `unavailable` (`departure.state`
+  `unreachable` or `unreadable`) and changes nothing else. `checkDeparture: false`
+  turns the read off.
+- **The company domain's live DNS declaration: `liveDns`.** With `rpcUrl`, the TXT
+  record at `_agreely.<domain>` is read over DNS-over-HTTPS (`dohUrl`, default
+  `https://cloudflare-dns.com/dns-query`) and compared with the key the registry
+  names for that domain today: `confirmed`, `not-declared`, `not-resolvable`, or
+  `unreachable` when the resolver could not be read. It never changes `overall`.
+  `checkDns: false` turns the read off.
+- **Vectors** `vectors/issuer-departure.json` and `vectors/live-dns.json`, shared
+  byte for byte by the TypeScript and PHP SDKs.
+
 ## 0.7.0 - 2026-10-29
 
 ### Added
